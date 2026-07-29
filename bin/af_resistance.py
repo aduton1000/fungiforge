@@ -77,11 +77,17 @@ def load_reference_index(data_dir, ref_faa, bundled):
     for fa in faas:
         try:
             for h, s in read_fasta(fa).items():
-                m = gene_kw.search(h)
-                if not m:
-                    continue
-                g = m.group(1).lower().replace("cyp51", "cyp51a" if "cyp51a" in h.lower() else "cyp51")
-                idx.setdefault(g, []).append((h, h, s))
+                # a FungAMR reference header can carry several gene names (e.g.
+                # "Cdr1_Erg11_Fcy1_Fks1__ACC__Species") — index under EVERY gene keyword,
+                # not just the first, or the ERG11 reference would be missed on an ERG11 query.
+                genes = set()
+                for m in gene_kw.finditer(h):
+                    g = m.group(1).lower()
+                    if g == "cyp51":
+                        g = "cyp51a" if "cyp51a" in h.lower() else "cyp51"
+                    genes.add(g)
+                for g in genes:
+                    idx.setdefault(g, []).append((h, h, s))
         except Exception:
             continue
     return idx
@@ -221,7 +227,14 @@ def main():
                           "status": "no_reference", "confidence": conf,
                           "note": "gene searched; no reference sequence staged (install FungAMR) — cannot resolve residues"})
             continue
-        refseq = max((s for _, _, s in refs), key=len)
+        # Pick a reference from the isolate's SPECIES (headers are GENE__ACC__Species). The
+        # panel's hotspot numbering is species-specific, so a wrong-species reference would
+        # misnumber every residue. Fall back to genus, then to the longest available.
+        toks = [t for t in re.split(r"\s+", species.lower()) if len(t) > 2]
+        sp_refs = [s for (h, _, s) in refs if toks and all(t in h.lower() for t in toks)]
+        if not sp_refs and toks:
+            sp_refs = [s for (h, _, s) in refs if toks[0] in h.lower()]
+        refseq = max(sp_refs, key=len) if sp_refs else max((s for _, _, s in refs), key=len)
         orth = best_ortholog(refseq, proteins) if proteins else None
         if not orth:
             calls.append({"gene": gene, "drug_class": row.get("drug_class"), "mechanism": mech,
