@@ -1,0 +1,14 @@
+# Stage 00/01 — ONT/Illumina read QC + filtering.
+# Apple Silicon: CONDA_SUBDIR=osx-64 mamba env create -f env/readqc.yml (some builds linux/osx-64 only).
+name: ff-readqc
+channels: [conda-forge, bioconda]
+dependencies:
+  - python=3.11
+  - nanoplot>=1.42
+  - chopper>=0.9
+  - filtlong>=0.2.1
+  - fastp>=0.23
+  - seqkit>=2.6
+  - genomescope2
+  - jellyfish>=2.3
+  # Dorado is NOT here — it runs as the native arm64 host binary (Stage 00).

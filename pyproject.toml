@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fungiforge"
+version = "0.1.0"
+description = "FungiForge — reproducible fungal genomics from ONT (+ optional Illumina hybrid): assembly, eukaryotic annotation, ITS/genome identification, antifungal-resistance calling, mobile/TE/mycovirus, biosynthetic gene clusters, novelty, and One Health comparative analysis."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "aduton1000" }]
+keywords = ["fungal-genomics", "nanopore", "antifungal-resistance", "biosynthetic-gene-clusters", "funannotate", "nextflow", "one-health"]
+dependencies = [
+  "biopython>=1.81",
+  "pandas>=2.0",
+  "numpy>=1.24",
+  "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+fungiforge = "fungiforge.cli:main"
+
+[tool.setuptools]
+packages = ["fungiforge"]
+
+[tool.setuptools.package-data]
+fungiforge = ["resources/*.tsv", "report_templates/*.j2"]

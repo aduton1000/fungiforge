@@ -1,0 +1,9 @@
+# Stage 05 — assembly QC + completeness.
+name: ff-busco
+channels: [conda-forge, bioconda]
+dependencies:
+  - python=3.11
+  - busco>=5.7
+  - compleasm>=0.2.6
+  - quast>=5.2
+  - merqury>=1.3          # QV/kmer completeness when Illumina present

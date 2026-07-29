@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# fungiforge HPC launcher — sources site config then runs the pipeline with the
+# SLURM + Apptainer profiles. Deploy: copy share/fungiforge-env.sh.example to
+# ~/.fungiforge-env.sh, edit paths, then `module load fungiforge` exposes this.
+#
+#   fungiforge-run --samplesheet s.csv [extra nextflow args...]
+set -euo pipefail
+: "${FUNGIFORGE_HOME:?set FUNGIFORGE_HOME to the repo checkout (see fungiforge-env.sh)}"
+: "${FUNGIFORGE_DB:?set FUNGIFORGE_DB to the reference-database dir}"
+[ -f "${FUNGIFORGE_ENV:-$HOME/.fungiforge-env.sh}" ] && source "${FUNGIFORGE_ENV:-$HOME/.fungiforge-env.sh}"
+
+PROFILE="${FUNGIFORGE_PROFILE:-hpc_slurm,apptainer}"
+WORK="${FUNGIFORGE_WORK:-$PWD/work}"
+
+exec nextflow run "$FUNGIFORGE_HOME/main.nf" \
+    -profile "$PROFILE" \
+    -work-dir "$WORK" \
+    --data_dir "$FUNGIFORGE_DB" \
+    ${FUNGIFORGE_PARTITION:+--slurm_partition "$FUNGIFORGE_PARTITION"} \
+    ${FUNGIFORGE_ACCOUNT:+--slurm_account "$FUNGIFORGE_ACCOUNT"} \
+    "$@"
