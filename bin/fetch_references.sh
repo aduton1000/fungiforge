@@ -175,8 +175,16 @@ step_fungamr(){
       dl "$base/${f// /%20}" "$f" || exit 1
     done
   ) >>"$LOGDIR/fungamr.log" 2>&1 || ok=0
-  [ "$ok" = 1 ] && mark fungamr "FungAMR github tables (070425); MARDy=api-key-gated, skipped" \
-                || fail fungamr "FungAMR github download"
+  if [ "$ok" != 1 ]; then fail fungamr "FungAMR github download"; return; fi
+  # FungAMR ships no sequences — build the alignment references af_resistance.py needs by
+  # fetching each ref_seq_uniprot_accession from UniProt -> fungamr/reference_proteins.faa.
+  log "building FungAMR reference proteins from UniProt (build_fungamr_refs.py)"
+  if python3 "$(dirname "$0")/build_fungamr_refs.py" --data-dir "$DB" >>"$LOGDIR/fungamr.log" 2>&1 \
+     && [ -s "$DB/fungamr/reference_proteins.faa" ]; then
+    mark fungamr "tables + $(grep -c '>' "$DB/fungamr/reference_proteins.faa") reference proteins (MARDy=api-key-gated, skipped)"
+  else
+    fail fungamr "FungAMR reference-protein build (UniProt) failed — tables present, re-run to retry"
+  fi
 }
 
 # ---- RVDB / mycoviral RdRp for mycovirus screen (Stage 10) -------------------
