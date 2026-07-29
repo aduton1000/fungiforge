@@ -66,7 +66,7 @@ workflow FUNGIFORGE {
     if (!params.skip_bgc)     { BGC(ANNOTATE.out.gbk); bgc_ch = BGC.out.json }
 
     novelty_ch = Channel.empty()
-    if (!params.skip_novelty) { NOVELTY(DECONTAM.out.nuclear.join(IDENTIFY.out.markers)); novelty_ch = NOVELTY.out.json }
+    if (!params.skip_novelty) { NOVELTY(DECONTAM.out.nuclear.join(IDENTIFY.out.markers).join(IDENTIFY.out.json)); novelty_ch = NOVELTY.out.json }
 
     extras_ch = Channel.empty()
     if (!params.skip_extras)  { EXTRAS(ANNOTATE.out.proteins.join(READ_QC.out.reads)); extras_ch = EXTRAS.out.json }
