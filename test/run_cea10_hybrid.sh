@@ -3,7 +3,7 @@
 set -euo pipefail
 REPO="~/fungiforge"
 DB="/Volumes/Extreme SSD/fungiforge_db"
-WORK="/Volumes/Extreme SSD/fungiforge_work_cea10"
+WORK="~/fungiforge_work_cea10"   # MUST be a space-free path: Flye aborts on spaces in read paths
 cd "$REPO"
 # stale-lock hygiene
 pkill -9 -f nextflow.cli.Launcher 2>/dev/null || true
