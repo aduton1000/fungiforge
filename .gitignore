@@ -28,3 +28,5 @@ HANDOVER.md
 .vscode/
 test/sra/
 test/reads/
+results_cea10/
+results_*/

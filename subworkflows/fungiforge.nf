@@ -59,7 +59,8 @@ workflow FUNGIFORGE {
     RESISTANCE(ANNOTATE.out.proteins
                  .join(IDENTIFY.out.species)
                  .join(DECONTAM.out.nuclear)
-                 .join(ANNOTATE.out.gbk))
+                 .join(ANNOTATE.out.gbk)
+                 .join(SRPOLISH.out.json))
 
     // 10-13: skippable stages — a skip flag truly skips the process (empty channel),
     // rather than running it emptily (which would also drag in its container).

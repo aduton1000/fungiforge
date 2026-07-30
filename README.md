@@ -14,7 +14,7 @@ The fungal sibling of the *forge* family (captureforge / callforge / methylforge
 
 ```bash
 # 1. one-time: fetch reference databases onto the external SSD (hours)
-export FUNGIFORGE_DB="/Volumes/Extreme SSD/fungiforge_db"
+export FUNGIFORGE_DB="/path/to/fungiforge_db"
 bash bin/fetch_references.sh                 # aria2c: multi-connection, resumable
 
 # 2. build a samplesheet (ONT required; Illumina optional -> hybrid polishing)

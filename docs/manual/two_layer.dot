@@ -1,0 +1,27 @@
+// FungiForge two-layer architecture + the master-table handoff contract.
+// Render: dot -Tpng -Gdpi=200 two_layer.dot -o figures/two_layer.png
+digraph TwoLayer {
+    rankdir=LR; bgcolor="white";
+    fontname="Helvetica-Bold"; fontsize=18; labelloc="t";
+    label="FungiForge two-layer design — per-isolate genomics (Layer 1) → One Health comparison (Layer 2)";
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.18,0.10"];
+    edge [color="#5f6368", arrowsize=0.8];
+
+    subgraph cluster_l1 {
+        label="Layer 1 — fungiforge (Nextflow DSL2, per isolate)"; fontsize=13; style="rounded,filled"; fillcolor="#eef5ff"; color="#4285f4";
+        node [fillcolor="#ffffff", color="#4285f4"];
+        A [label="15 stages\n00 basecall … 14 report\n(one run per isolate)"];
+    }
+
+    HANDOFF [shape=note, fillcolor="#fffde7", color="#f9a825",
+             label="master_fungi.tsv  (fixed schema, the contract)\nsample · compartment · facility · season ·\nspecies · species_confidence · id_method ·\nqc_pass · busco_complete · assembly_len · n_contigs ·\nploidy · mating_type · resistant_classes ·\nn_known_af_mutations · cyp51A_TR · novelty ·\nn_bgc · n_mycovirus · te_percent · polish_mode"];
+
+    subgraph cluster_l2 {
+        label="Layer 2 — analysis/ (R objective scripts)"; fontsize=13; style="rounded,filled"; fillcolor="#f6ecfb"; color="#8e24aa";
+        node [fillcolor="#ffffff", color="#8e24aa"];
+        B [label="01 merge → 02 recover →\nanalysis_dataset.csv →\n8 One Health objectives\n(composition · resistome · mobile ·\ntransmission · risk · virulence ·\nconnectivity · novelty)\n→ FigureN + manuscript"];
+    }
+
+    A -> HANDOFF [label="one row per isolate\n(publishDir 04_summary/)", fontsize=10];
+    HANDOFF -> B [label="run_downstream.sh", fontsize=10];
+}

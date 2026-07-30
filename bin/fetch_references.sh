@@ -8,7 +8,7 @@
 # NOT abort the others. Designed to run for many hours on an external SSD.
 #
 # Usage:
-#   export FUNGIFORGE_DB="/Volumes/Extreme SSD/fungiforge_db"
+#   export FUNGIFORGE_DB="/path/to/fungiforge_db"
 #   bin/fetch_references.sh                 # all steps
 #   bin/fetch_references.sh images antismash funannotate   # selected steps
 #

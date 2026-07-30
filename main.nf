@@ -5,7 +5,7 @@
 // -> eukaryote-extras -> per-isolate report + master table.
 //
 //   nextflow run main.nf -profile local,docker \
-//     --samplesheet samples.csv --data_dir "/Volumes/Extreme SSD/fungiforge_db"
+//     --samplesheet samples.csv --data_dir "/path/to/fungiforge_db"
 nextflow.enable.dsl = 2
 
 include { FUNGIFORGE } from './subworkflows/fungiforge.nf'
