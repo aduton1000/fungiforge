@@ -3,7 +3,8 @@
 include { BASECALL }    from '../modules/stage00_basecall.nf'
 include { READ_QC }     from '../modules/stage01_readqc.nf'
 include { ASSEMBLE }    from '../modules/stage02_assemble.nf'
-include { POLISH }      from '../modules/stage03_polish.nf'
+include { MEDAKA }      from '../modules/stage03_polish.nf'
+include { SRPOLISH }    from '../modules/stage03b_srpolish.nf'
 include { DECONTAM }    from '../modules/stage04_decontam.nf'
 include { ASSEMBLY_QC } from '../modules/stage05_assembly_qc.nf'
 include { REPEATMASK }  from '../modules/stage06_repeatmask.nf'
@@ -32,11 +33,14 @@ workflow FUNGIFORGE {
     // 2. assembly (Flye --nano-hq by default) + purge_dups
     ASSEMBLE(READ_QC.out.reads)
 
-    // 3. polishing: Medaka (+ optional Illumina Polypolish/POLCA hybrid branch)
-    POLISH(ASSEMBLE.out.assembly.join(READ_QC.out.reads))
+    // 3. polishing: Medaka (ONT, always) then optional Illumina Polypolish hybrid
+    ont_ch  = READ_QC.out.reads.map { meta, ont, r1, r2 -> tuple(meta, ont) }
+    ilmn_ch = READ_QC.out.reads.map { meta, ont, r1, r2 -> tuple(meta, r1, r2) }
+    MEDAKA(ASSEMBLE.out.assembly.join(ont_ch))
+    SRPOLISH(MEDAKA.out.assembly.join(ilmn_ch))
 
     // 4. decontamination + organelle split -> nuclear / mito
-    DECONTAM(POLISH.out.assembly)
+    DECONTAM(SRPOLISH.out.assembly)
 
     // 5. assembly QC + completeness (QUAST + compleasm/BUSCO)
     ASSEMBLY_QC(DECONTAM.out.nuclear)
@@ -73,7 +77,7 @@ workflow FUNGIFORGE {
 
     // 14. aggregate every per-stage result.json per isolate -> report + master row
     all_json = READ_QC.out.json
-      .mix(POLISH.out.json, DECONTAM.out.json, ASSEMBLY_QC.out.json, REPEATMASK.out.json,
+      .mix(SRPOLISH.out.json, DECONTAM.out.json, ASSEMBLY_QC.out.json, REPEATMASK.out.json,
            ANNOTATE.out.json, IDENTIFY.out.json, RESISTANCE.out.json,
            mobile_ch, bgc_ch, novelty_ch, extras_ch)
       .map { meta, j -> tuple(meta.id, meta, j) }
