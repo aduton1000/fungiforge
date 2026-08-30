@@ -1,8 +1,40 @@
-# FungiForge
+<!-- banner -->
+![FungiForge](assets/banner.png)
+
+<p align="center">
+  <img alt="license" src="https://img.shields.io/badge/license-MIT-2b7bb9">
+  <img alt="nextflow" src="https://img.shields.io/badge/Nextflow-DSL2-0DC09D?logo=nextflow&logoColor=white">
+  <img alt="python" src="https://img.shields.io/badge/CLI-Python-3776AB?logo=python&logoColor=white">
+  <img alt="platforms" src="https://img.shields.io/badge/platforms-Linux%20%7C%20macOS-8A6D1C">
+  <img alt="status" src="https://img.shields.io/badge/status-research-9E2B25">
+</p>
+
+<p align="center"><b>Reproducible fungal genomics from Oxford Nanopore (optional Illumina hybrid) — organism-agnostic: change inputs and config, never code.</b></p>
+
+---
+
 
 Reproducible **fungal genomics from Oxford Nanopore** (with an optional Illumina hybrid branch): assembly → eukaryotic annotation → ITS/genome identification → **antifungal-resistance** calling → mobile/TE/mycovirus → **biosynthetic gene clusters** → novelty → One Health comparative analysis.
 
 The fungal sibling of the *forge* family (captureforge / callforge / methylforge). Organism-agnostic by design: **change inputs and config, never code.**
+
+## Pipeline
+
+```mermaid
+flowchart LR
+  ONT([ONT reads]) --> ASM[assembly + polish<br/>ONT · optional hybrid]
+  ASM --> QC[decontam · QC · BUSCO]
+  QC --> ANN[annotation<br/>Funannotate]
+  ANN --> ID[identify<br/>ITS/LSU · ANI · GCPSR]
+  ANN --> AMR[antifungal resistance<br/>FungAMR · cyp51A TR34/46]
+  ANN --> MGE[mobile / TE / mycovirus]
+  ANN --> BGC[BGCs · fungiSMASH]
+  ID --> REP[per-isolate report<br/>master_fungi.tsv]
+  AMR --> REP
+  MGE --> REP
+  BGC --> REP
+  REP --> OH[One Health<br/>comparative analysis]
+```
 
 ## Two layers
 
