@@ -42,10 +42,10 @@ flowchart LR
    basecall QC → read QC → assembly → polish (ONT + optional hybrid) → decontam/organelle → assembly QC/BUSCO → repeat-mask → Funannotate → identify → **antifungal resistance** → mobile/TE/mycovirus → **fungiSMASH BGCs** → novelty → eukaryote extras → per-isolate report + `master_fungi.tsv`.
 2. **Layer 2 — `analysis/`** — objective scripts (mirroring the bacterial `r-analysis/`) that consume the master table and produce the compartment (air/human/surface) comparative story + figures + manuscript.
 
-## Quickstart (this Apple-Silicon Mac)
+## Quickstart
 
 ```bash
-# 1. one-time: fetch reference databases onto the external SSD (hours)
+# 1. one-time: fetch reference databases to local storage (hours)
 export FUNGIFORGE_DB="/path/to/fungiforge_db"
 bash bin/fetch_references.sh                 # aria2c: multi-connection, resumable
 
@@ -53,7 +53,7 @@ bash bin/fetch_references.sh                 # aria2c: multi-connection, resumab
 pip install -e .
 fungiforge samplesheet --ont 'reads/*.ont.fastq.gz' \
     --illumina-r1 'reads/*_R1*.fastq.gz' --illumina-r2 'reads/*_R2*.fastq.gz' \
-    --compartment AIR --facility Abattoir_1 --season Dry -o samples.csv
+    --compartment SOIL --facility SITE_A --season WET -o samples.csv
 
 # 3. run
 nextflow run main.nf -profile local,docker \
@@ -62,7 +62,7 @@ nextflow run main.nf -profile local,docker \
 
 **Before a real run**, triage fresh ONT data with `bin/preflight_qc.sh` — per-sample read QC, an amplicon-vs-WGS check, a GO/MARGINAL/NO-GO assembly verdict, and an assembly-free species ID (even when coverage is too low to assemble). See [`docs/preflight_qc.md`](docs/preflight_qc.md).
 
-On the HPC (once it's back): `-profile hpc_slurm,singularity` (native, no emulation).
+On an HPC cluster: `-profile hpc_slurm,singularity` (native, no emulation).
 
 ## Profiles
 
