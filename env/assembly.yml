@@ -1,0 +1,11 @@
+# Stage 02 — long-read assembly + haplotig purging.
+name: ff-assembly
+channels: [conda-forge, bioconda]
+dependencies:
+  - python=3.11
+  - flye>=2.9.3
+  - raven-assembler>=1.8
+  - canu>=2.2
+  - minimap2>=2.26
+  - purge_dups>=1.2.6
+  - seqkit>=2.6

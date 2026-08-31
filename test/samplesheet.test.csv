@@ -1,0 +1,2 @@
+sample,ont_fastq,illumina_r1,illumina_r2,compartment,facility,season
+TESTFUN01,test/reads/TESTFUN01.ont.fastq.gz,,,AIR,Abattoir_1,Dry

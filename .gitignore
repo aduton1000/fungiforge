@@ -1,0 +1,32 @@
+# Nextflow
+work/
+.nextflow*
+results/
+results_test/
+# fungiforge run outputs
+*_out/
+fungiforge_out/
+# Downloaded reference databases + external-SSD data dir (NOT source; see bin/fetch_references.sh)
+data_dir/
+_local/
+test/mini_db/
+test/reads/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+# Local deployment notes (untracked)
+HANDOVER.md
+# OS / editors
+.DS_Store
+*.swp
+.idea/
+.vscode/
+test/sra/
+test/reads/
+results_cea10/
+results_*/

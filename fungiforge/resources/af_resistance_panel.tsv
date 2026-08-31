@@ -1,0 +1,43 @@
+# FungiForge curated antifungal-resistance panel (v0.1).
+# Interpretation overlay used by bin/af_resistance.py on top of the FungAMR/MARDy
+# reference catalogues in --data-dir. Genotype-only: this flags KNOWN resistance-
+# associated protein changes; MIC/AFST phenotype confirmation is always required.
+# 'target' genes without simple point mutations (efflux pumps, transcriptional
+# regulators, promoter repeats) are handled by their listed mechanism:
+#   substitution = read residues at hotspot/known_positions from the aligned protein
+#   GOF          = gain-of-function regulator; report gene presence + any known GOF residue
+#   overexpression = efflux/target upregulation; needs expression data — report presence only
+#   promoter_TR  = cyp51A promoter tandem repeat; detected structurally by bin/cyp51a_TR.py
+# Columns are TAB-separated.
+gene	organism_regex	drug_class	drugs	mechanism	hotspot_aa	known_mutations	note	source
+cyp51A	Aspergillus fumigatus	azole	itraconazole,voriconazole,posaconazole,isavuconazole	substitution	54,98,121,138,216,220,289,448,219	G54E,G54R,G54V,G54W,L98H,Y121F,G138C,P216L,M220K,M220T,M220V,M220I,T289A,G448S,F219C,F219I	L98H pairs with TR34; Y121F+T289A pairs with TR46 (see promoter_TR)	Garcia-Rubio 2017; Rivero-Menendez 2016
+cyp51A_promoter	Aspergillus fumigatus	azole	itraconazole,voriconazole,posaconazole	promoter_TR	NA	TR34,TR46,TR46_3,TR53,TR120	environmental azole resistance; tandem repeats in the cyp51A promoter — detected by cyp51a_TR.py	Snelders 2008; Chowdhary 2014
+hmg1	Aspergillus fumigatus	azole	itraconazole,voriconazole,posaconazole	substitution	242,269,304,307	S269F,F262del,I242V,G307S,G307D	HMG-CoA reductase sterol-sensing domain; emerging pan-azole resistance	Rybak 2019
+cyp51B	Aspergillus fumigatus	azole	itraconazole	substitution	NA	NA	minor contributor; reported for completeness
+ERG11	Candida albicans	azole	fluconazole,voriconazole	substitution	105,132,143,405,450,464,467	Y132F,Y132H,K143R,F145L,S405F,G448E,G464S,R467K	often co-driven by TAC1/UPC2 gain-of-function	Flowers 2015
+ERG11	Candida auris	azole	fluconazole	substitution	126,132,143	F126L,Y132F,K143R	F126L in clade III; Y132F/K143R in clades I and IV	Chow 2020; Rhodes 2018
+ERG11	Candida parapsilosis	azole	fluconazole	substitution	132	Y132F	drives clonal fluconazole-resistant outbreaks	Berkow 2018
+ERG11	Candida tropicalis	azole	fluconazole	substitution	132,154	Y132F,S154F
+ERG11	Nakaseomyces glabratus	azole	fluconazole	substitution	NA	NA	azole resistance in this species is mainly PDR1 GOF + efflux, not ERG11
+ERG11	Cryptococcus neoformans	azole	fluconazole	substitution	145,484	Y145F,G484S	often with chromosome-1 aneuploidy (ERG11/AFR1 amplification)
+FKS1	Candida albicans	echinocandin	caspofungin,micafungin,anidulafungin	substitution	641,645,648,1361	F641S,F641L,S645P,S645F,S645Y,D648Y,R1361H	HS1 (641-649) and HS2 (~1357-1364) hotspots	Perlin 2015
+FKS1	Candida auris	echinocandin	caspofungin,micafungin,anidulafungin	substitution	635,639	S639F,S639P,S639Y	confers pan-echinocandin resistance	Chow 2020
+FKS1	Candida parapsilosis	echinocandin	caspofungin	substitution	658	R658G	underlies intrinsically higher echinocandin MICs
+FKS1	Nakaseomyces glabratus	echinocandin	caspofungin,micafungin,anidulafungin	substitution	625,629,632	F625S,S629P,D632E,D632G,D632Y
+FKS2	Nakaseomyces glabratus	echinocandin	caspofungin,micafungin,anidulafungin	substitution	659,663,665	F659del,F659S,S663P,S663F,R665S	FKS2 is the dominant echinocandin-resistance locus in this species	Katiyar 2012
+FKS1	Aspergillus fumigatus	echinocandin	caspofungin	substitution	678	S678P	echinocandins are fungistatic against Aspergillus; resistance rare
+FUR1	Candida albicans	pyrimidine	flucytosine	substitution	101	R101C	uracil phosphoribosyltransferase	Dodgson 2004
+FCY1	Candida albicans	pyrimidine	flucytosine	loss_of_function	NA	NA	cytosine deaminase; LoF/nonsense/frameshift confers 5-FC resistance
+FCY2	Candida albicans	pyrimidine	flucytosine	loss_of_function	NA	NA	cytosine permease; LoF confers 5-FC resistance
+FUR1	Cryptococcus neoformans	pyrimidine	flucytosine	loss_of_function	NA	NA
+ERG3	Candida albicans	azole	fluconazole	loss_of_function	NA	NA	C-5 sterol desaturase; LoF bypasses toxic sterol, confers azole resistance
+ERG6	Candida albicans	polyene	amphotericin B	loss_of_function	NA	NA	rare amphotericin B resistance
+ERG2	Candida albicans	polyene	amphotericin B	loss_of_function	NA	NA	rare amphotericin B resistance
+TAC1	Candida albicans	azole	fluconazole	GOF	NA	N977D,R673L,G980E	gain-of-function upregulates CDR1/CDR2 efflux	Coste 2006
+MRR1	Candida albicans	azole	fluconazole	GOF	NA	P683S,G878E	gain-of-function upregulates MDR1 efflux	Dunkel 2008
+UPC2	Candida albicans	azole	fluconazole	GOF	NA	G648D,A643T,A643V	gain-of-function upregulates ERG11	Heilmann 2010
+PDR1	Nakaseomyces glabratus	azole	fluconazole	GOF	NA	NA	dominant azole-resistance mechanism; upregulates CDR1/PDH1 efflux	Ferrari 2009
+CDR1	Candida albicans	azole	fluconazole	overexpression	NA	NA	ABC efflux transporter; resistance by overexpression (needs expression data)
+CDR2	Candida albicans	azole	fluconazole	overexpression	NA	NA	ABC efflux transporter
+MDR1	Candida albicans	azole	fluconazole	overexpression	NA	NA	MFS efflux transporter
+AtrF	Aspergillus fumigatus	azole	itraconazole	overexpression	NA	NA	ABC efflux transporter

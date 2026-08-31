@@ -1,0 +1,18 @@
+# Stage 13 — eukaryote extras: ploidy, mating-type, secretome, CAZymes, virulence.
+# NB SignalP6/DeepTMHMM are license-gated / large ML models — installed separately;
+# EffectorP3 + dbcan + free alternatives (deepsig) are here.
+name: ff-extras
+channels: [conda-forge, bioconda]
+dependencies:
+  - python=3.11
+  - nquire>=1.0
+  - smudgeplot>=0.2.5
+  - genomescope2
+  - dbcan>=4.1            # run_dbCAN CAZyme annotation
+  - effectorp>=3.0
+  - deepsig>=1.2          # free signal-peptide predictor (SignalP alternative)
+  - hmmer>=3.4
+  - diamond>=2.1
+  - seqkit>=2.6
+  - biopython>=1.81
+  - pandas>=2.0

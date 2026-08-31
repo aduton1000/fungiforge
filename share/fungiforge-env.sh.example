@@ -1,0 +1,12 @@
+# fungiforge site config — copy to ~/.fungiforge-env.sh and edit. Sourced by
+# share/bin/fungiforge-run (and safe to `source` in your ~/.bashrc).
+export FUNGIFORGE_HOME="/path/to/fungiforge"                 # repo checkout
+export FUNGIFORGE_DB="/scratch/$USER/fungiforge_db"          # bin/fetch_references.sh target
+export FUNGIFORGE_WORK="/scratch/$USER/fungiforge_work"      # Nextflow work/ (needs space)
+export FUNGIFORGE_PROFILE="hpc_slurm,apptainer"              # or hpc_slurm,singularity
+# optional SLURM routing
+export FUNGIFORGE_PARTITION=""                               # e.g. "genomics"
+export FUNGIFORGE_ACCOUNT=""                                 # e.g. "pi_adu"
+# Apptainer image cache + bind mounts (so containers see $FUNGIFORGE_DB and $FUNGIFORGE_WORK)
+export NXF_APPTAINER_CACHEDIR="$FUNGIFORGE_DB/.apptainer"
+export APPTAINER_BINDPATH="$FUNGIFORGE_DB,$FUNGIFORGE_WORK"

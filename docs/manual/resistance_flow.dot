@@ -1,0 +1,43 @@
+// FungiForge Stage 09 antifungal-resistance calling flow (the centerpiece).
+// Render: dot -Tpng -Gdpi=200 resistance_flow.dot -o figures/resistance_flow.png
+digraph Resistance {
+    rankdir=TB; bgcolor="white";
+    fontname="Helvetica-Bold"; fontsize=18; labelloc="t";
+    label="Stage 09 — antifungal-resistance calling (bespoke: there is no ResFinder for fungi)";
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.16,0.09"];
+    edge [color="#5f6368", arrowsize=0.8];
+
+    node [shape=cylinder, fillcolor="#fffde7", color="#f9a825"];
+    PANEL [label="curated panel (v0.1)\naf_resistance_panel.tsv\ngene · organism · drug_class ·\nmechanism · hotspot_aa · known_mutations"];
+    FUNGAMR [label="FungAMR references\n$DB/fungamr/reference_proteins.faa\n(built from UniProt by\nbuild_fungamr_refs.py)"];
+
+    node [shape=box, fillcolor="#e8f0fe", color="#4285f4"];
+    IN1 [label="proteins.faa\n(Stage 07 Funannotate)"];
+    IN2 [label="species call\n(Stage 08 identify)"];
+    IN3 [label="nuclear.fasta + GBK\n(Stages 04/07)"];
+    IN4 [label="polish mode\n(Stage 03b)"];
+
+    node [fillcolor="#fce8e6", color="#ea4335"];
+    REL  [label="select species-relevant panel rows\n(organism_regex vs species/genus)"];
+    ORTH [label="find isolate ortholog\nk-mer prefilter → BLOSUM62 pairwise align\n(species-matched reference, ≥55% id)"];
+    MAP  [label="map reference hotspot positions\n→ read observed residue in query frame"];
+
+    node [fillcolor="#e0f7fa", color="#00acc1"];
+    SUB  [label="substitution\nknown mutation | novel hotspot | wild-type"];
+    LOF  [label="loss_of_function\ntruncation < 85% ref length"];
+    GOF  [label="GOF regulator\nreport known gain-of-function residues"];
+    OVX  [label="overexpression (efflux)\nreport presence (needs RNA-seq)"];
+
+    node [fillcolor="#fde7f3", color="#c2185b"];
+    TR   [label="cyp51A promoter TR detector (structural)\ncyp51a_TR.py: locate cyp51A in GBK →\nextract ~600 bp promoter → tandem-array scan\n→ TR34 / TR46 / TR46³ / TR53"];
+
+    node [fillcolor="#eceff1", color="#546e7a"];
+    OUT  [label="resistance.json\ncalls[] · resistant_drug_classes ·\nn_known_mutations · confidence flag\n(high | provisional_ont_only)"];
+
+    PANEL -> REL; IN2 -> REL;
+    FUNGAMR -> ORTH; IN1 -> ORTH; REL -> ORTH -> MAP;
+    MAP -> SUB; MAP -> LOF; MAP -> GOF; MAP -> OVX;
+    IN3 -> TR [label="A. fumigatus only", fontsize=9];
+    SUB -> OUT; LOF -> OUT; GOF -> OUT; OVX -> OUT; TR -> OUT;
+    IN4 -> OUT [label="confidence flag", fontsize=9, style=dashed, color="#ea4335"];
+}

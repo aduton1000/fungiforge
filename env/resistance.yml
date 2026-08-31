@@ -1,0 +1,15 @@
+# Stage 09 — antifungal-resistance calling (bespoke).
+name: ff-resistance
+channels: [conda-forge, bioconda]
+dependencies:
+  - python=3.11
+  - blast>=2.15
+  - diamond>=2.1
+  - hmmer>=3.4
+  - pyhmmer>=0.10
+  - mafft>=7.5
+  - minimap2>=2.26
+  - samtools>=1.19
+  - biopython>=1.81
+  - pandas>=2.0
+  - numpy>=1.24

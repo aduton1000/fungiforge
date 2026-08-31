@@ -1,0 +1,100 @@
+// FungiForge pipeline DAG — 15 Nextflow stages colour-coded by group, option-aware,
+// with the optional hybrid branch, skippable stages, external DB inputs, and the
+// Layer-1 -> Layer-2 handoff. Render:
+//   dot -Tpng -Gdpi=200 fungiforge_dag.dot -o figures/architecture.png
+//   dot -Tpdf            fungiforge_dag.dot -o figures/architecture.pdf
+digraph FungiForge {
+    rankdir=TB;
+    bgcolor="white";
+    labelloc="t";
+    fontname="Helvetica-Bold"; fontsize=20;
+    label="FungiForge — fungal ONT (+optional Illumina hybrid) genomics (reads → assembly → annotation → ID → resistance → BGCs → report → One Health analysis)";
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.16,0.09"];
+    edge [color="#5f6368", arrowsize=0.8];
+
+    // ---- external inputs (cylinders) ----
+    node [shape=cylinder, style="filled", fillcolor="#fffde7", color="#f9a825"];
+    ONT   [label="ONT reads (FASTQ)\nor pod5 dir (--basecall)\n+ optional Illumina R1/R2\n+ sample sheet"];
+    DBS   [label="Reference databases (--data_dir)\nUNITE · FungAMR · BUSCO/odb10\nfunannotate · antiSMASH · Kraken2\nRVDB · sourmash-fungi · eggNOG\n(bin/fetch_references.sh; aria2c resumable)"];
+
+    // ---- main pipeline nodes, coloured by stage group ----
+    node [shape=box, style="rounded,filled"];
+
+    // reads & assembly
+    S0  [label="Stage 00 — Basecall (optional)\nDorado (native arm64 host)\n[--basecall; pod5 → FASTQ]", fillcolor="#e8f0fe", color="#4285f4", style="rounded,filled,dashed"];
+    S1  [label="Stage 01 — Read QC & filter\nONT: NanoPlot + chopper · Illumina: fastp\n[base image]", fillcolor="#e8f0fe", color="#4285f4"];
+    S2  [label="Stage 02 — Assembly\nFlye --nano-hq (| canu | raven) + purge_dups\n[staphb/flye]", fillcolor="#e6f4ea", color="#34a853"];
+    S3a [label="Stage 03a — ONT polish (always)\nMedaka consensus\n[staphb/medaka]", fillcolor="#d7f0e3", color="#137333"];
+    S3b [label="Stage 03b — Short-read polish (hybrid)\nbwa mem -a → Polypolish\n[staphb/polypolish]\nmode: hybrid | ont_only | hybrid_failed_ont_fallback", fillcolor="#d7f0e3", color="#137333"];
+    S4  [label="Stage 04 — Decontam + organelle split\nKraken2/tiara + BlobTools · GetOrganelle/oatk\n→ nuclear / mito  [base image]", fillcolor="#e6f4ea", color="#34a853"];
+
+    // annotation & ID
+    S5  [label="Stage 05 — Assembly QC + completeness\nQUAST + compleasm/BUSCO (odb10)\nMIMAG-style qc_pass  [ezlabgva/busco]", fillcolor="#fef7e0", color="#f9ab00"];
+    S6  [label="Stage 06 — Repeat model + soft-mask\nRepeatModeler2 + RepeatMasker\n→ masked genome + TE library  [dfam/tetools]", fillcolor="#fef7e0", color="#f9ab00"];
+    S7  [label="Stage 07 — Eukaryotic annotation\nFunannotate predict+annotate\n(GeneMark/Augustus/SNAP/EVM; eggNOG/Pfam/dbCAN)\n→ proteins + GBK  [nextgenusfs/funannotate]", fillcolor="#fff3e0", color="#fb8c00"];
+    S8  [label="Stage 08 — Identification (GCPSR)\nITSx+barrnap → UNITE (vsearch) ·\nsourmash/skani genome ANI · MLST\n→ species + confidence  [base image]", fillcolor="#fff3e0", color="#fb8c00"];
+
+    // feature calling
+    S9  [label="Stage 09 — Antifungal resistance ★\ncurated panel + FungAMR refs (subst/LoF/GOF)\n+ cyp51A TR34/TR46 promoter detector\n[af_resistance.py · cyp51a_TR.py]", fillcolor="#fce8e6", color="#ea4335"];
+    S10 [label="Stage 10 — Mobile & repeat elements\nTE landscape + RIP · geNomad/RVDB mycovirus\n· mito mobile introns  [base image]", fillcolor="#e0f7fa", color="#00acc1", style="rounded,filled,dashed"];
+    S11 [label="Stage 11 — Biosynthetic gene clusters\nfungiSMASH (antiSMASH 8, fungal)\n→ NRPS/PKS/terpene/RiPP  [antismash/standalone]", fillcolor="#e0f7fa", color="#00acc1", style="rounded,filled,dashed"];
+    S12 [label="Stage 12 — Novelty\ngenome ANI (skani<95%) + ITS distance\n+ phylo placement  [base image]", fillcolor="#e0f7fa", color="#00acc1", style="rounded,filled,dashed"];
+    S13 [label="Stage 13 — Eukaryote extras\nploidy · mating-type · secretome ·\nCAZymes · virulence  [base image]", fillcolor="#e0f7fa", color="#00acc1", style="rounded,filled,dashed"];
+
+    // reporting
+    S14 [label="Stage 14 — Report + master table\nmerge per-stage result.json →\nper-isolate HTML + master_fungi.tsv row\n[make_report.py]", fillcolor="#eceff1", color="#546e7a"];
+
+    // Layer-2
+    L2  [label="Layer 2 — analysis/ (R objectives)\nmaster_fungi.tsv → 8 One Health objectives\n(composition · resistome · mobile · transmission ·\nrisk · virulence · connectivity · novelty)\n+ figures + manuscript", fillcolor="#f3e5f5", color="#8e24aa"];
+
+    // ---- main spine ----
+    ONT -> S0 [style=dashed];
+    S0 -> S1 [style=dashed];
+    ONT -> S1;
+    S1 -> S2 -> S3a -> S3b -> S4;
+    S4 -> S5; S4 -> S6; S4 -> S8;
+    S6 -> S7;
+    S7 -> S9 [label="proteins + GBK", fontsize=9];
+    S8 -> S9 [label="species", fontsize=9, fontcolor="#ea4335"];
+    S4 -> S9 [label="nuclear (TR locus)", fontsize=8, style=dotted];
+    S6 -> S10 [label="TE library", fontsize=8, style=dotted];
+    S4 -> S10 [label="mito", fontsize=8, style=dotted];
+    S7 -> S11 [label="GBK", fontsize=8, style=dotted];
+    S8 -> S12 [label="markers + ID", fontsize=8, style=dotted];
+    S7 -> S13 [label="proteins", fontsize=8, style=dotted];
+
+    // everything converges on the report
+    S5 -> S14 [style=dotted]; S8 -> S14 [style=dotted]; S9 -> S14;
+    S10 -> S14 [style=dotted]; S11 -> S14 [style=dotted]; S12 -> S14 [style=dotted]; S13 -> S14 [style=dotted];
+    S14 -> L2 [label="master_fungi.tsv", fontsize=9, fontcolor="#8e24aa", penwidth=1.6];
+
+    // resistance-confidence carry
+    S3b -> S9 [label="resistance_confidence\n(ONT-only → provisional)", fontsize=8, style=dashed, color="#ea4335", constraint=false];
+
+    // ---- external DB inputs feeding stages ----
+    DBS -> S4  [color="#f9a825", style=dashed, constraint=false, label="Kraken2", fontsize=8];
+    DBS -> S5  [color="#f9a825", style=dashed, constraint=false, label="BUSCO odb10", fontsize=8];
+    DBS -> S7  [color="#f9a825", style=dashed, constraint=false, label="funannotate/eggNOG", fontsize=8];
+    DBS -> S8  [color="#f9a825", style=dashed, constraint=false, label="UNITE/sourmash", fontsize=8];
+    DBS -> S9  [color="#f9a825", style=dashed, constraint=false, label="FungAMR", fontsize=8];
+    DBS -> S10 [color="#f9a825", style=dashed, constraint=false, label="RVDB/geNomad", fontsize=8];
+    DBS -> S11 [color="#f9a825", style=dashed, constraint=false, label="antiSMASH", fontsize=8];
+    DBS -> S12 [color="#f9a825", style=dashed, constraint=false, label="ref genomes", fontsize=8];
+
+    // ---- legend ----
+    subgraph cluster_legend {
+        label="Stage groups & conventions"; fontsize=12; fontname="Helvetica-Bold"; style="rounded"; color="#bbbbbb";
+        node [shape=box, style="rounded,filled", fontsize=9, width=2.4];
+        L0 [label="Reads & assembly", fillcolor="#e6f4ea", color="#34a853"];
+        L1 [label="Read QC / basecall / decontam", fillcolor="#e8f0fe", color="#4285f4"];
+        L3 [label="Annotation & identification", fillcolor="#fff3e0", color="#fb8c00"];
+        L3b [label="Assembly QC / repeat-mask", fillcolor="#fef7e0", color="#f9ab00"];
+        L4 [label="Antifungal resistance ★ (centerpiece)", fillcolor="#fce8e6", color="#ea4335"];
+        L5 [label="Feature-calling (skippable, dashed)", fillcolor="#e0f7fa", color="#00acc1"];
+        L6 [label="Reporting", fillcolor="#eceff1", color="#546e7a"];
+        L7 [label="Layer-2 One Health analysis (R)", fillcolor="#f3e5f5", color="#8e24aa"];
+        L8 [label="External DB input (--data_dir)", fillcolor="#fffde7", color="#f9a825", shape=cylinder];
+        Lnote [label="dashed node = optional/skippable · dotted edge = feeds\n★ = bespoke (no ResFinder-for-fungi)", fillcolor="#ffffff", color="#546e7a"];
+        L0->L1->L3->L3b->L4->L5->L6->L7->L8->Lnote [style=invis];
+    }
+}

@@ -1,0 +1,10 @@
+# Stage 11 — BGC post-processing (antiSMASH runs from its own container; this env
+# is BiG-SCAPE + parsing for the comparative BGC network layer).
+name: ff-bgc
+channels: [conda-forge, bioconda]
+dependencies:
+  - python=3.11
+  - bigscape>=1.1.9
+  - hmmer>=3.4
+  - biopython>=1.81
+  - pandas>=2.0

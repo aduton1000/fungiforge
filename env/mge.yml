@@ -1,0 +1,12 @@
+# Stage 10 — mobile & repeat elements (mycovirus/geNomad + TE parsing).
+name: ff-mge
+channels: [conda-forge, bioconda]
+dependencies:
+  - python=3.11
+  - genomad>=1.8
+  - diamond>=2.1
+  - hmmer>=3.4
+  - minimap2>=2.26
+  - seqkit>=2.6
+  - biopython>=1.81
+  - pandas>=2.0
