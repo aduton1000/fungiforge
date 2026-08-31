@@ -60,6 +60,8 @@ nextflow run main.nf -profile local,docker \
     --samplesheet samples.csv --data_dir "$FUNGIFORGE_DB"
 ```
 
+**Before a real run**, triage fresh ONT data with `bin/preflight_qc.sh` — per-sample read QC, an amplicon-vs-WGS check, a GO/MARGINAL/NO-GO assembly verdict, and an assembly-free species ID (even when coverage is too low to assemble). See [`docs/preflight_qc.md`](docs/preflight_qc.md).
+
 On the HPC (once it's back): `-profile hpc_slurm,singularity` (native, no emulation).
 
 ## Profiles
