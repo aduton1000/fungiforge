@@ -1,0 +1,14 @@
+# Stage 14 report engine + Layer-2 analysis glue (pure Python — solves on
+# linux-64, osx-64 and osx-arm64; no emulation needed). After creating:
+#   conda activate fungiforge && pip install -e .
+name: fungiforge
+channels: [conda-forge, bioconda]
+dependencies:
+  - python=3.11
+  - biopython>=1.81
+  - pandas>=2.0
+  - numpy>=1.24
+  - jinja2>=3.1
+  - openpyxl>=3.1
+  - matplotlib>=3.7
+  - pip

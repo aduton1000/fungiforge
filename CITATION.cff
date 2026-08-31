@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use FungiForge, please cite it."
+title: "FungiForge: reproducible fungal genomics from ONT (+ hybrid Illumina)"
+authors:
+  - family-names: Adu
+    given-names: Bright
+    alias: aduton1000
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/aduton1000/fungiforge"
+keywords:
+  - fungal genomics
+  - nanopore
+  - antifungal resistance
+  - biosynthetic gene clusters
+  - Funannotate
+  - nextflow

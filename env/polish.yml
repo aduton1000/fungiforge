@@ -1,0 +1,12 @@
+# Stage 03 — polishing. Medaka (ONT) + hybrid short-read (Polypolish, POLCA/MaSuRCA).
+name: ff-polish
+channels: [conda-forge, bioconda]
+dependencies:
+  - python=3.11
+  - medaka>=1.11
+  - polypolish>=0.6
+  - masurca>=4.1        # provides POLCA
+  - bwa-mem2>=2.2
+  - bwa>=0.7.17
+  - samtools>=1.19
+  - minimap2>=2.26
