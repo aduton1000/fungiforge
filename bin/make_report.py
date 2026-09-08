@@ -103,7 +103,7 @@ th,td{{border:1px solid #dcdfe6;padding:6px 10px;text-align:left}}th{{background
 <table><caption>Summary (master row)</caption>{rows}</table>
 <table><caption>Antifungal-resistance calls</caption>
 <tr><th>gene</th><th>class</th><th>change/status</th><th>known</th><th>confidence</th></tr>{call_rows}</table>
-<p style="color:#777">Resistance calls on ONT-only assemblies are <b>provisional</b> until hybrid-polished.</p>
+<p style="color:#777">Resistance calls on ONT-only assemblies are <b>provisional</b> until hybrid-polished; hybrid and Illumina-only assemblies are high-confidence (no homopolymer-indel risk).</p>
 """
 
 
