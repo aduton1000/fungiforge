@@ -14,7 +14,7 @@ process RESISTANCE {
   # Carry the polishing mode through so ONT-only calls are flagged provisional while
   # hybrid-polished calls are high-confidence (the polish.json rides in from Stage 03b).
   MODE=\$(grep -o '"mode"[^,]*' ${polish_json} 2>/dev/null | head -1 | sed -E 's/.*: *"?([a-z_]+)"?.*/\\1/')
-  case "\$MODE" in hybrid) PM=hybrid;; ont_only) PM=ont_only;; *) PM=unknown;; esac
+  case "\$MODE" in hybrid) PM=hybrid;; illumina_only) PM=illumina_only;; ont_only) PM=ont_only;; *) PM=unknown;; esac
   python3 ${projectDir}/bin/af_resistance.py \\
       --sample "${meta.id}" --proteins ${proteins} --species ${species} \\
       --assembly ${nuclear} --gbk ${gbk} --polish-mode "\$PM" \\
