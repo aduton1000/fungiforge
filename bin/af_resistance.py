@@ -11,7 +11,8 @@ For the species-relevant target genes in the curated panel it:
 
 Every call carries a confidence flag: ONT-only-polished assemblies are marked *provisional*
 because homopolymer indels can mimic frameshifts/substitutions exactly where these mutations
-live. Degrades gracefully: without a reference sequence (FungAMR not yet staged) it reports the
+live; hybrid- and Illumina-only assemblies are *high* confidence (short-read base accuracy has
+no homopolymer-indel problem). Degrades gracefully: without a reference sequence (FungAMR not yet staged) it reports the
 gene as searched-but-unresolved rather than guessing, and the structural TR scan still runs.
 """
 from __future__ import annotations
@@ -193,7 +194,8 @@ def main():
     ap.add_argument("--panel", required=True)
     ap.add_argument("--data-dir", default="")
     ap.add_argument("--ref-faa", help="explicit reference protein FASTA (headers containing gene names)")
-    ap.add_argument("--polish-mode", default="unknown", choices=["hybrid", "ont_only", "unknown"])
+    ap.add_argument("--polish-mode", default="unknown",
+                    choices=["hybrid", "illumina_only", "ont_only", "unknown"])
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
 
@@ -204,7 +206,10 @@ def main():
                                "fungiforge", "resources", "af_reference_proteins.faa")
     refidx = load_reference_index(a.data_dir, a.ref_faa, bundled_ref)
 
-    conf = {"hybrid": "high", "ont_only": "provisional_ont_only", "unknown": "provisional"}[a.polish_mode]
+    # Illumina base accuracy carries no homopolymer-indel risk, so short-read-only
+    # assemblies are high-confidence for point-mutation resistance calls, like hybrid.
+    conf = {"hybrid": "high", "illumina_only": "high",
+            "ont_only": "provisional_ont_only", "unknown": "provisional"}[a.polish_mode]
     # species relevance: organism_regex matches the species, or genus matches, or 'spp.'
     genus = species.split()[0] if species and species != "unknown" else ""
     def relevant(row):
@@ -271,7 +276,7 @@ def main():
         if tr.get("tr_detected"):
             calls.append({"gene": "cyp51A_promoter", "drug_class": "azole", "mechanism": "promoter_TR",
                           "status": "resistance", "change": tr["tr_type"], "known": True,
-                          "confidence": "high" if a.polish_mode == "hybrid" else "medium",
+                          "confidence": "high" if a.polish_mode in ("hybrid", "illumina_only") else "medium",
                           "note": tr["note"] + " — pairs with cyp51A L98H (TR34) or Y121F+T289A (TR46)"})
 
     resistant_classes = sorted({c.get("drug_class") for c in calls

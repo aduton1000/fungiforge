@@ -4,10 +4,15 @@
   + per-feature long tables; Layer 2 (R objective scripts) consumes only those. Mirrors
   the bacterial pipeline so the two studies are directly comparable and Layer 2 can be
   re-run independently.
-- **ONT-first, hybrid-optional.** All isolates get Illumina eventually, but ONT lands
-  first. Medaka always; Polypolish/POLCA when Illumina is present. Antifungal-resistance
-  point-mutation calls are flagged **provisional on ONT-only assemblies** because
-  homopolymer indels mimic the very substitutions/frameshifts we call.
+- **Platform-flexible, one contract.** Each isolate is routed by its reads
+  (`meta.assembly_mode`): **long-read** (ONT present) uses Flye + Medaka, with Polypolish
+  adding Illumina when it's there (hybrid); **short-read** (Illumina only, no ONT) uses
+  SPAdes. All three modes converge on the same `*.polished.fasta` → downstream stages, so
+  nothing after Stage 03b needs to know how the assembly was made. Antifungal-resistance
+  point-mutation calls are flagged **provisional on ONT-only assemblies** (homopolymer
+  indels mimic the very substitutions/frameshifts we call) but **high-confidence on hybrid
+  and Illumina-only assemblies**, which have no homopolymer-indel problem. Illumina-only
+  isolates skip Medaka/Polypolish (nothing to hybrid-polish) and report `mode=illumina_only`.
 - **Resistance is bespoke.** No ResFinder-for-fungi exists. A curated panel + FungAMR/MARDy
   references drive substitution/LoF/GOF calling, plus a dedicated structural detector for
   the *A. fumigatus* cyp51A promoter tandem repeats (TR34/TR46) — invisible to any SNP caller.

@@ -3,6 +3,7 @@
 include { BASECALL }    from '../modules/stage00_basecall.nf'
 include { READ_QC }     from '../modules/stage01_readqc.nf'
 include { ASSEMBLE }    from '../modules/stage02_assemble.nf'
+include { SR_ASSEMBLE } from '../modules/stage02b_srassemble.nf'
 include { MEDAKA }      from '../modules/stage03_polish.nf'
 include { SRPOLISH }    from '../modules/stage03b_srpolish.nf'
 include { DECONTAM }    from '../modules/stage04_decontam.nf'
@@ -24,20 +25,35 @@ workflow FUNGIFORGE {
   main:
     reads0 = samples.map { meta, f -> tuple(meta, f.ont, f.r1, f.r2) }
 
-    // 0. optional Dorado basecalling (ont column = pod5 dir when --basecall)
-    reads_bc = params.basecall ? BASECALL(reads0).reads : reads0
+    // 0. optional Dorado basecalling (ont column = pod5 dir when --basecall).
+    //    Only long-read isolates carry ONT/pod5; short-read-only rows pass through.
+    if (params.basecall) {
+      lr0 = reads0.filter { it[0].assembly_mode == 'longread' }
+      sr0 = reads0.filter { it[0].assembly_mode == 'shortread' }
+      reads_bc = BASECALL(lr0).reads.mix(sr0)
+    } else {
+      reads_bc = reads0
+    }
 
-    // 1. read QC + filtering (ONT chopper/NanoPlot; Illumina fastp)
+    // 1. read QC + filtering (ONT chopper/NanoPlot; Illumina fastp — mode-aware)
     READ_QC(reads_bc)
 
-    // 2. assembly (Flye --nano-hq by default) + purge_dups
-    ASSEMBLE(READ_QC.out.reads)
+    // Split isolates by assembly mode: long-read (ONT ± hybrid) vs short-read (Illumina only).
+    reads_lr = READ_QC.out.reads.filter { it[0].assembly_mode == 'longread' }
+    reads_sr = READ_QC.out.reads.filter { it[0].assembly_mode == 'shortread' }
 
-    // 3. polishing: Medaka (ONT, always) then optional Illumina Polypolish hybrid
-    ont_ch  = READ_QC.out.reads.map { meta, ont, r1, r2 -> tuple(meta, ont) }
+    // 2. assembly — long-read (Flye --nano-hq + purge_dups) OR short-read (SPAdes)
+    ASSEMBLE(reads_lr)
+    SR_ASSEMBLE(reads_sr)
+
+    // 3. polishing: Medaka (ONT long-read only) then Illumina Polypolish hybrid when
+    //    short reads are present. Short-read-only assemblies skip Medaka (no ONT) and
+    //    flow straight into Stage 03b, which records mode=illumina_only (high conf).
+    ont_ch  = reads_lr.map { meta, ont, r1, r2 -> tuple(meta, ont) }
     ilmn_ch = READ_QC.out.reads.map { meta, ont, r1, r2 -> tuple(meta, r1, r2) }
     MEDAKA(ASSEMBLE.out.assembly.join(ont_ch))
-    SRPOLISH(MEDAKA.out.assembly.join(ilmn_ch))
+    pre_srpolish = MEDAKA.out.assembly.mix(SR_ASSEMBLE.out.assembly)
+    SRPOLISH(pre_srpolish.join(ilmn_ch))
 
     // 4. decontamination + organelle split -> nuclear / mito
     DECONTAM(SRPOLISH.out.assembly)

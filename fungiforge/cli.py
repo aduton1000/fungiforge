@@ -2,7 +2,8 @@
 
 Subcommands:
   run          wrap `nextflow run main.nf` with sane defaults
-  samplesheet  build a samplesheet CSV from directories of ONT (+ Illumina) reads
+  samplesheet  build a samplesheet CSV from directories of ONT and/or Illumina reads
+               (ONT-only, Illumina-only, or hybrid — per sample, whichever are found)
   fetch-refs   print the reference-database fetch command (bin/fetch_references.sh)
   version
 """
@@ -29,22 +30,51 @@ def cmd_run(a):
 
 
 def cmd_samplesheet(a):
-    """Pair ONT fastqs (required) with Illumina R1/R2 (optional) by sample id."""
+    """Build a samplesheet from ONT and/or Illumina reads, keyed by sample id.
+
+    A sample may have ONT only, Illumina only, or both (hybrid) — every sample id
+    seen in any of the three inputs gets a row; missing columns are left blank and
+    the pipeline routes each isolate by its inputs (see main.nf meta.assembly_mode).
+    """
     def sid(p):
         b = os.path.basename(p)
         for suf in (".ont.fastq.gz", ".fastq.gz", ".fq.gz", ".fastq", ".fq"):
             if b.endswith(suf): return b[: -len(suf)]
         return os.path.splitext(b)[0]
 
-    ont = {sid(p): p for pat in a.ont for p in sorted(glob.glob(pat))}
-    r1 = {sid(p).replace("_R1", "").replace("_1", ""): p for pat in (a.illumina_r1 or []) for p in sorted(glob.glob(pat))}
-    r2 = {sid(p).replace("_R2", "").replace("_2", ""): p for pat in (a.illumina_r2 or []) for p in sorted(glob.glob(pat))}
+    def ilmn_sid(p):
+        s = sid(p)
+        for tag in ("_R1", "_R2", "_1", "_2"):
+            s = s.replace(tag, "")
+        return s
+
+    ont = {sid(p): p for pat in (a.ont or []) for p in sorted(glob.glob(pat))}
+    r1 = {ilmn_sid(p): p for pat in (a.illumina_r1 or []) for p in sorted(glob.glob(pat))}
+    r2 = {ilmn_sid(p): p for pat in (a.illumina_r2 or []) for p in sorted(glob.glob(pat))}
+    if not (ont or r1 or r2):
+        sys.exit("[fungiforge] no reads matched --ont / --illumina-r1 / --illumina-r2 globs")
+
+    samples = sorted(set(ont) | set(r1) | set(r2))
     rows = ["sample,ont_fastq,illumina_r1,illumina_r2,compartment,facility,season"]
-    for s, p in ont.items():
-        rows.append(f"{s},{p},{r1.get(s,'')},{r2.get(s,'')},{a.compartment},{a.facility},{a.season}")
+    n_ont = n_ilmn = n_hyb = 0
+    dropped = []
+    for s in samples:
+        o, a1, a2 = ont.get(s, ""), r1.get(s, ""), r2.get(s, "")
+        has_ont, has_pair = bool(o), bool(a1 and a2)
+        if not has_ont and not has_pair:
+            dropped.append(s)  # e.g. an unpaired R1 with no ONT — cannot assemble
+            continue
+        if has_ont and has_pair: n_hyb += 1
+        elif has_ont:            n_ont += 1
+        else:                    n_ilmn += 1
+        rows.append(f"{s},{o},{a1},{a2},{a.compartment},{a.facility},{a.season}")
     out = a.out or "samplesheet.csv"
     open(out, "w").write("\n".join(rows) + "\n")
-    print(f"[fungiforge] {len(ont)} samples -> {out}")
+    print(f"[fungiforge] {len(rows)-1} samples -> {out} "
+          f"(ONT-only={n_ont}, Illumina-only={n_ilmn}, hybrid={n_hyb})")
+    if dropped:
+        print(f"[fungiforge] WARNING: skipped {len(dropped)} sample(s) with neither ONT nor "
+              f"paired Illumina: {', '.join(dropped)}")
 
 
 def cmd_fetch_refs(a):
@@ -57,7 +87,7 @@ def cmd_version(a):
 
 
 def build_parser():
-    p = argparse.ArgumentParser(prog="fungiforge", description="FungiForge — fungal ONT/hybrid genomics")
+    p = argparse.ArgumentParser(prog="fungiforge", description="FungiForge — fungal ONT / Illumina / hybrid genomics")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     r = sub.add_parser("run", help="run the Nextflow pipeline")
@@ -67,9 +97,10 @@ def build_parser():
     r.add_argument("extra", nargs=argparse.REMAINDER, help="extra args passed through to nextflow")
     r.set_defaults(func=cmd_run)
 
-    s = sub.add_parser("samplesheet", help="build a samplesheet from read directories")
-    s.add_argument("--ont", nargs="+", required=True, help="ONT fastq files/globs")
-    s.add_argument("--illumina-r1", nargs="*"); s.add_argument("--illumina-r2", nargs="*")
+    s = sub.add_parser("samplesheet", help="build a samplesheet from read directories (ONT and/or Illumina)")
+    s.add_argument("--ont", nargs="*", help="ONT fastq files/globs (optional if Illumina given)")
+    s.add_argument("--illumina-r1", nargs="*", help="Illumina R1 fastq files/globs")
+    s.add_argument("--illumina-r2", nargs="*", help="Illumina R2 fastq files/globs")
     s.add_argument("--compartment", default="NA"); s.add_argument("--facility", default="NA"); s.add_argument("--season", default="NA")
     s.add_argument("-o", "--out")
     s.set_defaults(func=cmd_samplesheet)

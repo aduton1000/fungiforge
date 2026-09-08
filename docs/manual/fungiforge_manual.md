@@ -4,9 +4,9 @@
 
 # 1. Introduction
 
-**FungiForge** is a **Nextflow DSL2** pipeline that turns Oxford Nanopore (ONT) long
-reads — optionally augmented with Illumina short reads for a hybrid polish — from a single
-fungal isolate into a **de-novo assembly, a eukaryotic gene annotation, a species
+**FungiForge** is a **Nextflow DSL2** pipeline that turns sequencing reads from a single
+fungal isolate — **Oxford Nanopore (ONT) long reads, Illumina short reads, or both (hybrid)** —
+into a **de-novo assembly, a eukaryotic gene annotation, a species
 identification, an antifungal-resistance genotype, a mobile-element/mycovirus inventory, a
 biosynthetic-gene-cluster (BGC) catalogue, and a novelty verdict**, then merges everything
 into one per-isolate report and a single row of a fixed-schema **master table**. A second,
@@ -24,14 +24,15 @@ sequencing fungi recovered from **air, human, and surface** compartments across 
 clinics, markets and community settings, to ask which settings concentrate azole-resistant
 *Aspergillus fumigatus*, echinocandin-resistant *Candida/Nakaseomyces*, priority pathogens
 such as *Candida auris*, and candidate novel species or novel natural-product clusters. But
-the pipeline is **organism-agnostic**: any cultured fungal isolate with ONT reads runs
-through it.
+the pipeline is **organism-agnostic**: any cultured fungal isolate with ONT and/or Illumina
+reads runs through it.
 
 **Who it is for.** Genomics-core and bioinformatics staff running fungal isolate genomics
 who need a reproducible, container-pinned workflow that is honest about the two structural
-realities of fungal genomics from Nanopore: **(1)** ONT homopolymer indels fall exactly where
+realities of fungal genomics: **(1)** ONT homopolymer indels fall exactly where
 antifungal-resistance point mutations live, so resistance calls on an ONT-only assembly are
-**provisional until hybrid-polished**; and **(2)** there is **no ResFinder for fungi and no
+**provisional until hybrid-polished** (hybrid and Illumina-only assemblies are high-confidence,
+having no homopolymer-indel problem); and **(2)** there is **no ResFinder for fungi and no
 GTDB for fungi** — resistance and identification must be done with bespoke, curated logic
 rather than a single push-button database.
 
@@ -47,16 +48,27 @@ rather than a single push-button database.
 This section covers the fungal-genomics background a FungiForge user needs to read the
 outputs correctly.
 
-**ONT-first, hybrid-optional assembly — and why polishing matters for resistance.**
-Nanopore long reads span repeats and resolve a contiguous fungal genome (typically
-30–50 Mb) that short reads alone fragment. Their weakness is **systematic error in
-homopolymer runs** — a run of six `A`s may be read as five or seven — which produces
-**false indels and frameshifts**. Antifungal-resistance calling reads single-residue changes
-in genes like *cyp51A*, *ERG11* and *FKS1*, so an uncorrected homopolymer error can *invent*
-a resistance mutation or *erase* a real one. FungiForge therefore polishes in two steps:
-**Stage 03a Medaka** (an ONT neural consensus, always run) then, when Illumina reads are
-present, **Stage 03b Polypolish** (a short-read polisher that corrects the residual indels
-Medaka cannot). Every isolate carries a **polish mode** (`hybrid`, `ont_only`, or
+**Three input modes — and why polishing matters for resistance.**
+FungiForge assembles from whatever reads an isolate has, routed automatically by
+`meta.assembly_mode` (set from the samplesheet):
+
+- **ONT-only (`longread`)** — Nanopore long reads span repeats and resolve a contiguous fungal
+  genome (typically 30–50 Mb) that short reads alone fragment (Flye). Their weakness is
+  **systematic error in homopolymer runs** — a run of six `A`s may be read as five or seven —
+  producing **false indels and frameshifts**. Antifungal-resistance calling reads single-residue
+  changes in genes like *cyp51A*, *ERG11* and *FKS1*, so an uncorrected homopolymer error can
+  *invent* a resistance mutation or *erase* a real one. **Stage 03a Medaka** (an ONT neural
+  consensus) is always applied, but calls remain `provisional_ont_only`.
+- **Hybrid (`longread` + Illumina)** — after Medaka, **Stage 03b Polypolish** uses the short reads
+  to correct the residual indels Medaka cannot. This is the highest-quality assembly and yields
+  `high`-confidence resistance calls.
+- **Illumina-only (`shortread`)** — no ONT at all: **Stage 02b SPAdes** assembles directly from the
+  short reads. There is no homopolymer-indel problem, so Medaka/Polypolish are skipped and calls
+  are `high`-confidence. (The trade-off is contiguity: short-read-only assemblies are more
+  fragmented than long-read ones, which can affect repeat-spanning features such as the *cyp51A*
+  promoter TR locus.)
+
+Every isolate carries a **polish mode** (`hybrid`, `illumina_only`, `ont_only`, or
 `hybrid_failed_ont_fallback`) and a **resistance-confidence flag**; ONT-only calls are labelled
 `provisional_ont_only` and never presented as clean.
 
@@ -128,10 +140,11 @@ staged under `--data_dir`.
 | # | Stage | Key tool(s) / container | Inputs → key output(s) |
 |:--|:----------|:--------------------|:-----------------------------|
 | 00 | Basecall *(optional)* | Dorado (native arm64 host / base image) | pod5 dir → `*.ont.fastq.gz` |
-| 01 | Read QC & filter | NanoPlot, chopper, fastp / base image | raw reads → `*.ont.filt.fastq.gz`, `readqc.json` |
-| 02 | Assembly | Flye \| Canu \| Raven + purge_dups / `staphb/flye` | filtered ONT → `*.assembly.fasta` |
-| 03a | ONT polish | Medaka / `staphb/medaka` | draft + ONT → `*.medaka.fasta` |
-| 03b | Short-read polish (hybrid) | bwa + Polypolish / `staphb/polypolish` | Medaka + Illumina → `*.polished.fasta`, `polish.json` |
+| 01 | Read QC & filter | NanoPlot, chopper, fastp / base image | raw reads → `*.ont.filt.fastq.gz`, `readqc.json` (mode-aware) |
+| 02 | Assembly (long-read) | Flye \| Canu \| Raven + purge_dups / `staphb/flye` | filtered ONT → `*.assembly.fasta` |
+| 02b | Assembly (short-read) | SPAdes \| MEGAHIT / `staphb/spades` | Illumina-only → `*.assembly.fasta` |
+| 03a | ONT polish | Medaka / `staphb/medaka` | draft + ONT → `*.medaka.fasta` (long-read isolates) |
+| 03b | Short-read polish (hybrid) / Illumina-only passthrough | bwa + Polypolish / `staphb/polypolish` | Medaka + Illumina → `*.polished.fasta`, `polish.json`; Illumina-only passes through (`mode=illumina_only`) |
 | 04 | Decontam + organelle split | Kraken2/tiara/BlobTools, GetOrganelle / base image | polished → `*.nuclear.fasta`, `*.mito.fasta`, `decontam.json` |
 | 05 | Assembly QC + completeness | QUAST, compleasm/BUSCO / `ezlabgva/busco` | nuclear → `assemblyqc.json` (contiguity, BUSCO, `qc_pass`) |
 | 06 | Repeat model + soft-mask | RepeatModeler2, RepeatMasker / `dfam/tetools` | nuclear → `*.masked.fasta`, `*.telib.fasta`, `repeat.json` |
@@ -269,7 +282,7 @@ process automatically.
 
 - `fungiforge run …` — thin wrapper over `nextflow run main.nf` (adds `--samplesheet`,
   `--data_dir`, `--outdir`, `-profile`, `-resume`; extra args pass through).
-- `fungiforge samplesheet …` — build a sample sheet by pairing ONT (and optional Illumina)
+- `fungiforge samplesheet …` — build a sample sheet by pairing ONT and/or Illumina
   read globs by sample id (§7).
 - `fungiforge fetch-refs --data_dir DIR` — print the reference-DB fetch command (§6).
 - `fungiforge version`.
@@ -371,30 +384,36 @@ sample,ont_fastq,illumina_r1,illumina_r2,compartment,facility,season
 ```
 
 - **`sample`** — unique isolate id (becomes the output directory and every filename).
-- **`ont_fastq`** — the ONT FASTQ (required). When `--basecall` is set this column is instead
-  the **pod5 directory** Dorado basecalls.
-- **`illumina_r1`, `illumina_r2`** — optional short reads; present → the Stage 03b hybrid
-  polish runs (under `--hybrid auto`). Left blank, the isolate is ONT-only and resistance calls
-  are flagged provisional. Missing reads are substituted with the `assets/NO_R1` / `NO_R2`
+- **`ont_fastq`** — the ONT FASTQ. **Optional** — required only when the isolate has no Illumina
+  reads. When `--basecall` is set this column is instead the **pod5 directory** Dorado basecalls.
+- **`illumina_r1`, `illumina_r2`** — paired short reads. **Optional** individually, but they come
+  as a pair (one without the other is an error). With ONT present → the Stage 03b hybrid polish
+  runs (under `--hybrid auto`). Without ONT → the isolate is **Illumina-only** and is assembled by
+  SPAdes (Stage 02b). Missing reads are substituted with the `assets/NO_ONT` / `NO_R1` / `NO_R2`
   sentinels so the channel plumbing stays well-typed.
 - **`compartment`, `facility`, `season`** — the One Health metadata carried untouched to the
   master table and consumed by Layer 2 (e.g. `AIR` / `HUMAN` / `SURFACE`; a facility label; a
   season). Default to `NA` when absent.
 
-A generic example:
+**Each row must provide either `ont_fastq` or the `illumina_r1`+`illumina_r2` pair (or all three).**
+The mode is auto-detected per row (`meta.assembly_mode`): ONT present → `longread`
+(ONT-only or hybrid); ONT absent → `shortread` (Illumina-only).
+
+A generic example mixing all three modes:
 
 ```text
 sample,ont_fastq,illumina_r1,illumina_r2,compartment,facility,season
 AF_AIR_001,reads/AF_AIR_001.ont.fastq.gz,reads/AF_AIR_001_R1.fastq.gz,reads/AF_AIR_001_R2.fastq.gz,AIR,Abattoir_1,Dry
 CA_HUM_014,reads/CA_HUM_014.ont.fastq.gz,,,HUMAN,Clinic_2,Wet
-AF_SUR_room,reads/AF_SUR_room.ont.fastq.gz,,,SURFACE,Abattoir_1,Dry
+CA_SUR_009,,reads/CA_SUR_009_R1.fastq.gz,reads/CA_SUR_009_R2.fastq.gz,SURFACE,Clinic_2,Wet
 ```
 
-Here `AF_AIR_001` has Illumina reads (it will be hybrid-polished, high-confidence resistance),
-while the other two are ONT-only (provisional resistance).
+Here `AF_AIR_001` is **hybrid** (ONT + Illumina → hybrid-polished, high-confidence resistance),
+`CA_HUM_014` is **ONT-only** (provisional resistance), and `CA_SUR_009` is **Illumina-only**
+(SPAdes assembly, high-confidence resistance).
 
-**Building one automatically.** `fungiforge samplesheet` pairs ONT and optional Illumina globs
-by sample id and stamps the metadata:
+**Building one automatically.** `fungiforge samplesheet` pairs ONT and/or Illumina globs
+by sample id and stamps the metadata (omit `--ont` entirely for an Illumina-only cohort):
 
 ```bash
 fungiforge samplesheet \
@@ -421,9 +440,10 @@ the knobs you will touch most.
 | `--samplesheet` | `null` | **required** — the CSV sample sheet |
 | `--data_dir` | `null` | reference-database root (§6); warns if unset |
 | `--outdir` | `results` | results directory |
-| `--hybrid` | `auto` | `auto` (polish with Illumina if present) \| `on` \| `off` |
-| `--assembler` | `flye` | `flye` \| `canu` \| `raven` |
-| `--purge_dups` | `true` | collapse heterozygous haplotigs after assembly |
+| `--hybrid` | `auto` | ONT isolates only: `auto` (polish with Illumina if present) \| `on` \| `off` |
+| `--assembler` | `flye` | long-read assembler (ONT/hybrid): `flye` \| `canu` \| `raven` |
+| `--sr_assembler` | `spades` | short-read assembler (Illumina-only): `spades` \| `megahit` |
+| `--purge_dups` | `true` | collapse heterozygous haplotigs after long-read assembly (skipped for short-read) |
 | `--ont_min_qual` | `10` | chopper Q filter (Stage 01) |
 | `--ont_min_len` | `1000` | chopper length filter (Stage 01) |
 | `--basecall` | `false` | run Dorado on a pod5 dir (ont_fastq column = pod5 dir) |
@@ -474,36 +494,46 @@ nextflow run main.nf -profile local,docker --samplesheet pod5_samples.csv \
     --data_dir /path/to/fungiforge_db --basecall --dorado_model r1041_e82_400bps_sup_v5.2.0
 ```
 
-## 9.2 Stage 01 — Read QC & filter
+## 9.2 Stage 01 — Read QC & filter (mode-aware)
 
-**ONT:** NanoPlot on raw and filtered reads; **chopper** filters by quality (`--ont_min_qual`,
-default Q10) and length (`--ont_min_len`, default 1000 bp). **Illumina (if present):** fastp.
-Emits the filtered ONT FASTQ (carried forward) and `readqc.json`.
+For **long-read isolates** (ONT present): **NanoPlot** on raw and filtered reads; **chopper**
+filters by quality (`--ont_min_qual`, default Q10) and length (`--ont_min_len`, default 1000 bp);
+**Illumina (if present):** fastp. For **Illumina-only isolates**: **fastp** only, and an empty ONT
+placeholder is emitted to keep the tuple contract. `readqc.json` records the `platform`
+(`ont` \| `hybrid` \| `illumina`) and the filtered ONT FASTQ (long-read) is carried forward.
 
-## 9.3 Stage 02 — Assembly
+## 9.3 Stage 02 — Assembly (long-read) / Stage 02b — Assembly (short-read)
 
-De-novo assembly with the chosen `--assembler`: **Flye `--nano-hq`** (default), Raven, or Canu
-(`genomeSize=35m`). When `--purge_dups true` (default), **purge_dups** collapses heterozygous
-haplotigs via a minimap2 self-alignment; if purge_dups is unavailable the raw assembly is kept.
-Emits `*.assembly.fasta`.
+**Long-read isolates (`assembly_mode == longread`)** are assembled with the chosen `--assembler`:
+**Flye `--nano-hq`** (default), Raven, or Canu (`genomeSize=35m`). When `--purge_dups true`
+(default), **purge_dups** collapses heterozygous haplotigs via a minimap2 self-alignment; if
+purge_dups is unavailable the raw assembly is kept.
 
-## 9.4 Stage 03a — ONT polish (Medaka), always run
+**Illumina-only isolates (`assembly_mode == shortread`)** are assembled by **Stage 02b** with
+`--sr_assembler`: **SPAdes `--isolate`** (default; built-in read error-correction) or **MEGAHIT**.
+purge_dups (a long-read haplotig step) does not apply. Both stages emit the same
+`*.assembly.fasta` so the two paths merge transparently downstream.
+
+## 9.4 Stage 03a — ONT polish (Medaka), long-read isolates
 
 **Medaka** (`staphb/medaka`) computes a neural consensus of the draft using the ONT reads and
 the `--dorado_model`. If Medaka produces no consensus the draft passes through unchanged. Emits
-`*.medaka.fasta`. Medaka and Polypolish live in different containers, which is why the polish is
-split into 03a and 03b.
+`*.medaka.fasta`. Runs only for long-read isolates (Illumina-only assemblies skip it — there is no
+ONT and no homopolymer error to correct). Medaka and Polypolish live in different containers,
+which is why the polish is split into 03a and 03b.
 
-## 9.5 Stage 03b — Short-read polish (Polypolish), the hybrid branch
+## 9.5 Stage 03b — Short-read polish (Polypolish) / Illumina-only passthrough
 
-When Illumina reads are present and `--hybrid` is `auto` (default) or `on`, this stage polishes
-the Medaka consensus with **Polypolish** (`staphb/polypolish`). Polypolish requires **all**
-alignments per read (`bwa mem -a`) plus an insert-size filter — the module runs `bwa index`,
-two `bwa mem -a` passes, `polypolish filter`, then `polypolish polish`. The reported **mode is
+For **hybrid isolates** (ONT + Illumina, `--hybrid` `auto`/`on`), this stage polishes the Medaka
+consensus with **Polypolish** (`staphb/polypolish`). Polypolish requires **all** alignments per
+read (`bwa mem -a`) plus an insert-size filter — the module runs `bwa index`, two `bwa mem -a`
+passes, `polypolish filter`, then `polypolish polish`. For **Illumina-only isolates** the SPAdes
+assembly is already short-read-derived, so it passes through unchanged. The reported **mode is
 honest**:
 
 - `hybrid` — the short-read pass succeeded (`resistance_confidence: high`);
-- `ont_only` — no Illumina reads (`provisional_ont_only`);
+- `illumina_only` — Illumina-only assembly, no ONT (`resistance_confidence: high`; no homopolymer-indel risk);
+- `ont_only` — long-read isolate with no Illumina reads (`provisional_ont_only`);
 - `hybrid_failed_ont_fallback` — the pass was attempted but failed, so the Medaka consensus is
   kept and the mode says so (`provisional_ont_only`) — never silently claimed as a clean hybrid.
 
@@ -782,7 +812,8 @@ this manual; do not over-read them.
 | ITSx aborts "over comparison pipeline limit" | it was handed a whole chromosome — `extract_rrna_region.py` windows the rRNA operon first; ensure barrnap ran |
 | Resistance genes all `no_reference` | FungAMR references not staged — run `bin/fetch_references.sh fungamr` (builds `reference_proteins.faa` from UniProt) |
 | A UNITE/Kraken2/RVDB fetch step logs `FAILED` | version-sensitive URL 404'd — resolve the current release (recipe in `fetch_references.sh`) and re-run just that step |
-| Resistance calls all `provisional_ont_only` | the isolate is ONT-only — add Illumina reads (populate `illumina_r1/r2`) for a hybrid polish and `high` confidence |
+| Resistance calls all `provisional_ont_only` | the isolate is ONT-only — add Illumina reads (populate `illumina_r1/r2`) for a hybrid polish, or run it Illumina-only, for `high` confidence |
+| Illumina-only isolate not assembling / wrong assembler | check the row has both `illumina_r1`+`illumina_r2` and no `ont_fastq`; switch `--sr_assembler spades\|megahit` if SPAdes runs out of memory (MEGAHIT is leaner) |
 | A stage's container gets pulled despite a skip | ensure you used the `--skip_*` flag (it emits an empty channel, avoiding the pull) |
 | conda env won't solve on Apple Silicon | `CONDA_SUBDIR=osx-64 mamba env create -f env/<name>.yml` (some builds are linux/osx-64 only) |
 

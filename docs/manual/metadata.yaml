@@ -1,6 +1,6 @@
 ---
 title: "FungiForge — User Manual"
-subtitle: "A fungal ONT (+optional Illumina hybrid) genomics pipeline (reads → assembly → annotation → identification → antifungal resistance → BGCs → One Health analysis)"
+subtitle: "A fungal ONT / Illumina / hybrid genomics pipeline (reads → assembly → annotation → identification → antifungal resistance → BGCs → One Health analysis)"
 author:
   - "Bright Adu"
   - ""
