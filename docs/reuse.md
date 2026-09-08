@@ -6,9 +6,10 @@ layers fungal One Health work actually needs. Per stage:
 | Stage | Reused / adapted | Built bespoke |
 |---|---|---|
 | 00 basecall | Dorado (ONT) | — |
-| 01 read QC | NanoPlot, chopper, fastp, Kraken2, GenomeScope2 | QC JSON contract |
-| 02 assembly | Flye / Canu / Raven, purge_dups, minimap2 | assembler switch + size-vs-expectation check |
-| 03 polish | Medaka, Polypolish, POLCA | **hybrid branch + polishing-confidence flag feeding resistance** |
+| 01 read QC | NanoPlot, chopper, fastp, Kraken2, GenomeScope2 | mode-aware QC JSON contract (ONT / Illumina / hybrid) |
+| 02 assembly (long-read) | Flye / Canu / Raven, purge_dups, minimap2 | assembler switch + size-vs-expectation check |
+| 02b assembly (short-read) | **SPAdes / MEGAHIT** | Illumina-only assembly branch (`meta.assembly_mode`), same FASTA contract |
+| 03 polish | Medaka, Polypolish, POLCA | **hybrid branch + polishing-confidence flag feeding resistance; Illumina-only bypass (mode=illumina_only, high conf)** |
 | 04 decontam | Kraken2/tiara, BlobTools, GetOrganelle/oatk | nuclear/mito split contract |
 | 05 QC | QUAST, compleasm/BUSCO, Merqury | MIMAG-style QC-pass gate |
 | 06 repeats | RepeatModeler2, RepeatMasker (dfam/tetools) | TE-class + RIP summary for Stage 10 |

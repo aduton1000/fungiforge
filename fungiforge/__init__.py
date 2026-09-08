@@ -1,4 +1,4 @@
-"""FungiForge — reproducible fungal genomics from ONT (+ optional Illumina hybrid).
+"""FungiForge — reproducible fungal genomics from ONT, Illumina, or ONT+Illumina hybrid.
 
 Layer 1 is a Nextflow DSL2 pipeline (see main.nf); this Python package is the thin
 CLI front door plus the bespoke per-isolate callers invoked by the pipeline's bin/

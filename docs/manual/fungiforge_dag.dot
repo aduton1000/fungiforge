@@ -8,13 +8,13 @@ digraph FungiForge {
     bgcolor="white";
     labelloc="t";
     fontname="Helvetica-Bold"; fontsize=20;
-    label="FungiForge — fungal ONT (+optional Illumina hybrid) genomics (reads → assembly → annotation → ID → resistance → BGCs → report → One Health analysis)";
+    label="FungiForge — fungal ONT / Illumina / hybrid genomics (reads → assembly → annotation → ID → resistance → BGCs → report → One Health analysis)";
     node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.16,0.09"];
     edge [color="#5f6368", arrowsize=0.8];
 
     // ---- external inputs (cylinders) ----
     node [shape=cylinder, style="filled", fillcolor="#fffde7", color="#f9a825"];
-    ONT   [label="ONT reads (FASTQ)\nor pod5 dir (--basecall)\n+ optional Illumina R1/R2\n+ sample sheet"];
+    ONT   [label="Reads (FASTQ) + sample sheet\nONT (or pod5 dir, --basecall)\nand/or Illumina R1/R2\n(ONT-only · Illumina-only · hybrid)"];
     DBS   [label="Reference databases (--data_dir)\nUNITE · FungAMR · BUSCO/odb10\nfunannotate · antiSMASH · Kraken2\nRVDB · sourmash-fungi · eggNOG\n(bin/fetch_references.sh; aria2c resumable)"];
 
     // ---- main pipeline nodes, coloured by stage group ----
@@ -23,7 +23,7 @@ digraph FungiForge {
     // reads & assembly
     S0  [label="Stage 00 — Basecall (optional)\nDorado (native arm64 host)\n[--basecall; pod5 → FASTQ]", fillcolor="#e8f0fe", color="#4285f4", style="rounded,filled,dashed"];
     S1  [label="Stage 01 — Read QC & filter\nONT: NanoPlot + chopper · Illumina: fastp\n[base image]", fillcolor="#e8f0fe", color="#4285f4"];
-    S2  [label="Stage 02 — Assembly\nFlye --nano-hq (| canu | raven) + purge_dups\n[staphb/flye]", fillcolor="#e6f4ea", color="#34a853"];
+    S2  [label="Stage 02/02b — Assembly\nlong-read: Flye --nano-hq (| canu | raven) + purge_dups [staphb/flye]\nIllumina-only: SPAdes (| megahit) [staphb/spades]", fillcolor="#e6f4ea", color="#34a853"];
     S3a [label="Stage 03a — ONT polish (always)\nMedaka consensus\n[staphb/medaka]", fillcolor="#d7f0e3", color="#137333"];
     S3b [label="Stage 03b — Short-read polish (hybrid)\nbwa mem -a → Polypolish\n[staphb/polypolish]\nmode: hybrid | ont_only | hybrid_failed_ont_fallback", fillcolor="#d7f0e3", color="#137333"];
     S4  [label="Stage 04 — Decontam + organelle split\nKraken2/tiara + BlobTools · GetOrganelle/oatk\n→ nuclear / mito  [base image]", fillcolor="#e6f4ea", color="#34a853"];
