@@ -6,6 +6,11 @@
 // short-read pass is attempted but fails, it is 'hybrid_failed_ont_fallback'
 // (never silently claimed as a clean hybrid). resistance_confidence rides
 // downstream to flag ONT-only calls as provisional (homopolymer indels).
+//
+// Short-read-only isolates (assembly_mode == 'shortread') arrive here with a SPAdes
+// assembly already built from the Illumina reads: there is nothing to hybrid-polish
+// and no homopolymer-indel problem, so the assembly passes through unchanged with
+// mode='illumina_only' and resistance_confidence='high'.
 process SRPOLISH {
   tag { meta.id }
   label 'srpolish'
@@ -15,8 +20,15 @@ process SRPOLISH {
           tuple val(meta), path("${meta.id}.polish.json"),    emit: json
   script:
   def has_illumina = r1.name != 'NO_R1'
-  def do_hybrid = params.hybrid == 'on' || (params.hybrid == 'auto' && has_illumina)
-  if (do_hybrid)
+  def is_shortread = meta.assembly_mode == 'shortread'
+  def do_hybrid = !is_shortread && (params.hybrid == 'on' || (params.hybrid == 'auto' && has_illumina))
+  if (is_shortread)
+    """
+    cp ${medaka} ${meta.id}.polished.fasta
+    printf '{"sample":"%s","stage":"polish","mode":"illumina_only","short_read_polisher":"none","assembler":"%s","polypolish_bp_changed":"NA","resistance_confidence":"high"}\\n' \\
+      "${meta.id}" "${params.sr_assembler}" > ${meta.id}.polish.json
+    """
+  else if (do_hybrid)
     """
     MODE=hybrid_failed_ont_fallback; CONF=provisional_ont_only; CHANGES=NA
     if bwa index ${medaka} 2> bwa_index.log \\
