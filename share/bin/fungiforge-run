@@ -1,21 +1,105 @@
 #!/usr/bin/env bash
-# fungiforge HPC launcher — sources site config then runs the pipeline with the
-# SLURM + Apptainer profiles. Deploy: copy share/fungiforge-env.sh.example to
-# ~/.fungiforge-env.sh, edit paths, then `module load fungiforge` exposes this.
+# fungiforge — shared HPC launcher (SLURM + Apptainer/Singularity). Works WITH or
+# WITHOUT a module system: everything resolves from the site env file + install-
+# relative defaults. Forwards every extra argument straight to `nextflow run`.
 #
-#   fungiforge-run --samplesheet s.csv [extra nextflow args...]
+#   fungiforge-run --samplesheet samples.csv [--outdir results] [-resume] [nextflow args...]
+#   fungiforge-run --help
+#
+# Site env (sourced, first found): $FUNGIFORGE_ENV, ~/.fungiforge-env.sh,
+#   <install_root>/fungiforge-env.sh, <repo>/share/fungiforge-env.sh
+#   (see share/fungiforge-env.sh.example; bin/hpc_install.sh writes a filled-in one)
+#
+# Environment (all optional except FUNGIFORGE_DB):
+#   FUNGIFORGE_HOME         repo checkout (default: parent of this script's share/bin)
+#   FUNGIFORGE_DB           reference-database root  (REQUIRED; bin/fetch_references.sh target)
+#   FUNGIFORGE_WORK         Nextflow work dir        (default: <cwd>/work)
+#   FUNGIFORGE_ENGINE       apptainer | singularity  (default: apptainer)
+#   FUNGIFORGE_PROFILE      full -profile string     (default: hpc_slurm,$FUNGIFORGE_ENGINE)
+#   FUNGIFORGE_PARTITION    SLURM partition          (default: cluster default partition)
+#   FUNGIFORGE_ACCOUNT      SLURM account            (default: none)
+#   FUNGIFORGE_SITE_CONFIG  extra nextflow config passed with -c (caps, image paths, …)
+#   FUNGIFORGE_IMAGE_CACHE  shared .sif cache (NXF_APPTAINER_CACHEDIR / NXF_SINGULARITY_CACHEDIR)
+#   FUNGIFORGE_BIND         extra host paths to bind into task containers (comma-separated)
+#   FUNGIFORGE_RUNDIR       where run state (.nextflow/, log, work/) goes (default: $PWD)
 set -euo pipefail
-: "${FUNGIFORGE_HOME:?set FUNGIFORGE_HOME to the repo checkout (see fungiforge-env.sh)}"
-: "${FUNGIFORGE_DB:?set FUNGIFORGE_DB to the reference-database dir}"
-[ -f "${FUNGIFORGE_ENV:-$HOME/.fungiforge-env.sh}" ] && source "${FUNGIFORGE_ENV:-$HOME/.fungiforge-env.sh}"
 
-PROFILE="${FUNGIFORGE_PROFILE:-hpc_slurm,apptainer}"
-WORK="${FUNGIFORGE_WORK:-$PWD/work}"
+_self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_default_home="$(cd "${_self_dir}/../.." && pwd)"
 
-exec nextflow run "$FUNGIFORGE_HOME/main.nf" \
-    -profile "$PROFILE" \
-    -work-dir "$WORK" \
-    --data_dir "$FUNGIFORGE_DB" \
-    ${FUNGIFORGE_PARTITION:+--slurm_partition "$FUNGIFORGE_PARTITION"} \
-    ${FUNGIFORGE_ACCOUNT:+--slurm_account "$FUNGIFORGE_ACCOUNT"} \
-    "$@"
+# --- site env ---------------------------------------------------------------
+for _env in "${FUNGIFORGE_ENV:-}" "$HOME/.fungiforge-env.sh" \
+            "${_default_home}/../fungiforge-env.sh" "${_default_home}/share/fungiforge-env.sh"; do
+  if [[ -n "$_env" && -f "$_env" ]]; then source "$_env"; break; fi
+done
+FUNGIFORGE_HOME="${FUNGIFORGE_HOME:-$_default_home}"
+
+ENGINE="${FUNGIFORGE_ENGINE:-apptainer}"
+case "$ENGINE" in apptainer|singularity) ;; *) echo "[fungiforge-run] ERROR: FUNGIFORGE_ENGINE must be apptainer or singularity (got '$ENGINE')" >&2; exit 2;; esac
+PROFILE="${FUNGIFORGE_PROFILE:-hpc_slurm,${ENGINE}}"
+RUNDIR="${FUNGIFORGE_RUNDIR:-$PWD}"
+WORK="${FUNGIFORGE_WORK:-$RUNDIR/work}"
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || $# -eq 0 ]]; then
+  cat <<EOF
+fungiforge-run — shared HPC launcher (forwards to: nextflow run \$FUNGIFORGE_HOME/main.nf)
+  FUNGIFORGE_HOME        = ${FUNGIFORGE_HOME}
+  FUNGIFORGE_DB          = ${FUNGIFORGE_DB:-<UNSET — required>}
+  FUNGIFORGE_PROFILE     = ${PROFILE}
+  FUNGIFORGE_WORK        = ${WORK}
+  FUNGIFORGE_PARTITION   = ${FUNGIFORGE_PARTITION:-<cluster default>}
+  FUNGIFORGE_ACCOUNT     = ${FUNGIFORGE_ACCOUNT:-<none>}
+  FUNGIFORGE_SITE_CONFIG = ${FUNGIFORGE_SITE_CONFIG:-<none>}
+  FUNGIFORGE_IMAGE_CACHE = ${FUNGIFORGE_IMAGE_CACHE:-<nextflow default>}
+  FUNGIFORGE_BIND        = ${FUNGIFORGE_BIND:-<none>}
+
+usage: fungiforge-run --samplesheet samples.csv [--outdir results] [-resume] [nextflow args]
+Run from a WRITABLE directory (run state goes there). Pass -profile to override the
+site profile entirely (e.g. -profile test,hpc_slurm,apptainer -stub-run).
+EOF
+  [[ $# -eq 0 ]] && exit 1 || exit 0
+fi
+
+: "${FUNGIFORGE_DB:?[fungiforge-run] set FUNGIFORGE_DB (reference-database root) — see fungiforge-env.sh}"
+[[ -f "$FUNGIFORGE_HOME/main.nf" ]] || { echo "[fungiforge-run] ERROR: no main.nf under FUNGIFORGE_HOME=$FUNGIFORGE_HOME" >&2; exit 2; }
+
+# --- run state must be user-writable (never the shared read-only install) ---
+if ! ( : > "${RUNDIR}/.fungiforge-wtest.$$" ) 2>/dev/null; then
+  echo "[fungiforge-run] ERROR: run directory is not writable: ${RUNDIR}" >&2
+  echo "  Nextflow writes .nextflow/, .nextflow.log and work/ here. cd to your home or a project dir," >&2
+  echo "  or set FUNGIFORGE_RUNDIR=/path/to/writable." >&2
+  exit 1
+fi
+rm -f "${RUNDIR}/.fungiforge-wtest.$$"
+mkdir -p "$WORK"
+export NXF_HOME="${NXF_HOME:-$HOME/.nextflow}"
+
+# --- shared image cache + bind mounts --------------------------------------
+if [[ -n "${FUNGIFORGE_IMAGE_CACHE:-}" ]]; then
+  export NXF_APPTAINER_CACHEDIR="${NXF_APPTAINER_CACHEDIR:-$FUNGIFORGE_IMAGE_CACHE}"
+  export NXF_SINGULARITY_CACHEDIR="${NXF_SINGULARITY_CACHEDIR:-$FUNGIFORGE_IMAGE_CACHE}"
+fi
+# Apptainer auto-mounts $HOME, /tmp and CWD only; the DB root and work dir must be bound.
+_bind="$FUNGIFORGE_DB,$WORK${FUNGIFORGE_BIND:+,$FUNGIFORGE_BIND}"
+export APPTAINER_BIND="${APPTAINER_BIND:+$APPTAINER_BIND,}$_bind"
+export SINGULARITY_BIND="${SINGULARITY_BIND:+$SINGULARITY_BIND,}$_bind"
+
+# --- assemble the command ----------------------------------------------------
+pre=(); post=()
+_have_profile=0; _have_log=0; _have_work=0
+for _a in "$@"; do case "$_a" in
+  -profile|-profile=*)              _have_profile=1 ;;
+  -log|-log=*)                      _have_log=1 ;;
+  -w|-work-dir|-work-dir=*)         _have_work=1 ;;
+esac; done
+[[ $_have_log  -eq 0 ]] && pre+=("-log" "${RUNDIR}/.nextflow.log")
+[[ $_have_profile -eq 0 ]] && post+=("-profile" "$PROFILE")
+[[ $_have_work -eq 0 ]] && post+=("-work-dir" "$WORK")
+[[ -n "${FUNGIFORGE_SITE_CONFIG:-}" && -f "${FUNGIFORGE_SITE_CONFIG}" ]] && post+=("-c" "$FUNGIFORGE_SITE_CONFIG")
+post+=("--data_dir" "$FUNGIFORGE_DB")
+[[ -n "${FUNGIFORGE_PARTITION:-}" ]] && post+=("--slurm_partition" "$FUNGIFORGE_PARTITION")
+[[ -n "${FUNGIFORGE_ACCOUNT:-}"   ]] && post+=("--slurm_account"   "$FUNGIFORGE_ACCOUNT")
+
+NF="${FUNGIFORGE_NEXTFLOW:-nextflow}"
+echo "[fungiforge-run] $NF ${pre[*]} run $FUNGIFORGE_HOME/main.nf ${post[*]} $*" >&2
+exec "$NF" "${pre[@]}" run "$FUNGIFORGE_HOME/main.nf" "${post[@]}" "$@"

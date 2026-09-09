@@ -76,6 +76,7 @@ set -euo pipefail
 # Defaults
 # ----------------------------------------------------------------------------
 IMAGE="${FUNGIFORGE_IMAGE:-aduton1000/fungiforge:0.1.0}"
+SIF="${FUNGIFORGE_SIF:-}"   # set (or --sif) => run via apptainer/singularity instead of docker (HPC)
 DB="${FUNGIFORGE_DB:-}"
 INPUT=""
 MERGED="./preflight_merged"
@@ -127,6 +128,8 @@ OPTIONS
   --amplicon-subn N    Reads subsampled for the amplicon test. Default 2000.
   --id-max-reads N     Cap on reads fed to the species-ID vsearch. Default 50000.
   --image NAME         Base docker image. Default aduton1000/fungiforge:0.1.0
+  --sif PATH           Run inside this .sif with apptainer/singularity instead of
+                       docker (HPC). Default $FUNGIFORGE_SIF.
   --force              Re-merge / overwrite existing merged outputs.
   -h, --help           This help.
 
@@ -153,6 +156,7 @@ while [ $# -gt 0 ]; do
     --amplicon-subn) AMPLICON_SUBN="${2:-}"; shift 2 ;;
     --id-max-reads)  ID_MAX_READS="${2:-}"; shift 2 ;;
     --image)         IMAGE="${2:-}"; shift 2 ;;
+    --sif)           SIF="${2:-}"; shift 2 ;;
     --skip-merge)    SKIP_MERGE=1; shift ;;
     --force)         FORCE=1; shift ;;
     -h|--help)       usage; exit 0 ;;
@@ -201,14 +205,23 @@ num(){ local v="${1:-}"; [ -z "$v" ] && echo 0 || echo "$v"; }
 # scripts stay single-quoted (no fragile nested quoting).
 # ----------------------------------------------------------------------------
 dock(){ # $1 = inner bash script (single-quoted at call site)
-  docker run --rm --platform linux/amd64 \
-    -e HOME=/tmp -e USER=fungiforge \
-    -e BASE -e UNITE -e AMPLICON_SUBN -e ID_MAX_READS \
-    -e COV_GO -e GOOD_N50 -e AMP_PCT_HI \
-    -v "$MERGED_ABS":/reads:ro \
-    -v "$DB":/db:ro \
-    -v "$OUTDIR_ABS":/out \
-    "$IMAGE" bash -c "$1"
+  if [ -n "$SIF" ]; then
+    # apptainer/singularity: same /reads,/db,/out layout; host env is inherited so the
+    # -e forwards are implicit. --containall keeps $HOME/CWD out, mirroring docker.
+    export BASE UNITE AMPLICON_SUBN ID_MAX_READS COV_GO GOOD_N50 AMP_PCT_HI
+    "$CRT" exec --containall --env USER=fungiforge --pwd /out \
+      -B "$MERGED_ABS":/reads:ro -B "$DB":/db:ro -B "$OUTDIR_ABS":/out \
+      "$SIF" bash -c "$1"
+  else
+    docker run --rm --platform linux/amd64 \
+      -e HOME=/tmp -e USER=fungiforge \
+      -e BASE -e UNITE -e AMPLICON_SUBN -e ID_MAX_READS \
+      -e COV_GO -e GOOD_N50 -e AMP_PCT_HI \
+      -v "$MERGED_ABS":/reads:ro \
+      -v "$DB":/db:ro \
+      -v "$OUTDIR_ABS":/out \
+      "$IMAGE" bash -c "$1"
+  fi
 }
 
 # ----------------------------------------------------------------------------
@@ -226,18 +239,28 @@ RUN_HOST="$(hostname 2>/dev/null || echo unknown)"
 ###############################################################################
 banner "CHECK 1  ENVIRONMENT READINESS"
 
-command -v docker >/dev/null 2>&1 || die "docker not found on PATH. Install/start Docker Desktop."
-docker info >/dev/null 2>&1 || die "docker daemon not responding. Is Docker Desktop running?"
-
-# NB: capture first — piping `docker images` into `grep -q` makes grep close the
-# pipe on first match, which SIGPIPEs `docker images` and trips `pipefail`.
-IMG_REPO="${IMAGE%:*}"
-IMG_LIST="$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null || true)"
-if printf '%s\n' "$IMG_LIST" | grep -q "$IMG_REPO"; then
-  echo "[ok] base image present: $IMAGE"
-  envrow PASS "docker image" "$IMAGE"
+CRT=""
+if [ -n "$SIF" ]; then
+  command -v apptainer >/dev/null 2>&1 && CRT=apptainer
+  [ -z "$CRT" ] && command -v singularity >/dev/null 2>&1 && CRT=singularity
+  [ -n "$CRT" ] || die "--sif given but neither apptainer nor singularity is on PATH."
+  [ -s "$SIF" ] || die "container image not found: $SIF"
+  echo "[ok] container image present ($CRT): $SIF"
+  envrow PASS "container image" "$SIF ($CRT)"
 else
-  die "base image '$IMAGE' not found (docker images | grep fungiforge). Build/pull it first."
+  command -v docker >/dev/null 2>&1 || die "docker not found on PATH. Install/start Docker Desktop (or pass --sif on an HPC)."
+  docker info >/dev/null 2>&1 || die "docker daemon not responding. Is Docker Desktop running?"
+
+  # NB: capture first — piping `docker images` into `grep -q` makes grep close the
+  # pipe on first match, which SIGPIPEs `docker images` and trips `pipefail`.
+  IMG_REPO="${IMAGE%:*}"
+  IMG_LIST="$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null || true)"
+  if printf '%s\n' "$IMG_LIST" | grep -q "$IMG_REPO"; then
+    echo "[ok] base image present: $IMAGE"
+    envrow PASS "docker image" "$IMAGE"
+  else
+    die "base image '$IMAGE' not found (docker images | grep fungiforge). Build/pull it first."
+  fi
 fi
 
 [ -n "$INPUT" ] || die "--input is required. Run with --help."
