@@ -48,23 +48,42 @@ mark(){ date '+%F %T' > "$DB/$1/.done"; echo -e "$1\t$2\tOK\t$(date '+%F %T')" >
 fail(){ echo -e "$1\t$2\tFAILED\t$(date '+%F %T')" >> "$MANIFEST"; log "✗ $1 FAILED ($2) — continuing"; }
 
 # ---- container images (linux/amd64; emulated on Mac, native on HPC) ----------
-IMAGES=(
-  "staphb/flye:latest"
-  "staphb/medaka:latest"
-  "staphb/filtlong:latest"
-  "antismash/standalone:8.0.0"
-  "nextgenusfs/funannotate:latest"      # Funannotate: predict + annotate + setup
-  "dfam/tetools:latest"                 # RepeatModeler2 + RepeatMasker
-  "ezlabgva/busco:v5.7.1_cv1"           # BUSCO (fallback if compleasm unavailable)
-)
+# Image list is derived from conf/base.config so it never drifts. The two
+# aduton1000/* images are built locally (env/Dockerfile, env/antismash-ff.Dockerfile)
+# and are skipped here. On a Docker host: `docker pull`. On an Apptainer/Singularity
+# host: pre-pull into the shared Nextflow image cache ($NXF_APPTAINER_CACHEDIR /
+# $NXF_SINGULARITY_CACHEDIR, default $DB/containers) using Nextflow's own file-naming
+# (registry/repo:tag -> registry-repo-tag.img) so runs find them without pulling.
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+public_images(){
+  grep -oE "container *= *'[^']+'" "$REPO_DIR/conf/base.config" | sed -E "s/.*'([^']+)'/\1/" \
+    | grep -v '^aduton1000/' | sort -u
+}
 step_images(){
   is_done containers && { log "images already pulled — skip"; return; }
-  local ok=1
-  for img in "${IMAGES[@]}"; do
-    log "docker pull $img"
-    docker pull --platform linux/amd64 "$img" >>"$LOGDIR/images.log" 2>&1 || { fail containers "$img"; ok=0; }
-  done
-  [ "$ok" = 1 ] && mark containers "${#IMAGES[@]} images"
+  local ok=1 img
+  local rt=""; command -v apptainer >/dev/null 2>&1 && rt=apptainer
+  [ -z "$rt" ] && command -v singularity >/dev/null 2>&1 && rt=singularity
+  if [ -n "$rt" ]; then
+    local cache="${NXF_APPTAINER_CACHEDIR:-${NXF_SINGULARITY_CACHEDIR:-$DB/containers}}"
+    mkdir -p "$cache"
+    for img in $(public_images); do
+      local name; name="$(echo "$img" | sed -E 's#[/:]#-#g').img"
+      if [ -s "$cache/$name" ]; then log "have $name — skip"; continue; fi
+      log "$rt pull $img -> $cache/$name"
+      $rt pull --name "$cache/$name" "docker://$img" >>"$LOGDIR/images.log" 2>&1 \
+        || { fail containers "$img"; ok=0; rm -f "$cache/$name"; }
+    done
+    [ "$ok" = 1 ] && mark containers "$(public_images | wc -l | tr -d ' ') images -> $cache"
+  elif command -v docker >/dev/null 2>&1; then
+    for img in $(public_images); do
+      log "docker pull $img"
+      docker pull --platform linux/amd64 "$img" >>"$LOGDIR/images.log" 2>&1 || { fail containers "$img"; ok=0; }
+    done
+    [ "$ok" = 1 ] && mark containers "$(public_images | wc -l | tr -d ' ') images (docker)"
+  else
+    fail containers "no apptainer/singularity/docker on PATH"
+  fi
 }
 
 # ---- antiSMASH databases (~9 GB) via the antismash 8 image -------------------

@@ -1,0 +1,39 @@
+// fungiforge — per-site Nextflow overrides, passed with `-c` (fungiforge-run does this
+// via FUNGIFORGE_SITE_CONFIG). Applied AFTER nextflow.config + profiles, so anything
+// here wins. Copy to <install_root>/site.config and edit. Values below suit a cluster
+// whose nodes have 72 cores / 1 TB RAM and no walltime limit; scale to yours.
+params {
+  // caps used by the per-label closures in conf/base.config
+  max_cpus   = 24
+  max_memory = '480.GB'
+  max_time   = '240.h'
+
+  // the two fungiforge-built images are NOT on Docker Hub — point at local .sif files
+  // (built by bin/hpc_install.sh from env/Dockerfile + env/antismash-ff.Dockerfile)
+  fungiforge_image = '/hpc/opt/fungiforge/images/fungiforge-0.1.0.sif'
+  antismash_image  = '/hpc/opt/fungiforge/images/antismash-ff-8.0.0-r2.sif'
+
+  // native linux/amd64: enable the stages that were too slow under Mac emulation
+  run_interproscan = true
+  genome_id        = true
+
+  // slurm_partition = 'global'   // or leave to FUNGIFORGE_PARTITION / cluster default
+}
+
+// heavier slots for the long stages on big nodes
+process {
+  withLabel: assembly { cpus = 24; memory = 128.GB; time = 48.h  }
+  withLabel: repeat   { cpus = 24; memory = 96.GB;  time = 96.h  }
+  withLabel: annotate { cpus = 24; memory = 160.GB; time = 240.h }
+  withLabel: polish   { cpus = 16; memory = 64.GB               }
+  withLabel: busco    { cpus = 16; memory = 48.GB               }
+}
+
+executor {
+  queueSize = 60          // 4 nodes × 72 cores — keep headroom for other users
+}
+
+apptainer {
+  cacheDir    = '/hpc/opt/fungiforge/images/cache'   // shared, pre-pulled .img files
+  pullTimeout = '4 h'                                  // funannotate image is ~15 GB
+}
