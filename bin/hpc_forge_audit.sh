@@ -23,6 +23,13 @@ esac; shift; done
 HOST="$(hostname -s 2>/dev/null || hostname)"
 [ -n "$OUT" ] || OUT="$HOME/forge_audit_${HOST}_$(date +%Y%m%d_%H%M%S).txt"
 TMO=""; command -v timeout >/dev/null 2>&1 && TMO="timeout -k 5"
+# Over a non-login ssh (`ssh host 'bash audit.sh'`) /etc/profile.d is NOT sourced, so the
+# forge env files and the shared nextflow never reach PATH and every PATH check is a false
+# MISSING. Load the site hooks ourselves (they are silent, export-only snippets).
+SOURCED_HOOKS=""
+for f in /etc/profile.d/*.sh; do
+  [ -r "$f" ] && grep -qs 'hpc/opt\|forge' "$f" && { . "$f" >/dev/null 2>&1 || true; SOURCED_HOOKS="$SOURCED_HOOKS $f"; }
+done
 
 hdr(){ echo; echo "=================================================================="; echo "## $*"; echo "=================================================================="; }
 sub(){ echo; echo "--- $* ---"; }
@@ -110,7 +117,9 @@ audit_forge(){
 
   sub "reference / database roots"
   local refs; refs="$(env | grep -E "^${UP}_(REFS|DB|DATA)=" | cut -d= -f2)"
-  for f in $refs /hpc/refs/$name /hpc/data/$name /hpc/refs; do [ -d "$f" ] && run 20 "refs $f" "ls -la '$f' | head -30; du -sh '$f'/* 2>/dev/null | sort -h | tail -15"; done
+  for f in $refs "$root/refs" "$root/config" "$root/images" /hpc/refs/$name /hpc/data/$name /hpc/refs; do
+    [ -d "$f" ] && run 30 "contents of $f" "ls -la '$f' | head -40; echo; du -sh '$f'/* 2>/dev/null | sort -h | tail -25"; done
+  [ -d "$root/refs" ] && run 60 "what kind of refs (fasta / index / vcf / cache)" "cd '$root/refs' && ls | sed -E 's/.*\.(fa|fasta|fna)(\.gz)?$/GENOME &/; s/.*\.(0123|bwt\.2bit\.64|amb|ann|pac|sa)$/BWA-INDEX &/; s/.*\.bt2$/BOWTIE2-INDEX &/; s/.*\.(fai|dict)$/GENOME-AUX &/; s/.*\.vcf(\.gz)?$/VCF &/; s/.*\.(bw|bigwig)$/BIGWIG &/; s/.*\.bed(\.gz)?$/BED &/; s/.*\.gtf(\.gz)?$/GTF &/' | sort | head -60; find . -maxdepth 2 -type d | head -20"
   [ -n "$refs" ] && { for f in $refs; do [ -d "$f" ] && ok "refs root" "$f ($(size "$f"))" || miss "refs root" "$f (named in env) does not exist"; done; }
 
   sub "PATH integration"
@@ -128,6 +137,7 @@ audit_forge(){
   sub "run history (where did we leave off?)"
   run 60 "nextflow history files mentioning $name" "for h in \$(find \$HOME /hpc/prj /hpc/data -maxdepth 4 -path '*/.nextflow/history' 2>/dev/null); do if grep -qi '$name' \"\$h\" 2>/dev/null; then echo \"== \$h\"; tail -5 \"\$h\" | cut -c1-200; fi; done"
   run 60 "recent nextflow logs mentioning $name (last status line)" "for l in \$(find \$HOME /hpc/prj -maxdepth 3 -name '.nextflow.log*' -newermt '-120 days' 2>/dev/null | head -30); do grep -qi '$name' \"\$l\" 2>/dev/null || continue; echo \"== \$l (\$(stat -c %y \"\$l\" | cut -d. -f1))\"; grep -E 'Launching|Execution complete|Execution cancelled|Session aborted|ERROR ~|Goodbye|Pipeline completed' \"\$l\" | tail -3 | cut -c1-220; done"
+  run 30 "last run's launch command + params (from history)" "for h in \$(find \$HOME /hpc/prj -maxdepth 4 -path '*/.nextflow/history' 2>/dev/null); do grep -i '$name' \"\$h\" 2>/dev/null | tail -1 | cut -f7- | cut -c1-600; done; ls -d \$HOME/*/results* 2>/dev/null | head; for r in \$(ls -d \$HOME/cf_sim*/results* \$HOME/cf_smoke/results* 2>/dev/null | head -4); do echo \"== \$r\"; ls \"\$r\" | head -12; done"
   run 30 "results / work dirs mentioning $name" "find \$HOME /hpc/prj -maxdepth 3 -type d \( -iname 'results*' -o -iname '*${name}*' -o -name 'work' \) -newermt '-365 days' 2>/dev/null | head -20"
   run 20 "handover / notes in the install" "ls '$root'/*.md '$repo'/HANDOVER.md '$repo'/docs/*.md 2>/dev/null; head -30 '$repo/HANDOVER.md' 2>/dev/null"
   summary "$name"
@@ -145,6 +155,7 @@ summary(){
   echo "forge audit — $(date) — $(id -un)@$(hostname -f 2>/dev/null || hostname)"
   echo "targets: ${TARGETS[*]}"
   hdr "shared context"
+  echo "profile.d hooks sourced by this audit:${SOURCED_HOOKS:- none}"
   run 10 "PATH" "echo \"\$PATH\" | tr ':' '\n' | awk '!seen[\$0]++' | grep -E 'hpc|opt|forge'"
   run 10 "/hpc/opt contents" "ls -la /hpc/opt 2>/dev/null; ls -la /hpc/opt/*/ 2>/dev/null | head -60"
   run 10 "profile.d hooks" "ls -la /etc/profile.d/ 2>/dev/null; grep -l 'hpc/opt' /etc/profile.d/* 2>/dev/null | xargs -r cat"
