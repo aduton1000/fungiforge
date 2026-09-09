@@ -1,12 +1,40 @@
-# fungiforge site config — copy to ~/.fungiforge-env.sh and edit. Sourced by
-# share/bin/fungiforge-run (and safe to `source` in your ~/.bashrc).
-export FUNGIFORGE_HOME="/path/to/fungiforge"                 # repo checkout
-export FUNGIFORGE_DB="/scratch/$USER/fungiforge_db"          # bin/fetch_references.sh target
-export FUNGIFORGE_WORK="/scratch/$USER/fungiforge_work"      # Nextflow work/ (needs space)
-export FUNGIFORGE_PROFILE="hpc_slurm,apptainer"              # or hpc_slurm,singularity
-# optional SLURM routing
-export FUNGIFORGE_PARTITION=""                               # e.g. "genomics"
-export FUNGIFORGE_ACCOUNT=""                                 # e.g. "pi_adu"
-# Apptainer image cache + bind mounts (so containers see $FUNGIFORGE_DB and $FUNGIFORGE_WORK)
-export NXF_APPTAINER_CACHEDIR="$FUNGIFORGE_DB/.apptainer"
-export APPTAINER_BINDPATH="$FUNGIFORGE_DB,$FUNGIFORGE_WORK"
+# ─────────────────────────────────────────────────────────────────────────────
+#  fungiforge — site environment (EXAMPLE). bin/hpc_install.sh writes a filled-in
+#  copy to <install_root>/fungiforge-env.sh; users get it via /etc/profile.d or
+#  `source` in ~/.bashrc. After sourcing, `fungiforge`, `fungiforge-run`,
+#  `fungiforge-preflight` and `fungiforge-fetch-refs` are on PATH, so a run is:
+#
+#      cd ~/runs/batch1 && fungiforge-run --samplesheet samples.csv --outdir results
+#
+#  Layout this file assumes (mirrors callforge / captureforge on the same cluster):
+#      <install_root>/repo        git checkout (main.nf, bin/, share/, conf/)
+#      <install_root>/images      fungiforge-0.1.0.sif, antismash-ff-8.0.0-r2.sif, cache/
+#      <install_root>/cli-env     conda env with the `fungiforge` Python CLI
+#      <install_root>/site.config nextflow -c overrides (caps, image paths, partition)
+#      <db_root>                  reference databases (bin/fetch_references.sh target)
+# ─────────────────────────────────────────────────────────────────────────────
+
+export FUNGIFORGE_ROOT="/hpc/opt/fungiforge"                          # [EDIT] install root
+export FUNGIFORGE_HOME="$FUNGIFORGE_ROOT/repo"                        # repo checkout
+export FUNGIFORGE_DB="/hpc/data/fungiforge"                           # [EDIT] reference DBs (150–250 GB)
+
+# Per-user run scratch. This site has no separate /scratch; home is large ZFS.
+export FUNGIFORGE_WORK="${FUNGIFORGE_WORK:-$HOME/fungiforge_work}"
+
+# Container engine + SLURM routing. Empty partition = cluster default (sinfo shows it with *).
+export FUNGIFORGE_ENGINE="apptainer"                                  # apptainer | singularity
+export FUNGIFORGE_PARTITION=""                                        # e.g. "global"
+export FUNGIFORGE_ACCOUNT=""                                          # e.g. "pi_adu"
+
+# Site nextflow overrides (resource caps, .sif paths) and the shared image cache.
+export FUNGIFORGE_SITE_CONFIG="$FUNGIFORGE_ROOT/site.config"
+export FUNGIFORGE_IMAGE_CACHE="$FUNGIFORGE_ROOT/images/cache"
+
+# Extra host roots to bind into task containers (DB + work dir are always bound).
+export FUNGIFORGE_BIND="/hpc"                                         # [EDIT or leave empty]
+
+# PATH: wrappers first, then repo helpers (preflight_qc.sh, fetch_references.sh, *.py).
+export PATH="$FUNGIFORGE_ROOT/bin:$FUNGIFORGE_HOME/share/bin:$FUNGIFORGE_HOME/bin:$PATH"
+
+# Nextflow's own state stays per-user (the shared install is read-only).
+export NXF_HOME="${NXF_HOME:-$HOME/.nextflow}"
