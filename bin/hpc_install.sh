@@ -115,7 +115,7 @@ if [ "$SKIP_IMAGES" = 0 ]; then
   build_sif "$FF_TAG" "$REPO_DIR/env/Dockerfile"              "$REPO_DIR"     "$FF_SIF"
   build_sif "$AS_TAG" "$REPO_DIR/env/antismash-ff.Dockerfile" "$REPO_DIR/env" "$AS_SIF"
   log "sanity: tools inside the images"
-  run "$RT" exec "$FF_SIF" bash -c 'ps --version | head -1; fungiforge version; itsx --help 2>&1 | head -1; sourmash --version'
+  run "$RT" exec "$FF_SIF" bash -c 'ps --version | head -1; fungiforge version; ITSx -h 2>&1 | head -1; sourmash --version'
   run "$RT" exec "$AS_SIF" bash -c 'ps --version | head -1; antismash --version'
   log "pre-pull public images into the shared cache (funannotate ≈15 GB — be patient)"
   export FUNGIFORGE_DB="$DB" NXF_APPTAINER_CACHEDIR="$PREFIX/images/cache" NXF_SINGULARITY_CACHEDIR="$PREFIX/images/cache"

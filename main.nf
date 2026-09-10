@@ -54,6 +54,20 @@ def help() {
 // (short-read only). assembly_mode routes it through the right assembler in
 // subworkflows/fungiforge.nf: 'longread' (ONT present, ± Illumina hybrid polish)
 // or 'shortread' (Illumina only).
+// Samplesheet paths: absolute, or relative to the launch dir (as before); a relative path
+// that does not exist there is resolved against the samplesheet's own directory, so a
+// sheet shipped next to its data (or the bundled test fixture) works from any launch dir.
+// NB Nextflow's file() absolutises relative strings against the launch dir, so test the
+// raw string, not the Path.
+def resolve_path(p) {
+  def s = p.toString()
+  if (s.startsWith('/')) return file(s)
+  def cwdf = file(s)
+  if (cwdf.exists()) return cwdf
+  def near = file(params.samplesheet).parent.resolve(s)
+  return near.exists() ? near : cwdf
+}
+
 def parse_row(row) {
   def has_ont  = row.ont_fastq?.trim()
   def has_r1   = row.illumina_r1?.trim()
@@ -67,9 +81,9 @@ def parse_row(row) {
                compartment  : (row.compartment ?: 'NA'),
                facility     : (row.facility ?: 'NA'),
                season       : (row.season ?: 'NA') ]
-  def files = [ ont: has_ont ? file(row.ont_fastq) : file("${projectDir}/assets/NO_ONT"),
-                r1 : has_r1 ? file(row.illumina_r1) : file("${projectDir}/assets/NO_R1"),
-                r2 : has_r2 ? file(row.illumina_r2) : file("${projectDir}/assets/NO_R2") ]
+  def files = [ ont: has_ont ? resolve_path(row.ont_fastq)   : file("${projectDir}/assets/NO_ONT"),
+                r1 : has_r1  ? resolve_path(row.illumina_r1) : file("${projectDir}/assets/NO_R1"),
+                r2 : has_r2  ? resolve_path(row.illumina_r2) : file("${projectDir}/assets/NO_R2") ]
   return tuple(meta, files)
 }
 

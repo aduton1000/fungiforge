@@ -10,7 +10,9 @@ fungiforge_out/
 data_dir/
 _local/
 test/mini_db/
-test/reads/
+test/reads/*
+!test/reads/TESTFUN0?.ont.fastq.gz
+!test/reads/TESTFUN0?_R?.fastq.gz
 # Python
 __pycache__/
 *.py[cod]
@@ -27,6 +29,8 @@ HANDOVER.md
 .idea/
 .vscode/
 test/sra/
-test/reads/
+test/reads/*
+!test/reads/TESTFUN0?.ont.fastq.gz
+!test/reads/TESTFUN0?_R?.fastq.gz
 results_cea10/
 results_*/
