@@ -71,8 +71,10 @@ step_images(){
       local name; name="$(echo "$img" | sed -E 's#[/:]#-#g').img"
       if [ -s "$cache/$name" ]; then log "have $name — skip"; continue; fi
       log "$rt pull $img -> $cache/$name"
-      $rt pull --name "$cache/$name" "docker://$img" >>"$LOGDIR/images.log" 2>&1 \
-        || { fail containers "$img"; ok=0; rm -f "$cache/$name"; }
+      # pull to a temp name, rename on success (an interrupted pull must not look finished)
+      rm -f "$cache/$name.part"
+      { $rt pull --name "$cache/$name.part" "docker://$img" >>"$LOGDIR/images.log" 2>&1 && mv "$cache/$name.part" "$cache/$name"; } \
+        || { fail containers "$img"; ok=0; rm -f "$cache/$name.part"; }
     done
     [ "$ok" = 1 ] && mark containers "$(public_images | wc -l | tr -d ' ') images -> $cache"
   elif command -v docker >/dev/null 2>&1; then
