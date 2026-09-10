@@ -8,16 +8,19 @@ params {
   max_memory = '480.GB'
   max_time   = '240.h'
 
-  // the two fungiforge-built images are NOT on Docker Hub — point at local .sif files
-  // (built by bin/hpc_install.sh from env/Dockerfile + env/antismash-ff.Dockerfile)
-  fungiforge_image = '/hpc/opt/fungiforge/images/fungiforge-0.1.0.sif'
-  antismash_image  = '/hpc/opt/fungiforge/images/antismash-ff-8.0.0-r2.sif'
-
   // native linux/amd64: enable the stages that were too slow under Mac emulation
   run_interproscan = true
   genome_id        = true
 
   // slurm_partition = 'global'   // or leave to FUNGIFORGE_PARTITION / cluster default
+}
+
+// The two fungiforge-built images are NOT on Docker Hub — point their labels at the local
+// .sif files (built by bin/hpc_install.sh from env/Dockerfile + env/antismash-ff.Dockerfile).
+// (Set here as label containers, not params: base.config reads params at parse time.)
+process {
+  withLabel: 'readqc|basecall|decontam|identify|resistance|mge|extras|report' { container = '/hpc/opt/fungiforge/images/fungiforge-0.1.0.sif' }
+  withLabel: bgc                                                             { container = '/hpc/opt/fungiforge/images/antismash-ff-8.0.0-r2.sif' }
 }
 
 // heavier slots for the long stages on big nodes

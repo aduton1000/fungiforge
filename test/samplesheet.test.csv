@@ -1,4 +1,4 @@
 sample,ont_fastq,illumina_r1,illumina_r2,compartment,facility,season
-TESTFUN01,test/reads/TESTFUN01.ont.fastq.gz,,,AIR,Abattoir_1,Dry
-TESTFUN02,test/reads/TESTFUN02.ont.fastq.gz,test/reads/TESTFUN02_R1.fastq.gz,test/reads/TESTFUN02_R2.fastq.gz,AIR,Abattoir_1,Dry
-TESTFUN03,,test/reads/TESTFUN03_R1.fastq.gz,test/reads/TESTFUN03_R2.fastq.gz,HUMAN,Abattoir_1,Wet
+TESTFUN01,reads/TESTFUN01.ont.fastq.gz,,,AIR,Abattoir_1,Dry
+TESTFUN02,reads/TESTFUN02.ont.fastq.gz,reads/TESTFUN02_R1.fastq.gz,reads/TESTFUN02_R2.fastq.gz,AIR,Abattoir_1,Dry
+TESTFUN03,,reads/TESTFUN03_R1.fastq.gz,reads/TESTFUN03_R2.fastq.gz,HUMAN,Abattoir_1,Wet
