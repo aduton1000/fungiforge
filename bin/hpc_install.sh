@@ -106,8 +106,11 @@ if [ "$SKIP_IMAGES" = 0 ]; then
     log "docker build $tag  (native linux/amd64)"
     run docker build --platform linux/amd64 -t "$tag" -f "$df" "$ctx"
     log "convert -> $sif"
-    run rm -f "$sif"
-    run "$RT" build "$sif" "docker-daemon://$tag"
+    # build to a temp name and rename only on success: an interrupted build (ssh drop,
+    # Ctrl-C) must never leave a truncated .sif that a rerun would treat as finished.
+    run rm -f "$sif" "$sif.part"
+    run "$RT" build "$sif.part" "docker-daemon://$tag"
+    run mv "$sif.part" "$sif"
   }
   build_sif "$FF_TAG" "$REPO_DIR/env/Dockerfile"              "$REPO_DIR"     "$FF_SIF"
   build_sif "$AS_TAG" "$REPO_DIR/env/antismash-ff.Dockerfile" "$REPO_DIR/env" "$AS_SIF"
