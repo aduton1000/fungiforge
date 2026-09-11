@@ -19,7 +19,10 @@ process RESISTANCE {
       --sample "${meta.id}" --proteins ${proteins} --species ${species} \\
       --assembly ${nuclear} --gbk ${gbk} --polish-mode "\$PM" \\
       --panel "${params.af_panel}" --data-dir "${params.data_dir ?: ''}" \\
-      --out ${meta.id}.resistance.json || echo '{"sample":"${meta.id}","stage":"resistance","calls":[]}' > ${meta.id}.resistance.json
+      --out ${meta.id}.resistance.json
+  # NB no silent fallback: a caller crash must FAIL this task (a run that "succeeds" with an
+  # empty resistance result — cyp51A_TR = NA in master_fungi.tsv — is worse than a red stage).
+  # Graceful degradation for missing references is handled inside af_resistance.py itself.
   """
   stub:
   "echo '{\"sample\":\"${meta.id}\",\"stage\":\"resistance\"}' > ${meta.id}.resistance.json"
