@@ -200,7 +200,21 @@ def main():
     a = ap.parse_args()
 
     species = read_species(a.species)
-    panel = read_panel(a.panel)
+    # Panel: the path given (repo copy), else the copy packaged with the `fungiforge`
+    # Python package (present inside the container image / cli-env), else fail loudly.
+    panel_path = a.panel
+    if not os.path.exists(panel_path):
+        try:
+            from importlib.resources import files as _pkg_files
+            cand = str(_pkg_files("fungiforge").joinpath("resources", "af_resistance_panel.tsv"))
+            if os.path.exists(cand):
+                sys.stderr.write(f"[af_resistance] panel not found at {a.panel}; using packaged copy {cand}\n")
+                panel_path = cand
+        except Exception:
+            pass
+    if not os.path.exists(panel_path):
+        sys.exit(f"[af_resistance] ERROR: resistance panel not found: {a.panel} (and no packaged copy)")
+    panel = read_panel(panel_path)
     proteins = read_fasta(a.proteins) if os.path.exists(a.proteins) else {}
     bundled_ref = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                "fungiforge", "resources", "af_reference_proteins.faa")
