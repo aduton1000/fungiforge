@@ -39,22 +39,36 @@ def _revcomp(s):
     return s.translate(str.maketrans("ACGTacgtNn", "TGCAtgcaNn"))[::-1]
 
 
+CYP51A_GENE = re.compile(r"^(cyp51a|erg11|afua_4g06890|afu4g06890)$", re.I)
+
+
 def _locate_cyp51a(gbk_path):
-    """Return (contig, start, end, strand) of cyp51A from a GenBank file, or None."""
+    """Return (contig, start, end, strand, contig_seq) of cyp51A from a GenBank file, or None.
+
+    Two passes: an explicit gene name (CYP51A / erg11 / the A. fumigatus locus tag) wins;
+    only if none is present fall back to product/note wording, which also matches the
+    CYP51B paralog ("Sterol 14-alpha demethylase") and must not be preferred.
+    The record's own sequence is returned because funannotate renames/sorts contigs, so
+    GBK contig names do not map onto the assembly FASTA the pipeline holds.
+    """
     try:
         from Bio import SeqIO
     except Exception:
         return None
+    fallback = None
     for rec in SeqIO.parse(gbk_path, "genbank"):
         for feat in rec.features:
             if feat.type not in ("gene", "mRNA", "CDS"):
                 continue
             q = feat.qualifiers
+            hit = (rec.id, int(feat.location.start), int(feat.location.end),
+                   1 if feat.location.strand in (1, None) else -1, str(rec.seq))
+            if any(CYP51A_GENE.match(g.strip()) for g in q.get("gene", []) + q.get("locus_tag", [])):
+                return hit
             names = " ".join(q.get("gene", []) + q.get("product", []) + q.get("note", []))
-            if CYP51A_NAMES.search(names):
-                return (rec.id, int(feat.location.start), int(feat.location.end),
-                        1 if feat.location.strand in (1, None) else -1)
-    return None
+            if fallback is None and CYP51A_NAMES.search(names) and not re.search(r"cyp51b", names, re.I):
+                fallback = hit
+    return fallback
 
 
 def _tandem_scan(promoter, unit_lengths=range(20, 61), min_id=0.90):
@@ -92,10 +106,12 @@ def detect_tr(assembly_path, gbk_path=None, promoter_bp=600):
         out["note"] = "cyp51A not located in GBK; TR scan skipped (provide annotated GBK)"
         return out
     out["cyp51A_located"] = True
-    contig, start, end, strand = loc
-    seq = contigs.get(contig, "")
+    contig, start, end, strand, gbk_seq = loc
+    # Coordinates are in GBK space -> use the GBK record's sequence; the assembly FASTA is
+    # only a fallback (its contig names are Flye's, funannotate's are size-sorted).
+    seq = gbk_seq or contigs.get(contig, "")
     if not seq:
-        out["note"] = f"contig {contig} not found in assembly"
+        out["note"] = f"contig {contig} has no sequence in GBK and was not found in assembly"
         return out
     if strand == 1:
         promoter = seq[max(0, start - promoter_bp):start]
