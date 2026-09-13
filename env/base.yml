@@ -26,6 +26,7 @@ dependencies:
   - minimap2>=2.26
   - samtools>=1.19
   - genomad>=1.8
+  - kraken2>=2.1.3      # Stage 04 contig decontamination + bin/triage_reads.sh (was only in decontam.yml)
   - seqkit>=2.6
   # read filtering (light)
   - chopper>=0.9

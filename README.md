@@ -73,7 +73,7 @@ nextflow run main.nf -profile local,docker \
 
 Each row needs **either** `ont_fastq` **or** paired `illumina_r1`+`illumina_r2` (or all three for hybrid); the pipeline routes each isolate automatically (`meta.assembly_mode`).
 
-**Before a real run**, triage fresh **ONT** data with `bin/preflight_qc.sh` — per-sample read QC, an amplicon-vs-WGS check, a GO/MARGINAL/NO-GO assembly verdict, and an assembly-free species ID (even when coverage is too low to assemble). See [`docs/preflight_qc.md`](docs/preflight_qc.md). *(Illumina-only isolates don't use this ONT triage — QC runs in Stage 01 via fastp.)*
+**Before a real run**, check what each sample actually contains with `bin/triage_reads.sh` — Kraken2 on a read subsample, seconds per isolate, verdict fungal / likely_fungal / non_fungal / human / mixed, and a filtered samplesheet of the fungal ones (see [`docs/preflight_qc.md`](docs/preflight_qc.md)). For fresh **ONT** data, also triage with `bin/preflight_qc.sh` — per-sample read QC, an amplicon-vs-WGS check, a GO/MARGINAL/NO-GO assembly verdict, and an assembly-free species ID (even when coverage is too low to assemble). See [`docs/preflight_qc.md`](docs/preflight_qc.md). *(Illumina-only isolates don't use this ONT triage — QC runs in Stage 01 via fastp.)*
 
 On an HPC cluster: `-profile hpc_slurm,singularity` (native, no emulation).
 
@@ -136,6 +136,7 @@ CA_SUR_009,,reads/CA_SUR_009_R1.fastq.gz,reads/CA_SUR_009_R2.fastq.gz,SURFACE,Cl
 | `--assembler` | `flye` | long-read assembler: `flye` \| `canu` \| `raven` |
 | `--sr_assembler` | `spades` | short-read (Illumina-only) assembler: `spades` \| `megahit` |
 | `--purge_dups` | `true` | collapse heterozygous haplotigs (long-read only) |
+| `--skip_decontam` | `false` | skip the Kraken2 contig triage (Stage 04 drops bacterial/archaeal/viral/human contigs and records a fungal/non_fungal verdict) |
 | `--min_contig_len` | `500` | drop contigs shorter than this, or with <4 distinct bases, before QC/annotation |
 | `--busco_lineage` | `auto` | `auto` (order-specific after ID) \| e.g. `fungi_odb10` |
 | `--basecall` | `false` | run Dorado on a pod5 dir (`ont_fastq` = pod5 dir); needs `--dorado_model` |
