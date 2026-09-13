@@ -145,7 +145,7 @@ staged under `--data_dir`.
 | 02b | Assembly (short-read) | SPAdes \| MEGAHIT / `staphb/spades` | Illumina-only → `*.assembly.fasta` |
 | 03a | ONT polish | Medaka / `staphb/medaka` | draft + ONT → `*.medaka.fasta` (long-read isolates) |
 | 03b | Short-read polish (hybrid) / Illumina-only passthrough | bwa + Polypolish / `staphb/polypolish` | Medaka + Illumina → `*.polished.fasta`, `polish.json`; Illumina-only passes through (`mode=illumina_only`) |
-| 04 | Decontam + organelle split | Kraken2/tiara/BlobTools, GetOrganelle / base image | polished → `*.nuclear.fasta`, `*.mito.fasta`, `decontam.json` |
+| 04 | Decontam + organelle split | Kraken2 per contig (drops bacterial/archaeal/viral/human; records composition + fungal/non_fungal verdict) / base image | polished → `*.nuclear.fasta`, `*.mito.fasta`, `decontam.json` |
 | 05 | Assembly QC + completeness | QUAST, compleasm/BUSCO / `ezlabgva/busco` | nuclear → `assemblyqc.json` (contiguity, BUSCO, `qc_pass`) |
 | 06 | Repeat model + soft-mask | RepeatModeler2, RepeatMasker / `dfam/tetools` | nuclear → `*.masked.fasta`, `*.telib.fasta`, `repeat.json` |
 | 07 | Eukaryotic annotation | Funannotate / `nextgenusfs/funannotate` | masked → `*.proteins.faa`, `*.gbk`, `annotate.json` |
@@ -729,7 +729,8 @@ qc_pass, busco_complete, busco_lineage, assembly_len, n_contigs,
 ploidy, mating_type,
 resistant_classes, n_known_af_mutations, cyp51A_TR,
 novelty, n_bgc, n_mycovirus, te_percent,
-polish_mode
+polish_mode,
+sample_verdict, contam_removed_pct, top_taxon
 ```
 
 One row per isolate; missing values are `NA` (or `none` for `resistant_classes`). This schema is
