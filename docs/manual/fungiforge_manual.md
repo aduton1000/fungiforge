@@ -444,6 +444,7 @@ the knobs you will touch most.
 | `--assembler` | `flye` | long-read assembler (ONT/hybrid): `flye` \| `canu` \| `raven` |
 | `--sr_assembler` | `spades` | short-read assembler (Illumina-only): `spades` \| `megahit` |
 | `--purge_dups` | `true` | collapse heterozygous haplotigs after long-read assembly (skipped for short-read) |
+| `--min_contig_len` | `500` | drop contigs shorter than this, or with fewer than 4 distinct bases, at short-read assembly and before annotation (`funannotate sort --minlen`); short-read assemblers leave many tiny fragments and occasional homopolymer stubs that funannotate rejects |
 | `--ont_min_qual` | `10` | chopper Q filter (Stage 01) |
 | `--ont_min_len` | `1000` | chopper length filter (Stage 01) |
 | `--basecall` | `false` | run Dorado on a pod5 dir (ont_fastq column = pod5 dir) |
