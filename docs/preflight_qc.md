@@ -1,4 +1,26 @@
-# Preflight QC (`bin/preflight_qc.sh`)
+# Pre-run triage
+
+## Read-level composition triage (any platform): `bin/triage_reads.sh`
+
+Before assembling a plate, classify a subsample of reads per isolate with Kraken2 against the
+PlusPF database in `$FUNGIFORGE_DB/kraken2`. Seconds per sample; reports the domain composition,
+top species and a verdict — `fungal`, `likely_fungal`, `non_fungal`, `human`, `mixed` — and, from a
+samplesheet, writes `samples.fungal.csv` / `samples.excluded.csv`. The PlusPF-8 database holds few
+fungal genomes, so a genuine fungal isolate usually reads as mostly *unclassified* with a fungal
+minority (`likely_fungal`); a bacterial isolate classifies overwhelmingly as Bacteria.
+
+```bash
+bin/triage_reads.sh --samplesheet samples.csv --out triage          # needs kraken2 (in the fungiforge image)
+# on a cluster: apptainer exec -B /hpc <fungiforge.sif> bash bin/triage_reads.sh --samplesheet samples.csv --out triage
+```
+
+The same classifier runs on the assembled contigs in Stage 04 (`--skip_decontam` to disable):
+bacterial/archaeal/viral/human contigs are removed, and the verdict, the percentage of bases
+removed and the top taxon are appended to `master_fungi.tsv` (`sample_verdict`,
+`contam_removed_pct`, `top_taxon`). A non-fungal isolate is kept whole and flagged rather than
+emptied — the fungal stages downstream are not meaningful for it.
+
+## ONT read triage: `bin/preflight_qc.sh`
 
 A fast, **read-only** triage you run on freshly arrived Oxford Nanopore (ONT)
 data **before** committing to a long fungiforge run. A real run is multi-hour (slower

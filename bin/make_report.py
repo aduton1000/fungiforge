@@ -22,6 +22,8 @@ MASTER_COLS = [
     "resistant_classes", "n_known_af_mutations", "cyp51A_TR",
     "novelty", "n_bgc", "n_mycovirus", "te_percent",
     "polish_mode",
+    # appended 0.1.1: Stage 04 Kraken2 verdict (fungal | likely_fungal | non_fungal | human | mixed | not_run)
+    "sample_verdict", "contam_removed_pct", "top_taxon",
 ]
 
 
@@ -56,6 +58,9 @@ def build_row(sample, compartment, facility, season, S):
     ext = S.get("extras", {})
     mob = S.get("mobile", {})
     pol = S.get("polish", {})
+    dc  = S.get("decontam", {})
+    tops = g(dc, "top_species", default=[])
+    top_taxon = f"{tops[0]['name']} ({tops[0]['pct']}%)" if isinstance(tops, list) and tops else "NA"
     rc = g(res, "summary", "resistant_drug_classes", default=[])
     tr = g(res, "cyp51A_TR", "tr_type", default="NA")
     row = {
@@ -74,6 +79,9 @@ def build_row(sample, compartment, facility, season, S):
         "n_mycovirus": g(mob, "n_mycovirus", default="NA"),
         "te_percent": g(mob, "te_percent", default="NA"),
         "polish_mode": g(pol, "mode"),
+        "sample_verdict": g(dc, "verdict", default="NA"),
+        "contam_removed_pct": g(dc, "dropped_bp_pct", default="NA"),
+        "top_taxon": top_taxon,
     }
     return row
 
