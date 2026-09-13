@@ -38,7 +38,8 @@ process ANNOTATE {
   # " polypolish" to every contig (>contig_30 polypolish) which blows the 16-char limit and
   # aborts predict. funannotate 'sort' renames headers (contig_1..N, longest first) + is the
   # documented preprocessing step; sed-strip of the description is the fallback.
-  funannotate sort -i ${masked} -o clean.fasta -b contig 2>sort.log || sed '/^>/ s/[[:space:]].*//' ${masked} > clean.fasta
+  funannotate sort -i ${masked} -o clean.fasta -b contig --minlen ${params.min_contig_len} 2>sort.log \\
+    || sed '/^>/ s/[[:space:]].*//' ${masked} > clean.fasta
   funannotate predict -i clean.fasta -o fun -s "${meta.id}" \\
       --cpus ${task.cpus} --busco_db ${params.funannotate_busco} || true
   EGG=""; [ -n "\$(ls -A ${params.data_dir}/eggnog 2>/dev/null)" ] && EGG="--eggnog ${params.data_dir}/eggnog"

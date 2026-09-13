@@ -136,6 +136,7 @@ CA_SUR_009,,reads/CA_SUR_009_R1.fastq.gz,reads/CA_SUR_009_R2.fastq.gz,SURFACE,Cl
 | `--assembler` | `flye` | long-read assembler: `flye` \| `canu` \| `raven` |
 | `--sr_assembler` | `spades` | short-read (Illumina-only) assembler: `spades` \| `megahit` |
 | `--purge_dups` | `true` | collapse heterozygous haplotigs (long-read only) |
+| `--min_contig_len` | `500` | drop contigs shorter than this, or with <4 distinct bases, before QC/annotation |
 | `--busco_lineage` | `auto` | `auto` (order-specific after ID) \| e.g. `fungi_odb10` |
 | `--basecall` | `false` | run Dorado on a pod5 dir (`ont_fastq` = pod5 dir); needs `--dorado_model` |
 | `--ont_min_qual` / `--ont_min_len` | `10` / `1000` | chopper Q / length filters (Stage 01) |
