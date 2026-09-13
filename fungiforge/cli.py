@@ -9,6 +9,7 @@ Subcommands:
 """
 from __future__ import annotations
 import argparse
+import re
 import glob
 import os
 import subprocess
@@ -43,9 +44,12 @@ def cmd_samplesheet(a):
         return os.path.splitext(b)[0]
 
     def ilmn_sid(p):
+        # Strip the read-pair designation without touching the rest of the name:
+        #   bcl2fastq/BCL Convert  NAME_S12_R1_001  -> NAME   (also NAME_S12_L001_R1_001)
+        #   SRA / generic          NAME_R1, NAME_1, NAME.R1 -> NAME
         s = sid(p)
-        for tag in ("_R1", "_R2", "_1", "_2"):
-            s = s.replace(tag, "")
+        s = re.sub(r"_S\d+(_L\d{3})?_R[12]_\d{3}$", "", s)
+        s = re.sub(r"[._]R?[12]$", "", s)
         return s
 
     ont = {sid(p): p for pat in (a.ont or []) for p in sorted(glob.glob(pat))}
