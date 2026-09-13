@@ -22,7 +22,7 @@
 # ==============================================================================
 set -uo pipefail
 
-DB="${FUNGIFORGE_DB:?set FUNGIFORGE_DB to the target data dir, e.g. /Volumes/Extreme\ SSD/fungiforge_db}"
+DB="${FUNGIFORGE_DB:?set FUNGIFORGE_DB to the target data dir, e.g. /data/fungiforge_db}"
 mkdir -p "$DB"/{containers,funannotate,eggnog,antismash,busco,unite,kraken2,refseq_fungi,fungamr,rvdb,logs}
 LOGDIR="$DB/logs"; MANIFEST="$DB/MANIFEST.tsv"
 [ -f "$MANIFEST" ] || echo -e "database\tdetail\tstatus\ttimestamp" > "$MANIFEST"
@@ -47,7 +47,7 @@ is_done(){ [ -f "$DB/$1/.done" ]; }
 mark(){ date '+%F %T' > "$DB/$1/.done"; echo -e "$1\t$2\tOK\t$(date '+%F %T')" >> "$MANIFEST"; log "✓ $1 done ($2)"; }
 fail(){ echo -e "$1\t$2\tFAILED\t$(date '+%F %T')" >> "$MANIFEST"; log "✗ $1 FAILED ($2) — continuing"; }
 
-# ---- container images (linux/amd64; emulated on Mac, native on HPC) ----------
+# ---- container images (linux/amd64; native on x86_64 Linux, emulated on arm64 hosts) ----
 # Image list is derived from conf/base.config so it never drifts. The two
 # aduton1000/* images are built locally (env/Dockerfile, env/antismash-ff.Dockerfile)
 # and are skipped here. On a Docker host: `docker pull`. On an Apptainer/Singularity

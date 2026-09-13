@@ -11,4 +11,4 @@ dependencies:
   - seqkit>=2.6
   - genomescope2
   - jellyfish>=2.3
-  # Dorado is NOT here — it runs as the native arm64 host binary (Stage 00).
+  # Dorado is NOT here — it runs as a native host binary (Stage 00).

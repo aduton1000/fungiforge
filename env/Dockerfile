@@ -1,7 +1,7 @@
 # fungiforge base image — the light tools for stages without a dedicated public image
 # (identify / resistance / mge / extras-lite / report). Heavy stages use their own
 # images (staphb/flye, ontresearch|staphb/medaka, dfam/tetools, nextgenusfs/funannotate,
-# antismash/standalone, ezlabgva/busco). Build native linux/amd64 (no emulation):
+# antismash/standalone, ezlabgva/busco). Built for linux/amd64:
 #   docker build -f env/Dockerfile -t aduton1000/fungiforge:0.1.0 .
 FROM mambaorg/micromamba:1.5.8
 LABEL org.opencontainers.image.source="https://github.com/aduton1000/fungiforge"

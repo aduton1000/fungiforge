@@ -8,7 +8,7 @@ params {
   max_memory = '480.GB'
   max_time   = '240.h'
 
-  // native linux/amd64: enable the stages that were too slow under Mac emulation
+  // native linux/amd64: enable the stages that are too slow under emulation on arm64 hosts
   run_interproscan = true
   genome_id        = true
 

@@ -21,7 +21,7 @@
   never as a bare label.
 - **Containers per stage, base image for the rest.** Heavy stages use their upstream images
   (Funannotate, antiSMASH, dfam/tetools, Flye, Medaka, BUSCO); the light stages share
-  `aduton1000/fungiforge`. Native linux/amd64 on HPC; emulated on the Apple-Silicon Mac.
+  `aduton1000/fungiforge`. Native linux/amd64 on x86_64 Linux; run under emulation on arm64 hosts.
 - **Databases fetched up front, never mid-run** (`bin/fetch_references.sh`, aria2c-resumable),
   staged on an external drive via `--data_dir` because they total ~150–250 GB.
 - **Organism-agnostic.** When the real fungal reads arrive, only inputs/params change — no code.
