@@ -1,7 +1,7 @@
 # fungiforge base env — the light tools for the stages that don't use a dedicated
 # public image (identify, resistance, mge, extras-lite, report, read filtering).
 # Baked into the aduton1000/fungiforge base image (env/Dockerfile) and the Apptainer
-# .def. Pure-ish; solves on linux-64 (native on HPC, emulated on Mac).
+# .def. Pure-ish; solves on linux-64 (native on x86_64 Linux, emulated on arm64 hosts).
 name: fungiforge-base
 channels: [conda-forge, bioconda]
 dependencies:

@@ -139,7 +139,7 @@ staged under `--data_dir`.
 
 | # | Stage | Key tool(s) / container | Inputs → key output(s) |
 |:--|:----------|:--------------------|:-----------------------------|
-| 00 | Basecall *(optional)* | Dorado (native arm64 host / base image) | pod5 dir → `*.ont.fastq.gz` |
+| 00 | Basecall *(optional)* | Dorado (native host binary / base image) | pod5 dir → `*.ont.fastq.gz` |
 | 01 | Read QC & filter | NanoPlot, chopper, fastp / base image | raw reads → `*.ont.filt.fastq.gz`, `readqc.json` (mode-aware) |
 | 02 | Assembly (long-read) | Flye \| Canu \| Raven + purge_dups / `staphb/flye` | filtered ONT → `*.assembly.fasta` |
 | 02b | Assembly (short-read) | SPAdes \| MEGAHIT / `staphb/spades` | Illumina-only → `*.assembly.fasta` |
@@ -198,15 +198,15 @@ pip install -e .          # registers the `fungiforge` command; also usable in a
 
 **macOS (Apple Silicon) — the amd64 emulation caveat.** All heavy stage images are built
 **`linux/amd64`**; there are no `osx-arm64` builds for tools like Funannotate or antiSMASH.
-On an M-series Mac the `docker` profile therefore runs them under **Rosetta/QEMU emulation** —
+On Apple Silicon the `docker` profile therefore runs them under **Rosetta/QEMU emulation** —
 correct but slow. The pipeline is configured for this: `docker.runOptions` sets
-`--platform linux/amd64`, and heavy/slow options default **off** on the Mac
+`--platform linux/amd64`, and heavy/slow options default **off** for local runs
 (`--run_interproscan false`, `--genome_id false`). Two consequences to plan around:
 
 - Annotation (Stage 07) and BGC detection (Stage 11) can take **many hours** per isolate under
   emulation — budget accordingly, or run them on the HPC.
 - **Dorado (Stage 00) runs as a native arm64 host binary, not in a container**, so basecalling
-  stays fast on the Mac. The light conda envs that have no `osx-arm64` build can be created with
+  stays fast on Apple Silicon. The light conda envs that have no `osx-arm64` build can be created with
   `CONDA_SUBDIR=osx-64 mamba env create -f env/<name>.yml` (noted in `env/readqc.yml`).
 
 **The container image.** The light stages use `aduton1000/fungiforge:0.1.0`; build it once
@@ -294,11 +294,11 @@ The raw forms always work unchanged (`nextflow run main.nf …`).
 A run composes **one execution profile** and **one packaging profile**:
 
 ```bash
-# this machine, Docker (Apple-Silicon: linux/amd64 emulated)
+# single machine, Docker (on arm64 hosts: linux/amd64 emulated)
 nextflow run main.nf -profile local,docker \
     --samplesheet samples.csv --data_dir /path/to/fungiforge_db
 
-# lab Linux HPC, native (no emulation)
+# SLURM cluster, native (no emulation)
 nextflow run main.nf -profile hpc_slurm,singularity \
     --samplesheet samples.csv --data_dir /path/to/fungiforge_db
 
@@ -451,7 +451,7 @@ the knobs you will touch most.
 | `--dorado_duplex` | `false` | Dorado duplex basecalling |
 | `--busco_lineage` | `auto` | `auto` (order-specific after ID) \| `fungi_odb10` \| `<lineage>` |
 | `--genome_id` | `false` | Stage 08 genome-level sourmash gather (slow emulated; ITS is primary) |
-| `--run_interproscan` | `false` | Stage 07 InterProScan (heavy; default off on Mac, on for HPC) |
+| `--run_interproscan` | `false` | Stage 07 InterProScan (heavy; default off, enable on a cluster) |
 | `--ploidy` | `auto` | ploidy handling |
 | `--genemark_key` | `null` | path to a free-academic GeneMark license `.gm_key` |
 | `--af_panel` | bundled `af_resistance_panel.tsv` | curated resistance panel (Stage 09) |
@@ -460,7 +460,7 @@ the knobs you will touch most.
 | `--skip_bgc` | `false` | skip Stage 11 BGCs |
 | `--skip_novelty` | `false` | skip Stage 12 novelty |
 | `--skip_extras` | `false` | skip Stage 13 extras |
-| `--max_cpus` | `16` | max cores per task on this machine |
+| `--max_cpus` | `16` | max cores per task on the local machine |
 | `--max_memory` | `120.GB` | memory ceiling |
 | `--max_time` | `96.h` | time ceiling (fungal annotation is slow, esp. emulated) |
 | `--slurm_partition` / `--slurm_account` | `null` | SLURM routing (else time-based `short`/`long`) |
@@ -486,8 +486,8 @@ the whole pipeline, not stages individually.
 ## 9.1 Stage 00 — Basecall (optional)
 
 Runs **Dorado** on a pod5 directory to produce the ONT FASTQ, only when `--basecall` is set
-(and `--dorado_model` must be given, or `main.nf` errors). Dorado runs as the **native arm64
-host binary** for speed on Apple Silicon. Supports duplex via `--dorado_duplex`.
+(and `--dorado_model` must be given, or `main.nf` errors). Dorado runs as a **native host
+binary**, which keeps basecalling fast on Apple Silicon. Supports duplex via `--dorado_duplex`.
 
 ```bash
 nextflow run main.nf -profile local,docker --samplesheet pod5_samples.csv \
@@ -806,7 +806,7 @@ this manual; do not over-read them.
 | `--basecall set but --dorado_model missing` | pass `--dorado_model <model>` |
 | ID / resistance / BGC empty, warning about `--data_dir` | set `--data_dir /path/to/fungiforge_db` and stage the DBs (§6) |
 | Reference DBs invisible inside a container | the profile binds `--data_dir` automatically; ensure the path is correct and (Apptainer) in `APPTAINER_BINDPATH` |
-| Stage 07/11 take many hours on a Mac | linux/amd64 emulation — run on HPC, or accept the wall time; keep `--run_interproscan false` on the Mac |
+| Stage 07/11 take many hours locally | linux/amd64 emulation on arm64 hosts — run on a cluster, or accept the wall time; keep `--run_interproscan false` locally |
 | antiSMASH "command not found" / container exits immediately | the `bgc` label clears the image entrypoint (`--entrypoint=""`); keep that in `conf/base.config` |
 | Medaka/Funannotate crash on `getpass.getuser()` | the Docker profile sets `-e HOME=/tmp -e USER=fungiforge`; keep it |
 | ITSx aborts "over comparison pipeline limit" | it was handed a whole chromosome — `extract_rrna_region.py` windows the rRNA operon first; ensure barrnap ran |

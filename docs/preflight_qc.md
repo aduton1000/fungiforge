@@ -1,8 +1,8 @@
 # Preflight QC (`bin/preflight_qc.sh`)
 
 A fast, **read-only** triage you run on freshly arrived Oxford Nanopore (ONT)
-data **before** committing to a long fungiforge run. On this Apple-Silicon Mac
-the pipeline is emulated (linux/amd64) and a real run is multi-hour, so the goal
+data **before** committing to a long fungiforge run. A real run is multi-hour (slower
+still where linux/amd64 images run under emulation), so the goal
 is to answer three questions per sample in a few minutes:
 
 1. **Is there enough usable data to assemble a genome?** — GO / MARGINAL / NO-GO.

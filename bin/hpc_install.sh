@@ -16,7 +16,7 @@
 #   <db>                      reference DBs (filled by fungiforge-fetch-refs, hours)
 #
 # Usage (as a user who can write <prefix> and <db>, or with sudo for the mkdir step):
-#   bash hpc_install.sh --prefix /hpc/opt/fungiforge --db /hpc/data/fungiforge --group hpcusers
+#   bash hpc_install.sh --prefix /hpc/opt/fungiforge --db /hpc/data/fungiforge --group <group>
 # Options:
 #   --prefix DIR      install root                         (default /hpc/opt/fungiforge)
 #   --db DIR          reference database root              (default /hpc/data/fungiforge)
