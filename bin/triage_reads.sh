@@ -20,7 +20,8 @@
 #   apptainer exec -B /hpc <fungiforge.sif> bash bin/triage_reads.sh ...), and the DB:
 #   --db DIR  (default $FUNGIFORGE_DB/kraken2).
 # Outputs in --out: <sample>.k2.report, triage.tsv, and — when --samplesheet is given —
-#   samples.fungal.csv (fungal + likely_fungal rows) and samples.excluded.csv.
+#   samples.fungal.csv (fungal + likely_fungal rows, plus mixed rows with more fungal than
+#   bacterial reads — Stage 04 decontaminates those) and samples.excluded.csv.
 # ==============================================================================
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -90,7 +91,9 @@ done
 echo >&2; echo "[triage] verdict counts:" >&2; tail -n +2 "$OUT/triage.tsv" | cut -f13 | sort | uniq -c | sed 's/^/    /' >&2
 if [ -n "$SHEET" ]; then
   head -1 "$SHEET" > "$OUT/samples.fungal.csv"; head -1 "$SHEET" > "$OUT/samples.excluded.csv"
-  awk -F'\t' 'NR>1 && ($13=="fungal" || $13=="likely_fungal"){print $1}' "$OUT/triage.tsv" | sort -u > "$OUT/.keep"
+  # fungal + likely_fungal, plus "mixed" samples where fungal reads outnumber bacterial ones —
+  # a contaminated fungal culture is exactly what Stage 04 decontamination is for.
+  awk -F'\t' 'NR>1 && ($13=="fungal" || $13=="likely_fungal" || ($13=="mixed" && $8+0 > $5+0)){print $1}' "$OUT/triage.tsv" | sort -u > "$OUT/.keep"
   tail -n +2 "$SHEET" | while IFS= read -r row; do s="${row%%,*}"; if grep -qx "$s" "$OUT/.keep"; then echo "$row" >> "$OUT/samples.fungal.csv"; else echo "$row" >> "$OUT/samples.excluded.csv"; fi; done
   echo "[triage] $(($(wc -l < "$OUT/samples.fungal.csv")-1)) fungal/likely_fungal -> $OUT/samples.fungal.csv ; $(($(wc -l < "$OUT/samples.excluded.csv")-1)) excluded -> $OUT/samples.excluded.csv" >&2
   rm -f "$OUT/.keep" "$OUT/.samples.tsv"
