@@ -38,12 +38,12 @@ shared filesystem whose path contains **no spaces**, outbound HTTPS to the hosts
 ```bash
 # one-time, if the roots are root-owned:
 sudo mkdir -p /hpc/opt/fungiforge /hpc/data/fungiforge
-sudo chown $USER:hpcusers /hpc/opt/fungiforge /hpc/data/fungiforge
+sudo chown $USER:<group> /hpc/opt/fungiforge /hpc/data/fungiforge
 sudo chmod 2775 /hpc/opt/fungiforge /hpc/data/fungiforge
 
 git clone https://github.com/aduton1000/fungiforge /tmp/ff && cd /tmp/ff
 bash bin/hpc_install.sh --prefix /hpc/opt/fungiforge --db /hpc/data/fungiforge \
-     --group hpcusers --partition global --profile-d --smoke
+     --group <group> --partition <partition> --profile-d --smoke
 ```
 
 What it does: clones/updates `repo/`; `docker build` → `apptainer build … docker-daemon://`
@@ -102,7 +102,7 @@ job: `sbatch --wrap 'fungiforge-run --samplesheet samples.csv' --time=7-0 --cpus
 ## 5. Update
 
 ```bash
-bash /hpc/opt/fungiforge/repo/bin/hpc_install.sh --prefix /hpc/opt/fungiforge --db /hpc/data/fungiforge --group hpcusers --ref v0.1.1
+bash /hpc/opt/fungiforge/repo/bin/hpc_install.sh --prefix /hpc/opt/fungiforge --db /hpc/data/fungiforge --group <group> --ref v0.1.1
 ```
 Existing `site.config` / `fungiforge-env.sh` are kept; images are rebuilt only with
 `--rebuild-images` (or when the version in `nextflow.config` changes).

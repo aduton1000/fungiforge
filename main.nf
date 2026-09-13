@@ -44,7 +44,7 @@ def help() {
     --assembler    flye|canu|raven        (long-read; default flye)
     --sr_assembler spades|megahit         (Illumina-only; default spades)
     --busco_lineage auto|<odb10 lineage>  (default auto)
-    --run_interproscan  true|false        (default false; heavy under emulation)
+    --run_interproscan  true|false        (default false; heavy — enable on a cluster)
     --skip_bgc / --skip_mge / --skip_novelty / --skip_extras
   """.stripIndent()
 }

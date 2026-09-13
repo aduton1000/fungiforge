@@ -4,8 +4,8 @@
 #
 # WHAT THIS IS FOR
 #   A fast, read-only triage you run on FRESH Oxford Nanopore (ONT) data BEFORE
-#   committing to a long fungiforge run. On this Apple-Silicon Mac the pipeline
-#   is emulated (linux/amd64) and a real run is multi-hour, so you want to know
+#   committing to a long fungiforge run. A real run is multi-hour (and slower still
+#   where linux/amd64 images run under emulation), so you want to know
 #   up front, per sample:
 #     - Is there enough usable data to assemble a genome? (GO / MARGINAL / NO-GO)
 #     - Is this actually whole-genome shotgun, or an ITS amplicon run that
@@ -58,9 +58,9 @@
 #   8. ARTIFACTS — writes a per-sample summary TSV and a ready-to-edit fungiforge
 #      samplesheet stub (ont_fastq -> merged files; metadata columns = NA).
 #
-# TOOLING FACTS (tested on this machine — do not "simplify" these away):
+# PORTABILITY NOTES (verified behaviour — do not "simplify" these away):
 #   * Everything runs inside the base image aduton1000/fungiforge:0.1.0.
-#   * arm64 host + linux/amd64 image => every docker run passes
+#   * on an arm64 host the linux/amd64 image needs explicit selection => every docker run passes
 #     --platform linux/amd64 and -e HOME=/tmp -e USER=fungiforge.
 #   * Binaries live at /opt/conda/bin/<tool> (NOT on the bash -lc PATH) -> full paths.
 #   * kraken2 is NOT in the image -> read-based ID uses vsearch vs UNITE.
@@ -248,8 +248,8 @@ if [ -n "$SIF" ]; then
   echo "[ok] container image present ($CRT): $SIF"
   envrow PASS "container image" "$SIF ($CRT)"
 else
-  command -v docker >/dev/null 2>&1 || die "docker not found on PATH. Install/start Docker Desktop (or pass --sif on an HPC)."
-  docker info >/dev/null 2>&1 || die "docker daemon not responding. Is Docker Desktop running?"
+  command -v docker >/dev/null 2>&1 || die "docker not found on PATH. Install/start Docker (or pass --sif to use apptainer/singularity)."
+  docker info >/dev/null 2>&1 || die "docker daemon not responding. Is the Docker service running?"
 
   # NB: capture first — piping `docker images` into `grep -q` makes grep close the
   # pipe on first match, which SIGPIPEs `docker images` and trips `pipefail`.

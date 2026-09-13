@@ -1,5 +1,5 @@
 // Stage 00 — optional Dorado basecalling (pod5 dir -> ONT FASTQ). Runs native
-// arm64 Dorado on the host (fast); skipped unless --basecall.
+// Dorado as a native host binary (fast); skipped unless --basecall.
 process BASECALL {
   tag { meta.id }
   label 'basecall'
