@@ -11,7 +11,7 @@ Layout (mirrors callforge / captureforge on the same cluster):
 <prefix>/                      e.g. /hpc/opt/fungiforge
   repo/                        git checkout (pinned --ref)
   images/fungiforge-0.1.0.sif  built here from env/Dockerfile (NOT on Docker Hub)
-  images/antismash-ff-8.0.0-r2.sif   from env/antismash-ff.Dockerfile
+  images/antismash-ff-8.0.0-r3.sif   from env/antismash-ff.Dockerfile
   images/cache/                shared Nextflow image cache (public images pre-pulled)
   cli-env/                     conda env with the `fungiforge` Python CLI
   site.config                  nextflow -c overrides: caps, .sif paths, partition

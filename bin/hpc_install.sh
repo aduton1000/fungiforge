@@ -97,7 +97,7 @@ echo "  fungiforge $VERSION @ $COMMIT"
 
 # ---- 2. images ----------------------------------------------------------------
 FF_TAG="aduton1000/fungiforge:$VERSION";      FF_SIF="$PREFIX/images/fungiforge-$VERSION.sif"
-AS_TAG="aduton1000/antismash-ff:8.0.0-r2";    AS_SIF="$PREFIX/images/antismash-ff-8.0.0-r2.sif"
+AS_TAG="aduton1000/antismash-ff:8.0.0-r3";    AS_SIF="$PREFIX/images/antismash-ff-8.0.0-r3.sif"
 if [ "$SKIP_IMAGES" = 0 ]; then
   export APPTAINER_TMPDIR="${APPTAINER_TMPDIR:-$PREFIX/images/.tmp}"; mkdir -p "$APPTAINER_TMPDIR"
   build_sif(){ # build_sif <tag> <dockerfile> <context> <sif>
