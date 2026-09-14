@@ -8,7 +8,7 @@
 #
 #  Layout this file assumes (mirrors callforge / captureforge on the same cluster):
 #      <install_root>/repo        git checkout (main.nf, bin/, share/, conf/)
-#      <install_root>/images      fungiforge-0.1.0.sif, antismash-ff-8.0.0-r2.sif, cache/
+#      <install_root>/images      fungiforge-0.1.0.sif, antismash-ff-8.0.0-r3.sif, cache/
 #      <install_root>/cli-env     conda env with the `fungiforge` Python CLI
 #      <install_root>/site.config nextflow -c overrides (caps, image paths, partition)
 #      <db_root>                  reference databases (bin/fetch_references.sh target)

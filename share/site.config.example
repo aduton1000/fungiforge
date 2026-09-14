@@ -20,7 +20,7 @@ params {
 // (Set here as label containers, not params: base.config reads params at parse time.)
 process {
   withLabel: 'readqc|basecall|decontam|identify|resistance|mge|extras|report' { container = '/hpc/opt/fungiforge/images/fungiforge-0.1.0.sif' }
-  withLabel: bgc                                                             { container = '/hpc/opt/fungiforge/images/antismash-ff-8.0.0-r2.sif' }
+  withLabel: bgc                                                             { container = '/hpc/opt/fungiforge/images/antismash-ff-8.0.0-r3.sif' }
 }
 
 // heavier slots for the long stages on big nodes
