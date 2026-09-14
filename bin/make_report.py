@@ -75,7 +75,7 @@ def build_row(sample, compartment, facility, season, S):
         "n_known_af_mutations": g(res, "summary", "n_known_mutations", default=0),
         "cyp51A_TR": tr if tr else "NA",
         "novelty": g(nov, "verdict", default=g(nov, "novelty", default="NA")),
-        "n_bgc": g(bgc, "n_clusters", default=len(g(bgc, "clusters", default=[])) if isinstance(g(bgc, "clusters", default=[]), list) else "NA"),
+        "n_bgc": g(bgc, "n_clusters", default="NA") if g(bgc, "status", default="ok") == "ok" else "NA",
         "n_mycovirus": g(mob, "n_mycovirus", default="NA"),
         "te_percent": g(mob, "te_percent", default="NA"),
         "polish_mode": g(pol, "mode"),

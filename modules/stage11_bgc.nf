@@ -19,16 +19,21 @@ process BGC {
   if [ "${params.skip_bgc}" != "true" ] && [ -s ${gbk} ] && grep -q "^LOCUS" ${gbk} 2>/dev/null; then
     if grep -qE "^     CDS |/translation=" ${gbk} 2>/dev/null; then RUN_BGC=1; fi
   fi
+  STATUS=skipped
   if [ "\$RUN_BGC" = "1" ]; then
     antismash --taxon fungi --output-dir as --genefinding-tool none --cpus ${task.cpus} \\
-        --databases "${params.antismash_db ?: params.data_dir + '/antismash'}" ${gbk} > as.log 2>&1 \\
-        || echo "antismash returned non-zero — see as.log" >&2
+        --databases "${params.antismash_db ?: params.data_dir + '/antismash'}" ${gbk} > as.log 2>&1
+    RC=\$?
+    if [ \$RC -eq 0 ]; then STATUS=ok; else STATUS=failed; echo "antismash exited \$RC — see as.log" >&2; tail -20 as.log >&2; fi
     cat as/*.region*.gbk > ${meta.id}.regions.gbk 2>/dev/null || true
   else
     echo "BGC skipped: GBK empty or has no annotated CDS (skip_bgc=${params.skip_bgc})." >&2
   fi
-  python3 ${projectDir}/bin/bgc_summary.py --sample "${meta.id}" --as-dir as --out ${meta.id}.bgc.json 2>/dev/null \\
-    || printf '{"sample":"%s","stage":"bgc","clusters":[],"note":"no BGC result (empty GBK or antismash unavailable)"}\\n' "${meta.id}" > ${meta.id}.bgc.json
+  # Best-effort stage, but never a silent zero: a failed/skipped antiSMASH run is recorded as
+  # status failed/skipped with n_clusters null (-> NA in master_fungi.tsv), not as "0 BGCs".
+  python3 ${projectDir}/bin/bgc_summary.py --sample "${meta.id}" --as-dir as --status "\$STATUS" \\
+      --log as.log --out ${meta.id}.bgc.json \\
+    || printf '{"sample":"%s","stage":"bgc","status":"failed","n_clusters":null,"clusters":[],"note":"bgc_summary failed"}\\n' "${meta.id}" > ${meta.id}.bgc.json
   exit 0
   """
   stub:
