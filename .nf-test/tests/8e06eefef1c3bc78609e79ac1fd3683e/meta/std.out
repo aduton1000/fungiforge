@@ -1,0 +1,5 @@
+[PIPELINE] fungiforge 0.1.0 | profile=local,test
+[WORKDIR] /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/8e06eefef1c3bc78609e79ac1fd3683e/work
+[PROCESS 95/49d3e5] MOBILE (S1)
+
+[SUCCESS] completed=1 failed=0 cached=0

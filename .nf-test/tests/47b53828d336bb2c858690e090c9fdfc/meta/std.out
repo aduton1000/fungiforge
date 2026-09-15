@@ -1,0 +1,3 @@
+
+[FAILED] completed=0 failed=0 cached=0
+[ERROR] Sample 'BAD': Illumina must be PAIRED — provide both illumina_r1 and illumina_r2 (got r1='reads/TESTFUN03_R1.fastq.gz', r2='').

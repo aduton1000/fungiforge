@@ -1,0 +1,2 @@
+task_id	hash	native_id	name	status	exit	submit	duration	realtime	%cpu	peak_rss	peak_vmem	rchar	wchar
+1	df/ccdcdc	47031	NOVELTY (S1)	COMPLETED	0	2026-09-15 07:09:16.015	49ms	5ms	-	-	-	-	-

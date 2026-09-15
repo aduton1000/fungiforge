@@ -10,6 +10,7 @@ process BGC {
           tuple val(meta), path("${meta.id}.regions.gbk"),   emit: regions, optional: true
   script:
   """
+  export TMPDIR="\$PWD/tmp"; mkdir -p "\$TMPDIR"   # node /tmp is a shared tmpfs; keep scratch on disk
   # BGC is best-effort: antiSMASH needs a GBK with annotated CDS (genefinding none). An
   # empty/geneless GBK (e.g. failed annotation) makes antiSMASH exit non-zero — that must
   # NOT kill a multi-hour run, so we guard the input and force a clean exit 0.

@@ -1,0 +1,5 @@
+[PIPELINE] fungiforge 0.1.0 | profile=local,test
+[WORKDIR] /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/4b0d875dfc4a95b6b69487af16eb475a/work
+[PROCESS f3/becd93] REPEATMASK (S1)
+
+[SUCCESS] completed=1 failed=0 cached=0

@@ -1,0 +1,82 @@
+Sept-15 07:09:40.258 [main] DEBUG nextflow.cli.Launcher - $> nextflow -quiet -log /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/fdbd9a1936b3ab26179897125274c586/meta/nextflow.log run /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test-fdbd9a1936b3ab26179897125274c586.nf -c /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config -c /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config -params-file /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/fdbd9a1936b3ab26179897125274c586/meta/params.json -ansi-log false -profile local,test -with-trace /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/fdbd9a1936b3ab26179897125274c586/meta/trace.csv -w /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/fdbd9a1936b3ab26179897125274c586/work
+Sept-15 07:09:40.300 [main] DEBUG nextflow.plugin.PluginsFacade - Setting up plugin manager > mode=prod; embedded=false; plugins-dir=/Users/brightadu/.nextflow/plugins; core-plugins: nf-amazon@3.9.1,nf-azure@1.22.5,nf-cloudcache@0.6.0,nf-codecommit@0.5.2,nf-console@1.3.0,nf-google@1.27.3,nf-k8s@1.5.4,nf-seqera@0.20.1,nf-tower@1.28.0,nf-wave@1.21.0
+Sept-15 07:09:40.313 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Enabled plugins: []
+Sept-15 07:09:40.313 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Disabled plugins: []
+Sept-15 07:09:40.315 [main] INFO  org.pf4j.DefaultPluginManager - PF4J version 3.14.1 in 'deployment' mode
+Sept-15 07:09:40.322 [main] DEBUG nextflow.util.RetryConfig - Missing nextflow session - using default retry config
+Sept-15 07:09:40.384 [main] DEBUG nextflow.plugin.PluginUpdater - Using plugin repository: HttpPluginRepository [registry]; url=https://registry.nextflow.io/api
+Sept-15 07:09:40.386 [main] INFO  org.pf4j.AbstractPluginManager - No plugins
+Sept-15 07:09:40.405 [main] DEBUG nextflow.config.ConfigBuilder - Found config base: /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config
+Sept-15 07:09:40.407 [main] DEBUG nextflow.config.ConfigBuilder - User config file: /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config
+Sept-15 07:09:40.407 [main] DEBUG nextflow.config.ConfigBuilder - User config file: /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config
+Sept-15 07:09:40.407 [main] DEBUG nextflow.config.ConfigBuilder - Parsing config file: /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config
+Sept-15 07:09:40.408 [main] DEBUG nextflow.config.ConfigBuilder - Parsing config file: /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config
+Sept-15 07:09:40.408 [main] DEBUG nextflow.config.ConfigBuilder - Parsing config file: /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config
+Sept-15 07:09:40.409 [main] DEBUG nextflow.config.ConfigParserFactory - Using config parser v2
+Sept-15 07:09:40.417 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `local,test`
+Sept-15 07:09:40.716 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `local,test`
+Sept-15 07:09:40.784 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `local,test`
+Sept-15 07:09:40.835 [main] DEBUG nextflow.config.ConfigBuilder - Available config profiles: [local, hpc_slurm, conda, mamba, docker, singularity, apptainer, test]
+Sept-15 07:09:40.856 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins default=[]
+Sept-15 07:09:40.856 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins resolved requirement=[]
+Sept-15 07:09:40.863 [main] DEBUG n.secret.LocalSecretsProvider - Secrets store: /Users/brightadu/.nextflow/secrets/store.json
+Sept-15 07:09:40.864 [main] DEBUG nextflow.secret.SecretsLoader - Discovered secrets providers: [nextflow.secret.LocalSecretsProvider@18539cb1] - activable => nextflow.secret.LocalSecretsProvider@18539cb1
+Sept-15 07:09:40.907 [main] DEBUG nextflow.Session - Session UUID: 11695a9c-3f72-49dd-b7c2-21cb12bfd0fa
+Sept-15 07:09:40.907 [main] DEBUG nextflow.Session - Run name: cheesy_borg
+Sept-15 07:09:40.907 [main] DEBUG nextflow.Session - Executor pool size: 16
+Sept-15 07:09:40.911 [main] DEBUG nextflow.file.FilePorter - File porter settings maxRetries=3; maxTransfers=50; pollTimeout=null
+Sept-15 07:09:40.914 [main] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'FileTransfer' minSize=10; maxSize=48; workQueue=LinkedBlockingQueue[-1]; allowCoreThreadTimeout=false
+Sept-15 07:09:40.926 [main] DEBUG nextflow.cli.CmdRun - 
+  Version: 26.04.3 build 12259
+  Created: 28-05-2026 08:48 UTC (08:48 GMT)
+  System: Mac OS X 26.5.2
+  Runtime: Groovy 4.0.31 on OpenJDK 64-Bit Server VM 25.0.2+10-LTS
+  Encoding: UTF-8 (UTF-8)
+  Process: 50174@Brights-MacBook-Pro.local [127.94.0.2]
+  CPUs: 16 - Mem: 128 GB (52.6 GB) - Swap: 0 (0)
+Sept-15 07:09:40.935 [main] DEBUG nextflow.Session - Work-dir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/fdbd9a1936b3ab26179897125274c586/work [Mac OS X]
+Sept-15 07:09:40.952 [main] DEBUG nextflow.executor.ExecutorFactory - Extension executors providers=[]
+Sept-15 07:09:40.964 [main] DEBUG nextflow.Session - Observer factory (v2): LinObserverFactory
+Sept-15 07:09:40.965 [main] DEBUG nextflow.Session - Observer factory (v2): DefaultObserverFactory
+Sept-15 07:09:40.978 [main] DEBUG nextflow.cache.CacheFactory - Using Nextflow cache factory: nextflow.cache.DefaultCacheFactory
+Sept-15 07:09:40.982 [main] DEBUG nextflow.util.CustomThreadPool - Creating default thread pool > poolSize: 17; maxThreads: 1000
+Sept-15 07:09:41.006 [main] DEBUG nextflow.Session - Session start
+Sept-15 07:09:41.009 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow started -- trace file: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/fdbd9a1936b3ab26179897125274c586/meta/trace.csv
+Sept-15 07:09:41.010 [main] DEBUG nextflow.script.ScriptLoaderFactory - Using script parser v2
+Sept-15 07:09:41.527 [main] DEBUG nextflow.script.ScriptRunner - > Launching execution
+Sept-15 07:09:41.639 [main] DEBUG nextflow.Session - Process names: ANNOTATE, IDENTIFY, SR_ASSEMBLE, READ_QC, REPORT, DECONTAM, NOVELTY, SRPOLISH, ASSEMBLY_QC, REPEATMASK, ASSEMBLE, RESISTANCE, MEDAKA, PROVENANCE, DB_CHECK, EXTRAS, BASECALL, MOBILE, BGC
+Sept-15 07:09:41.640 [main] DEBUG nextflow.Session - Igniting dataflow network (0)
+Sept-15 07:09:41.640 [main] DEBUG nextflow.script.ScriptRunner - Parsed script files:
+  _nf_script_39de17f20d00a22c: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage02b_srassemble.nf
+  _nf_script_92c3ef39bf3c7fcf: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage09_resistance.nf
+  _nf_script_32b94b37e160f7ce: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage02_assemble.nf
+  _nf_script_a5b97214fe9f2831: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage08_identify.nf
+  _nf_script_1c1f98b4715b8aff: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage05_assembly_qc.nf
+  _nf_script_327aab5aa34c2615: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage03b_srpolish.nf
+  _nf_script_6970c1b2c9c5a3a4: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage01_readqc.nf
+  _nf_script_c81ea0f3d2cb7750: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage11_bgc.nf
+  _nf_script_af59dbd2d07ff4ff: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage07_annotate.nf
+  _nf_script_23be7f55efbcc390: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage15_provenance.nf
+  _nf_script_9a026347cfbed10d: /Users/brightadu/Documents/Claude/Projects/fungiforge/subworkflows/fungiforge.nf
+  _nf_script_1da71ed522b7511a: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage00_dbcheck.nf
+  _nf_script_56d6fb7b6bf16dd0: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage14_report.nf
+  _nf_script_56a80dc6c10c6fd4: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage00_basecall.nf
+  _nf_script_14e8dfef6c148033: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage04_decontam.nf
+  _nf_script_454ef1ff06d19d63: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage13_extras.nf
+  _nf_script_c0b2ab57b1cdbfba: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage06_repeatmask.nf
+  _nf_script_d941b15b2b91663a: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage12_novelty.nf
+  _nf_script_b4b4d57acedc65ba: /Users/brightadu/Documents/Claude/Projects/fungiforge/main.nf
+  _nf_script_efbe4d5176c10e0c: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage10_mobile.nf
+  Main: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test-fdbd9a1936b3ab26179897125274c586.nf
+  _nf_script_f5bc7f7df560f092: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage03_polish.nf
+Sept-15 07:09:41.640 [main] DEBUG nextflow.script.ScriptRunner - > Awaiting termination 
+Sept-15 07:09:41.640 [main] DEBUG nextflow.Session - Session await
+Sept-15 07:09:41.640 [main] DEBUG nextflow.Session - Session await > all processes finished
+Sept-15 07:09:41.640 [main] DEBUG nextflow.Session - Session await > all barriers passed
+Sept-15 07:09:41.647 [main] DEBUG n.trace.WorkflowStatsObserver - Workflow completed > WorkflowStats[succeededCount=0; failedCount=0; ignoredCount=0; cachedCount=0; pendingCount=0; submittedCount=0; runningCount=0; retriesCount=0; abortedCount=0; succeedDuration=0ms; failedDuration=0ms; cachedDuration=0ms;loadCpus=0; loadMemory=0; peakRunning=0; peakCpus=0; peakMemory=0; ]
+Sept-15 07:09:41.647 [main] DEBUG nextflow.trace.ReportObserver - Workflow completed -- rendering execution report
+Sept-15 07:09:42.043 [main] DEBUG nextflow.trace.TimelineObserver - Workflow completed -- rendering execution timeline
+Sept-15 07:09:42.097 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow completed -- saving trace file
+Sept-15 07:09:42.104 [main] DEBUG nextflow.cache.CacheDB - Closing CacheDB done
+Sept-15 07:09:42.112 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'FileTransfer' shutdown completed (hard=false)
+Sept-15 07:09:42.112 [main] DEBUG nextflow.script.ScriptRunner - > Execution complete -- Goodbye

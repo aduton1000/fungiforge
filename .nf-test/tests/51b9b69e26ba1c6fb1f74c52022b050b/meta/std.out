@@ -1,0 +1,5 @@
+[PIPELINE] fungiforge 0.1.0 | profile=local,test
+[WORKDIR] /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/51b9b69e26ba1c6fb1f74c52022b050b/work
+[PROCESS 3b/d31e0e] REPORT (S1)
+
+[SUCCESS] completed=1 failed=0 cached=0
