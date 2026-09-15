@@ -13,6 +13,7 @@ process DECONTAM {
   script:
   """
   source "${projectDir}/bin/ff_status.sh"; ff_init decontam "${meta.id}" ${meta.id}.decontam.json
+  ff_version kraken2 -- kraken2 --version
   if [ "${params.skip_decontam}" = "true" ] || [ -z "${params.data_dir ?: ''}" ] || [ ! -f "${params.data_dir ?: ''}/kraken2/hash.k2d" ]; then
     ff_skip kraken2 "decontamination skipped (--skip_decontam, or no kraken2 DB under --data_dir)"
     cp ${assembly} ${meta.id}.nuclear.fasta
@@ -31,5 +32,5 @@ process DECONTAM {
   ff_finalize
   """
   stub:
-  "touch ${meta.id}.nuclear.fasta ${meta.id}.mito.fasta ${meta.id}.decontam.json"
+  "touch ${meta.id}.nuclear.fasta ${meta.id}.mito.fasta; echo '{\"sample\":\"${meta.id}\",\"stage\":\"decontam\"}' > ${meta.id}.decontam.json"
 }

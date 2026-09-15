@@ -11,6 +11,7 @@ process MEDAKA {
   script:
   """
   source "${projectDir}/bin/ff_status.sh"; ff_init medaka "${meta.id}" ${meta.id}.medaka.json
+  ff_version medaka -- medaka --version
   mkdir -p medaka
   # A failed polish is a failed stage: silently carrying the unpolished assembly forward
   # would make every downstream resistance call untrustworthy without saying so.

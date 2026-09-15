@@ -5,6 +5,7 @@
 #   ff_init  <stage> <sample> <stage.json> [--best-effort]
 #   ff_run   <label> [--optional] -- <command ...>      # run a tool, record its exit code (in $FF_RC)
 #   ff_skip  <label> <reason>                            # record a tool deliberately not run
+#   ff_version <label> -- <command printing a version>   # record the tool's version string
 #   ff_finalize                                           # write status into <stage.json>; exit code
 #
 # Semantics
@@ -19,6 +20,10 @@
 #     it does not change the status.
 #   * Every tool's exit code and wall time land in the stage JSON under "tools", so nothing
 #     that ran is invisible in the results. `|| true` is never needed and must not be used.
+#   * ff_version runs a cheap version command and records the first line that looks like a
+#     version (else the first line of output; "not found"/"unknown" when nothing usable).
+#     Versions land under "versions" and are copied onto the matching "tools" entry, so the
+#     provenance stage can build one version table for the whole run.
 #
 # Pipelines: wrap in bash with pipefail so the exit code is the pipeline's, e.g.
 #   ff_run chopper -- bash -o pipefail -c "chopper -q 10 -i in.fq | gzip > out.fq.gz"
@@ -26,9 +31,27 @@
 ff_init() {
   FF_STAGE="$1"; FF_SAMPLE="$2"; FF_JSON="$3"; FF_BEST_EFFORT=""
   [ "${4:-}" = "--best-effort" ] && FF_BEST_EFFORT="--best-effort"
-  FF_TOOLS=".ff_tools.tsv"; FF_SKIPS=".ff_skips.tsv"; FF_RC=0
-  : > "$FF_TOOLS"; : > "$FF_SKIPS"
+  FF_TOOLS=".ff_tools.tsv"; FF_SKIPS=".ff_skips.tsv"; FF_VERSIONS=".ff_versions.tsv"; FF_RC=0
+  : > "$FF_TOOLS"; : > "$FF_SKIPS"; : > "$FF_VERSIONS"
   FF_HELPER="${FF_HELPER:-$(dirname "${BASH_SOURCE[0]}")/ff_status.py}"
+}
+
+ff_version() {
+  local label="$1"; shift
+  [ "${1:-}" = "--" ] && shift
+  local out v
+  if ! command -v "$1" >/dev/null 2>&1; then
+    v="not found"
+  else
+    # never let a broken --version abort the task: capture, cap, pick the version-looking line
+    out=$({ "$@" 2>&1 || true; } | head -c 4000 | tr -d '\r')
+    v=$(printf '%s\n' "$out" | grep -m1 -E '[0-9]+\.[0-9]+' || true)
+    [ -z "$v" ] && v=$(printf '%s\n' "$out" | grep -m1 . || true)
+    [ -z "$v" ] && v="unknown"
+    v=$(printf '%s' "$v" | tr -s '[:space:]' ' ' | sed -E 's/^ +| +$//g' | cut -c1-200)
+  fi
+  printf '%s\t%s\n' "$label" "$v" >> "$FF_VERSIONS"
+  return 0
 }
 
 ff_run() {
@@ -65,5 +88,5 @@ ff_skip() {
 
 ff_finalize() {
   python3 "$FF_HELPER" finalize --stage "$FF_STAGE" --sample "$FF_SAMPLE" --json "$FF_JSON" \
-      --tools "$FF_TOOLS" --skips "$FF_SKIPS" $FF_BEST_EFFORT
+      --tools "$FF_TOOLS" --skips "$FF_SKIPS" --versions "${FF_VERSIONS:-}" $FF_BEST_EFFORT
 }

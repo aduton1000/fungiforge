@@ -55,6 +55,13 @@ in `share/`; sets group read/exec; writes `/etc/profile.d/fungiforge.sh` (with
 `--profile-d`, via sudo) so every login gets the launchers on PATH; and with
 `--smoke` runs the 15-stage DAG as `-stub-run` through SLURM.
 
+The public images are pinned to versioned tags/digests in `conf/base.config`; the cache file
+names follow Nextflow's convention (`staphb-flye-2.9.6.img`, `nextgenusfs-funannotate@sha256-….img`),
+so a checkout that changes a pin needs the new file pulled (`fungiforge-fetch-refs images`, or
+rerun the installer) — an older `…-latest.img` in the cache is simply not used. Set
+`params.image_cache_dir` in `site.config` to the same directory as `apptainer.cacheDir` so
+`provenance.json` can record the sha256 of every image a run used.
+
 No Docker on the cluster? Build the two images on any Linux box with Docker
 (`docker build --platform linux/amd64 …`, then `apptainer build x.sif docker-daemon://tag`),
 copy the `.sif` files into `<prefix>/images/`, and rerun the installer with `--skip-images`.
