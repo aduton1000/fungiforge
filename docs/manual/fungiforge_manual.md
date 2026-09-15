@@ -273,6 +273,17 @@ in the config:
 You never activate any of these by hand — Nextflow provisions the right env/container per
 process automatically.
 
+**Every image is pinned.** `conf/base.config` names a versioned tag for each public image
+(`staphb/flye:2.9.6`, `staphb/spades:4.3.0`, `staphb/medaka:2.2.2`, `staphb/polypolish:0.6.1-bwa`,
+`ezlabgva/busco:v5.7.1_cv1`, `dfam/tetools:2.00`) and records, beside each, the manifest digest the
+tag resolved to when it was validated; funannotate has no versioned tag for the validated build, so it
+is pinned by digest (`nextgenusfs/funannotate@sha256:2eadfeb4…`). The fungiforge base image is built
+from `env/base.linux-64.lock`, an explicit URL+md5 lock of the whole solved environment (exported
+from the validated image with `bin/lock_env.sh`); `env/base.yml` carries the same versions as exact
+`==` pins for reading. Rebuilding from the lock reproduces the conda layer package-for-package
+(verified: two independent builds gave identical 453-package lists). `provenance.json` (§11.3)
+records what actually ran.
+
 # 5. The `fungiforge` CLI and how to run
 
 ## 5.1 The console command
@@ -351,7 +362,17 @@ external/scratch drive.
 | **Kraken2** (PlusPF-8 GB) | decontamination | 04 | `kraken2` |
 | **sourmash/RefSeq-fungi** (GenBank fungi k=31) | genome-ANI ID & novelty | 08, 12 | `refseq_fungi` |
 | **FungAMR** tables + built reference proteins | antifungal-resistance calling | 09 | `fungamr` (+ `build_fungamr_refs.py`) |
-| **RVDB-prot** (v31.0 RdRp) | mycovirus / EVE screen | 10 | `rvdb` |
+| **RVDB-prot** (v31.0 RdRp) | mycovirus / EVE screen (staged now; consumed from the W2.8 mobile/mycovirus upgrade) | 10 | `rvdb` |
+
+**Checked before every run.** The first task of a run, `DB_CHECK`, verifies that every database the
+enabled stages need is present and complete (the `.done` marker `fetch_references.sh` writes plus the
+key files each stage opens: UNITE FASTA, Kraken2 `*.k2d`, BUSCO lineage, funannotate `Pfam-A.hmm`,
+antiSMASH `clusterblast/`, FungAMR tables + reference proteins; `refseq_fungi` only with `--genome_id`;
+Kraken2/antiSMASH only when their stages are on). Anything missing is listed once and the run stops
+in seconds instead of hours later; `--allow_missing_db` turns that into a warning, and the
+dependent stages then record `skipped`. `--funannotate_db` / `--antismash_db` overrides are honoured.
+The findings are written to `pipeline_info/db_manifest.json` (with each database's `MANIFEST.tsv`
+source line) and embedded in `provenance.json`.
 
 ## 6.2 Staging them
 
@@ -746,8 +767,9 @@ and a `tools` block, written by `bin/ff_status.sh` / `bin/ff_status.py` at the e
 | `failed` | a required tool failed. The task exits non-zero and the run stops after pending tasks, except for the best-effort stages (BGC, extras), which record `failed` and let the run continue |
 | `skipped` | the stage was deliberately not run |
 
-`tools` records each tool's exit code and wall time; `skipped_tools` records steps not run and why
-(a missing database, not applicable to this isolate). The master table summarises this per isolate in
+`tools` records each tool's exit code, wall time and (via `ff_version`) the version string the tool
+reports; `versions` lists every version recorded in the task, including tools that were probed but not
+run; `skipped_tools` records steps not run and why (a missing database, not applicable to this isolate). The master table summarises this per isolate in
 `stages_failed` (`stage:status;…` or `none`), so a row with results is never mistaken for a clean run.
 The assembly and medaka steps, which have no scientific JSON of their own, emit small status JSONs
 (`<sample>.assemble.json`, `<sample>.medaka.json`) for the same reason. `|| true` is not used
@@ -759,9 +781,26 @@ Health analyses are directly comparable.
 
 ## 11.3 Provenance
 
-`bin/make_provenance.py` records pipeline version + git commit (+ dirty flag), Nextflow/Docker
-versions, host, and resolvable tool versions into `provenance.json` (best-effort). Nextflow also
-writes `pipeline_info/` (execution report, timeline, trace).
+Every run ends with a run-level `PROVENANCE` task that writes `pipeline_info/provenance.json`
+(schema `fungiforge/resources/provenance.schema.json`, checked at write time):
+
+| Block | Content | Source |
+|---|---|---|
+| `pipeline` | name, version, git commit and dirty flag, revision/repository when run from GitHub, script hash | `main.nf` (head node) |
+| `nextflow`, `run` | Nextflow version/build, session id, run name, start time, full command line, launch/work dirs, profile, container engine, stub/resume flags, user, host | Nextflow `workflow` metadata |
+| `params` | every effective parameter | Nextflow |
+| `containers` | process label → container reference that was configured | Nextflow |
+| `images` | for each reference, what actually ran: a site `.sif` or cached `.img` with size and **sha256**, or a Docker image id + repo digest | `workflow.onComplete` on the head node (`make_provenance.py images`) |
+| `databases` | the `DB_CHECK` manifest: each database's key files, `.done` timestamp and `MANIFEST.tsv` source | `bin/check_databases.py` |
+| `samples` | per isolate, per stage: `status`, `tools` (exit, seconds, version), `skipped_tools`, `versions`, `note` | every stage JSON |
+| `tool_versions`, `version_conflicts`, `stage_summary` | one consolidated version per tool across the run (a tool reporting two different versions is listed under `version_conflicts` — it should be empty), and ok/partial/failed/skipped counts per stage | aggregated |
+
+Versions are what each tool prints (e.g. `vsearch v2.29.1_linux_x86_64`); the authoritative package
+versions of the base image are in `env/base.linux-64.lock`. Hashing the ~30 GB image set takes one to
+two minutes at the end of the run; `--provenance_hash_images false` records path and size only. On a
+shared install set `params.image_cache_dir` (site config) to the pre-pulled image cache so cached
+images resolve; the launcher's `NXF_APPTAINER_CACHEDIR` is used otherwise. Nextflow also writes
+`pipeline_info/` (execution report, timeline, trace).
 
 # 12. Layer 2 — the One Health comparative analysis
 

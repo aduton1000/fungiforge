@@ -12,6 +12,8 @@ process REPORT {
   script:
   """
   source "${projectDir}/bin/ff_status.sh"; ff_init report "${meta.id}" ${meta.id}.report_status.json
+  ff_version python -- python3 --version
+  ff_version pandas -- python3 -c "import pandas; print(pandas.__version__)"
   ff_run make_report -- python3 ${projectDir}/bin/make_report.py --sample "${meta.id}" \\
       --compartment "${meta.compartment}" --facility "${meta.facility}" --season "${meta.season}" \\
       --jsons ${jsons} \\

@@ -17,6 +17,7 @@ process READ_QC {
   if (is_shortread)
     """
     source "${projectDir}/bin/ff_status.sh"; ff_init readqc "${meta.id}" ${meta.id}.readqc.json
+    ff_version fastp -- fastp --version
     ff_run fastp -- fastp -i ${r1} -I ${r2} -o r1.fp.fq.gz -O r2.fp.fq.gz --json fastp.json --thread ${task.cpus}
     : | gzip > ${meta.id}.ont.filt.fastq.gz   # no ONT for this isolate — empty placeholder
     printf '{"sample":"%s","stage":"readqc","platform":"%s","ont_filtered":null,"illumina":true}\\n' \\
@@ -26,6 +27,9 @@ process READ_QC {
   else
     """
     source "${projectDir}/bin/ff_status.sh"; ff_init readqc "${meta.id}" ${meta.id}.readqc.json
+    ff_version chopper -- chopper --version
+    ff_version nanoplot -- NanoPlot --version
+    ff_version fastp -- fastp --version
     ff_run nanoplot_raw --optional -- NanoPlot --fastq ${ont} -o nanoplot_raw --prefix raw --N50
     ff_run chopper -- bash -o pipefail -c "chopper -q ${params.ont_min_qual} -l ${params.ont_min_len} -i ${ont} 2> chopper.log | gzip > ${meta.id}.ont.filt.fastq.gz"
     ff_run nanoplot_filt --optional -- NanoPlot --fastq ${meta.id}.ont.filt.fastq.gz -o nanoplot_filt --prefix filt --N50
@@ -35,5 +39,5 @@ process READ_QC {
     ff_finalize
     """
   stub:
-  "touch ${meta.id}.ont.filt.fastq.gz ${meta.id}.readqc.json"
+  "touch ${meta.id}.ont.filt.fastq.gz; echo '{\"sample\":\"${meta.id}\",\"stage\":\"readqc\"}' > ${meta.id}.readqc.json"
 }

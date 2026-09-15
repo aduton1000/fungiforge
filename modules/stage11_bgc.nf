@@ -11,6 +11,7 @@ process BGC {
   script:
   """
   source "${projectDir}/bin/ff_status.sh"; ff_init bgc "${meta.id}" ${meta.id}.bgc.json --best-effort
+  ff_version antismash -- antismash --version
   # Best-effort stage: an antiSMASH failure is RECORDED (status failed, n_clusters null -> NA
   # in master_fungi.tsv) but does not stop a multi-hour run.
   mkdir -p as; STATUS=skipped

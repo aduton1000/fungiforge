@@ -34,6 +34,8 @@ process SRPOLISH {
   else if (do_hybrid)
     """
     source "${projectDir}/bin/ff_status.sh"; ff_init polish "${meta.id}" ${meta.id}.polish.json
+    ff_version polypolish -- polypolish --version
+    ff_version bwa -- bwa
     # Each step is optional: a failure falls back to the medaka assembly, the mode records it
     # and the stage is marked partial (resistance confidence drops to provisional).
     MODE=hybrid_failed_ont_fallback; CONF=provisional_ont_only; CHANGES=NA; OK=1
@@ -67,5 +69,5 @@ process SRPOLISH {
     ff_finalize
     """
   stub:
-  "touch ${meta.id}.polished.fasta ${meta.id}.polish.json"
+  "touch ${meta.id}.polished.fasta; echo '{\"sample\":\"${meta.id}\",\"stage\":\"polish\"}' > ${meta.id}.polish.json"
 }

@@ -4,7 +4,7 @@ Bootstrap: docker
 From: mambaorg/micromamba:1.5.8
 
 %files
-    env/base.yml /tmp/base.yml
+    env/base.linux-64.lock /tmp/base.lock
     pyproject.toml /opt/fungiforge/pyproject.toml
     README.md /opt/fungiforge/README.md
     fungiforge /opt/fungiforge/fungiforge
@@ -12,7 +12,7 @@ From: mambaorg/micromamba:1.5.8
 
 %post
     export LC_ALL=C.UTF-8 LANG=C.UTF-8
-    micromamba install -y -n base -f /tmp/base.yml && micromamba clean -a -y
+    micromamba install -y -n base -f /tmp/base.lock && micromamba clean -a -y
     export PATH=/opt/conda/bin:$PATH
     pip install --no-cache-dir -e /opt/fungiforge
     chmod +x /opt/fungiforge/bin/*.py 2>/dev/null || true

@@ -17,6 +17,7 @@ process SR_ASSEMBLE {
   def mem_gb = (task.memory ? task.memory.toGiga() : 64)
   """
   source "${projectDir}/bin/ff_status.sh"; ff_init assemble "${meta.id}" ${meta.id}.assemble.json
+  ff_version ${params.sr_assembler} -- ${params.sr_assembler == "spades" ? "spades.py --version" : "megahit --version"}
   case ${params.sr_assembler} in
     spades)
       ff_run spades -- spades.py --isolate -1 ${r1} -2 ${r2} -o spades -t ${task.cpus} -m ${mem_gb}

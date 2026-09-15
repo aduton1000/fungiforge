@@ -11,6 +11,7 @@ process MOBILE {
   script:
   """
   source "${projectDir}/bin/ff_status.sh"; ff_init mobile "${meta.id}" ${meta.id}.mobile.json
+  ff_version genomad -- genomad --version
   ff_run te_summary -- python3 ${projectDir}/bin/te_summary.py --telib ${telib} --out te_summary.json
   if [ "${params.skip_mge}" = "true" ]; then ff_skip genomad "disabled (--skip_mge)"
   elif [ -z "${params.data_dir ?: ''}" ] || [ ! -d "${params.data_dir ?: ''}/genomad_db" ]; then ff_skip genomad "geNomad database not staged under --data_dir (genomad_db)"

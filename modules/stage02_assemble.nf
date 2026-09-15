@@ -10,6 +10,9 @@ process ASSEMBLE {
   script:
   """
   source "${projectDir}/bin/ff_status.sh"; ff_init assemble "${meta.id}" ${meta.id}.assemble.json
+  ff_version ${params.assembler} -- ${params.assembler == "flye" ? "flye --version" : params.assembler == "raven" ? "raven --version" : "canu -version"}
+  ff_version minimap2 -- minimap2 --version
+  ff_version purge_dups -- purge_dups -h
   case ${params.assembler} in
     flye)  ff_run flye -- flye --nano-hq ${ont} --out-dir flye --threads ${task.cpus}; cp flye/assembly.fasta asm.fasta ;;
     raven) ff_run raven -- bash -c "raven -t ${task.cpus} ${ont} > asm.fasta" ;;

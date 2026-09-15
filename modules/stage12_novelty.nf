@@ -10,6 +10,7 @@ process NOVELTY {
   script:
   """
   source "${projectDir}/bin/ff_status.sh"; ff_init novelty "${meta.id}" ${meta.id}.novelty.json
+  ff_version skani -- skani --version
   # genome-ANI novelty needs reference GENOMES (FASTA) — use skani if a genome set is staged;
   # otherwise the ITS-distance signal from Stage 08 is used alone and the skip is recorded.
   if [ "${params.skip_novelty}" = "true" ]; then ff_skip skani "disabled (--skip_novelty)"

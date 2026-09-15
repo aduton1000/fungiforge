@@ -136,3 +136,38 @@ def test_bash_pipeline_exit_code_is_captured_with_pipefail(tmp_path):
 def test_bash_skip_is_recorded(tmp_path):
     rc, doc, _ = run_bash(tmp_path, "ff_skip genomad 'database not staged'")
     assert rc == 0 and doc["status"] == "ok" and doc["skipped_tools"]["genomad"] == "database not staged"
+
+
+# ---------------------------------------------------------------- ff_version (W0.2)
+def test_bash_version_is_recorded_and_copied_onto_matching_tool(tmp_path):
+    body = "ff_version echo -- echo 'demo tool 1.2.3 (build 7)'\nff_run echo -- echo hi"
+    rc, doc, _ = run_bash(tmp_path, body)
+    assert rc == 0 and doc["versions"] == {"echo": "demo tool 1.2.3 (build 7)"}
+    assert doc["tools"]["echo"]["version"] == "demo tool 1.2.3 (build 7)"
+
+
+def test_bash_version_picks_first_version_looking_line(tmp_path):
+    rc, doc, _ = run_bash(tmp_path, "ff_version t -- printf 'Program: tool\\nUsage: tool [opts]\\nVersion: 0.7.19-r1273\\n'")
+    assert doc["versions"]["t"] == "Version: 0.7.19-r1273"
+
+
+def test_bash_version_falls_back_to_first_line_then_unknown(tmp_path):
+    rc, doc, _ = run_bash(tmp_path, "ff_version a -- printf 'no digits here\\n'\nff_version b -- true")
+    assert doc["versions"] == {"a": "no digits here", "b": "unknown"}
+
+
+def test_bash_version_missing_command_and_failing_command_never_abort(tmp_path):
+    body = "ff_version gone -- definitely_not_a_command_xyz --version\nff_version bad -- bash -c 'echo v9.9 >&2; exit 3'\necho reached > m"
+    rc, doc, _ = run_bash(tmp_path, body)
+    assert rc == 0 and (tmp_path / "m").exists()
+    assert doc["versions"]["gone"] == "not found" and doc["versions"]["bad"] == "v9.9" and doc["status"] == "ok"
+
+
+def test_finalize_versions_tsv_without_tools_entry_goes_to_versions_only(tmp_path):
+    tools = tmp_path / "t.tsv"; tools.write_text("flye\t0\t0\t1\n")
+    vers = tmp_path / "v.tsv"; vers.write_text("flye\t2.9.6\nminimap2\t2.28\n")
+    js = tmp_path / "s.json"
+    r = subprocess.run([sys.executable, os.path.join(BIN, "ff_status.py"), "finalize", "--stage", "d", "--sample", "S",
+                        "--json", str(js), "--tools", str(tools), "--versions", str(vers)], capture_output=True, text=True)
+    doc = json.load(open(js))
+    assert r.returncode == 0 and doc["tools"]["flye"]["version"] == "2.9.6" and doc["versions"]["minimap2"] == "2.28"

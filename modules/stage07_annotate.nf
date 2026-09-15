@@ -20,6 +20,11 @@ process ANNOTATE {
   // funannotate's default (anidulans) for organism-agnostic self-training.
   """
   source "${projectDir}/bin/ff_status.sh"; ff_init annotate "${meta.id}" ${meta.id}.annotate.json
+  ff_version funannotate -- funannotate --version
+  ff_version augustus -- augustus --version
+  ff_version genemark -- gmes_petap.pl
+  ff_version emapper -- emapper.py --version
+  ff_version diamond -- diamond version
   export FUNANNOTATE_DB="${params.funannotate_db ?: params.data_dir + '/funannotate'}"
   # Augustus (funannotate's BUSCO self-training) must WRITE species params into
   # AUGUSTUS_CONFIG_PATH; the container default (/usr/share/augustus/config) is root-owned
@@ -57,5 +62,5 @@ process ANNOTATE {
   ff_finalize
   """
   stub:
-  "touch ${meta.id}.proteins.faa ${meta.id}.gbk ${meta.id}.annotate.json"
+  "touch ${meta.id}.proteins.faa ${meta.id}.gbk; echo '{\"sample\":\"${meta.id}\",\"stage\":\"annotate\"}' > ${meta.id}.annotate.json"
 }

@@ -20,8 +20,8 @@ Legend: `todo` · `in progress` · `built` (code + tests) · `validated` (real-d
 
 | ID | Item | Status | Commits | Validated on |
 |---|---|---|---|---|
-| W0.1 | Stage status contract, no silent failure | built | develop: W0.1 commit | unit (25 tests), stub DAG, Docker fixture run; real-data run pending W0.4 |
-| W0.2 | Pinned versions and full provenance | todo | | |
+| W0.1 | Stage status contract, no silent failure | built | develop: `6af3383` | unit (25 tests), stub DAG, Docker fixture run; real-data run pending W0.4 |
+| W0.2 | Pinned versions and full provenance | built | develop: W0.2 commit | unit (48 tests total), stub DAG local + docker engine (provenance.json valid, 9/9 images resolved), two independent image builds identical (453 packages); real-data run pending W0.4 |
 | W0.3 | Test framework and CI | todo | | |
 | W0.4 | Cluster development deployment (validate items on real data without touching production) | todo | | |
 | W1.1 | Validation suite, controls, benchmarks | todo | | |
@@ -48,7 +48,7 @@ Everything the assessment and the code audit found, mapped to the item that clos
 | # | Limitation | Evidence | Closed by |
 |---|---|---|---|
 | L1 | Blanket `\|\| true` on medaka, RepeatModeler/Masker, QUAST, BUSCO, funannotate predict/annotate, barrnap, ITSx, vsearch, sourmash, skani, geNomad, minimap2 | modules stage01–12 | W0.1 |
-| L2 | Floating image tags (`latest` ×5), `>=` conda pins, provenance records six tools only | base.config, env/*.yml, make_provenance.py | W0.2 |
+| L2 | Floating image tags (`latest` ×5), `>=` conda pins, provenance records six tools only — **resolved by W0.2** (versioned tags + digests, explicit conda lock, DB_CHECK, provenance.json with per-tool versions and image sha256) | base.config, env/*.yml, make_provenance.py | W0.2 |
 | L3 | No unit tests, no CI; stub DAG tests plumbing only | repo | W0.3 |
 | L4 | Resistance detection unproven on a positive; no read-level genotyping, no zygosity; panel has ~35 rows though FungAMR has thousands; species coverage is thin (no *A. flavus* cyp51C, *Cryptococcus*) | af_resistance_panel.tsv, af_resistance.py | W1.1, W2.4 |
 | L5 | Non-fungal or QC-failed isolates still run every heavy stage | subworkflow | W2.1 |
@@ -61,7 +61,7 @@ Everything the assessment and the code audit found, mapped to the item that clos
 | L12 | GeneMark unlicensed; InterProScan only consumes a pre-computed XML; eggNOG not staged; no RNA-seq evidence path | stage07 | W2.5 |
 | L13 | Stage 13 is keyword tallies: secretome, CAZyme, virulence, mating type all effectively empty; ploidy `NA` | extras.py | W2.6 |
 | L14 | Mitochondrial split is an empty placeholder file | stage04 | W2.7 |
-| L15 | geNomad database is not in the fetch script, so stage 10 never ran; it targets the (empty) mito file; `te_percent` always NA | stage10, fetch_references.sh | W2.8 |
+| L15 | geNomad database is not in the fetch script, so stage 10 never ran; it targets the (empty) mito file; `te_percent` always NA; RVDB-prot is fetched but no stage reads it (found by W0.2's database audit) | stage10, fetch_references.sh | W2.8 |
 | L16 | `refseq_fungi_genomes` never staged, so genome-ANI novelty never ran; novelty is ITS-distance only | stage12, fetch_references.sh | W2.9 |
 | L17 | No cross-isolate phylogeny, SNP distances or clonality | — | W3.1 |
 | L18 | No BGC families across isolates, no mycotoxin cluster flags | bgc_summary.py | W3.2 |
@@ -82,6 +82,8 @@ Everything the assessment and the code audit found, mapped to the item that clos
 
 #### W0.2 Pinned versions and full provenance
 **Goal.** Bit-for-bit reproducibility. **Design.** Replace every `latest` with a versioned tag and record the digest in `conf/base.config`; pin conda specs exactly (`==`) with a `conda-lock` file; `make_provenance.py` gathers all tool versions (from each container), image digests, database releases from `MANIFEST.tsv`, git commit, Nextflow version, and the effective parameters; a `--check-db` launch step verifies database completion markers and versions and fails early. **Validation.** Rebuilt images produce identical version tables on two hosts; provenance JSON validated against a schema in the test suite.
+
+**As built (2026-09-15).** Images: `staphb/flye:2.9.6`, `staphb/spades:4.3.0`, `staphb/medaka:2.2.2`, `staphb/polypolish:0.6.1-bwa`, `ezlabgva/busco:v5.7.1_cv1`, `dfam/tetools:2.00` (the validated `latest`; `1.99` ships RepeatModeler 2.0.8/RepeatMasker 4.2.3, so it was rejected after checking), `nextgenusfs/funannotate@sha256:2eadfeb4…` (no versioned tag for the validated 1.8.17.dev197 build); each tag's manifest digest is recorded in `conf/base.config`, and `bin/fetch_references.sh images` pre-pulls exactly these. Conda: `env/base.yml` pinned `==` to the versions of the validated image; `env/base.linux-64.lock` is an explicit lock exported from a fresh build of those pins (the Mac's 0.1.0 image turned out to lack kraken2 — the lock check caught it — so the lock comes from a rebuild that includes it); `env/Dockerfile` and `env/fungiforge.def` install from the lock (`--build-arg ENV_SPEC=env/base.yml` bootstraps a new lock); `bin/lock_env.sh` regenerates and cross-checks. Provenance: `ff_version` in the status helper records each tool's version into the stage JSON (`tools[].version`, `versions`); `DB_CHECK` (stage 00, run-level, `bin/check_databases.py`) gates every isolate's first stage and fails the run with one list of missing databases unless `--allow_missing_db`; `PROVENANCE` (stage 15, run-level, `bin/make_provenance.py aggregate`) writes `pipeline_info/provenance.json` and validates it against `fungiforge/resources/provenance.schema.json`; `workflow.onComplete` adds image identities (sha256 of `.sif`/cached `.img`, or docker repo digests; `--provenance_hash_images`, `--image_cache_dir`). Basecall (stage 00) was also brought onto the status contract (it had been missed by W0.1). Validation done: 48 unit tests (`ff_version` end to end incl. missing/failing commands; DB checker; aggregate/images/validate; schema semantics); stub DAG 46/46 with `local` and with the `docker` engine (all nine images resolved with repo digests; document schema-valid); every version command exercised in the rebuilt image; two independent builds (from `base.yml` and from the lock) have identical 453-package sets. Still pending: real-data run on the dev deployment (W0.4), and the apptainer cache path on the cluster. Note for the record: tool-reported strings can differ from package versions (chopper 0.9.0 prints `0.8.0`, barrnap 1.10.6 prints `1.10.5`); the lock is authoritative.
 
 #### W0.4 Cluster development deployment
 **Goal.** Validate each item on real data while production keeps running. **Design.** A second, independent install at `/hpc/opt/fungiforge-dev` (`hpc_install.sh --prefix /hpc/opt/fungiforge-dev --ref develop --db /hpc/data/fungiforge --group <group>` with its own images and site config, no profile.d hook), run directories under `~/runs/dev/`. Items are validated there on CEA10 and DF-005 (and C87 once available) before being marked `validated`. **Validation.** The dev install runs the stub DAG and CEA10 end to end with the develop branch.
@@ -156,4 +158,5 @@ After production runs complete: merge `develop` → `main`, tag `v0.2.0`, `hpc_i
 ## Change log of this document
 
 - 2026-09-15 — created; limitation inventory L1–L25; items W0.1–W5.1 defined; all `todo`.
+- 2026-09-15 — W0.2 built: pinned image tags + digests, exact conda pins + explicit lock (image builds install from it), `ff_version`, `DB_CHECK` and `PROVENANCE` run-level stages, schema-validated `provenance.json` with image sha256/digests, basecall stage onto the status contract, 23 new unit tests, stub DAG with and without a container engine, lock reproducibility verified by two builds. Found on the way: the local 0.1.0 image lacked kraken2 (lock check), `dfam/tetools:1.99` is older than the validated `latest` (now `2.00`), RVDB is fetched but unused (noted under L15).
 - 2026-09-15 — W0.1 built: `bin/ff_status.sh` + `bin/ff_status.py`, all 15 modules converted (no `|| true` masking a tool), assemble/medaka status JSONs, `stages_failed` master column, 25 unit tests, Docker fixture run exercised ok and failed paths. Found and fixed in the process: a bare optional `ff_run` tripped `bash -ue` errexit (now returns 0 and sets `$FF_RC`). Added W0.4 (cluster dev deployment) because real-data validation must not touch the production install.
