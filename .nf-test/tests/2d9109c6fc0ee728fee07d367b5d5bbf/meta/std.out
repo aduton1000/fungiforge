@@ -1,0 +1,5 @@
+[PIPELINE] fungiforge 0.1.0 | profile=local,test
+[WORKDIR] /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/2d9109c6fc0ee728fee07d367b5d5bbf/work
+[PROCESS e9/8d312d] PROVENANCE (run)
+
+[SUCCESS] completed=1 failed=0 cached=0

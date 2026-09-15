@@ -20,18 +20,24 @@ process ANNOTATE {
   // funannotate's default (anidulans) for organism-agnostic self-training.
   """
   export FUNANNOTATE_DB="${params.funannotate_db ?: params.data_dir + '/funannotate'}"
+  # Scratch stays in the task directory: the container's /tmp is the node's tmpfs (RAM-backed,
+  # shared by every task on the node). funannotate writes the protein-to-genome alignments
+  # (exonerate, tens of GB for a 500k-protein database) under TMPDIR, and a batch of concurrent
+  # annotate tasks filled it ("No space left on device"). The work dir is on the shared disk.
+  export TMPDIR="\$PWD/tmp"; mkdir -p "\$TMPDIR"
   # Augustus (funannotate's BUSCO self-training) must WRITE species params into
   # AUGUSTUS_CONFIG_PATH; the container default (/usr/share/augustus/config) is root-owned
   # (read-only to our host UID) so Augustus fails silently -> 0 BUSCOs -> predict aborts.
   # funannotate derives AUGUSTUS_BASE = dirname(CONFIG) ONLY when basename(CONFIG)=='config',
   # then needs BASE/scripts/*.pl and BASE/bin/bam2hints. So mirror the layout: a writable
   # 'config' copy with scripts/ and bin/bam2hints symlinked to the real (read-only) ones.
-  export AUGUSTUS_CONFIG_PATH=/tmp/augustus/config
+  # (per-task copy under the work dir, not the node-shared /tmp: concurrent tasks must not race)
+  export AUGUSTUS_CONFIG_PATH="\$PWD/augustus/config"
   if [ ! -d "\$AUGUSTUS_CONFIG_PATH/species" ]; then
-    mkdir -p /tmp/augustus/bin
-    cp -r /usr/share/augustus/config /tmp/augustus/config 2>/dev/null || true
-    ln -sf /usr/share/augustus/scripts /tmp/augustus/scripts 2>/dev/null || true
-    ln -sf "\$(command -v bam2hints || echo /usr/bin/bam2hints)" /tmp/augustus/bin/bam2hints 2>/dev/null || true
+    mkdir -p "\$PWD/augustus/bin"
+    cp -r /usr/share/augustus/config "\$PWD/augustus/config" 2>/dev/null || true
+    ln -sf /usr/share/augustus/scripts "\$PWD/augustus/scripts" 2>/dev/null || true
+    ln -sf "\$(command -v bam2hints || echo /usr/bin/bam2hints)" "\$PWD/augustus/bin/bam2hints" 2>/dev/null || true
   fi
   ${ params.genemark_key ? "cp ${params.genemark_key} ~/.gm_key || true" : "" }
   # funannotate requires short (<=16 char), space-free FASTA headers. Polypolish appends
