@@ -10,6 +10,7 @@ process BGC {
           tuple val(meta), path("${meta.id}.regions.gbk"),   emit: regions, optional: true
   script:
   """
+  export TMPDIR="\$PWD/tmp"; mkdir -p "\$TMPDIR"   # node /tmp is a shared tmpfs; keep scratch on disk
   source ff_status.sh; ff_init bgc "${meta.id}" ${meta.id}.bgc.json --best-effort
   ff_version antismash -- antismash --version
   # Best-effort stage: an antiSMASH failure is RECORDED (status failed, n_clusters null -> NA

@@ -10,6 +10,7 @@ process ASSEMBLY_QC {
   script:
   def lineage = params.busco_lineage == 'auto' ? 'fungi_odb10' : params.busco_lineage
   """
+  export TMPDIR="\$PWD/tmp"; mkdir -p "\$TMPDIR"   # node /tmp is a shared tmpfs; keep scratch on disk
   source ff_status.sh; ff_init assembly_qc "${meta.id}" ${meta.id}.assemblyqc.json
   ff_version busco -- busco --version
   ff_version quast -- quast.py --version
