@@ -1,0 +1,38 @@
+// Stub test for modules/stage15_provenance.nf — the run-level provenance aggregation.
+// The stub runs the real aggregator on the inputs, so the document is checked for shape.
+nextflow_process {
+
+    name "PROVENANCE stub"
+    script "modules/stage15_provenance.nf"
+    process "PROVENANCE"
+    options "-stub-run"
+
+    test("aggregates stage JSONs into a schema-shaped provenance document") {
+        setup {
+            file("$outputDir/run_info.json").text = '{"pipeline": {"name": "fungiforge", "version": "test"}, "nextflow": {"version": "x"}, "run": {}, "containers": {"withLabel:report": "img"}, "params": {}}'
+            file("$outputDir/db_manifest.json").text = '{"ok": true, "databases": {}}'
+            file("$outputDir/S1.assemble.json").text = '{"sample": "S1", "stage": "assemble", "status": "ok", "tools": {}, "versions": {"flye": "2.9.6"}}'
+            file("$outputDir/S2.assemble.json").text = '{"sample": "S2", "stage": "assemble", "status": "partial", "tools": {}, "versions": {"flye": "2.9.6"}}'
+            file("$outputDir/S1.master.tsv").text = "sample\nS1\n"
+        }
+        when {
+            process {
+                """
+                input[0] = file("$outputDir/run_info.json")
+                input[1] = file("$outputDir/db_manifest.json")
+                input[2] = [file("$outputDir/S1.assemble.json"), file("$outputDir/S2.assemble.json")]
+                input[3] = [file("$outputDir/S1.master.tsv")]
+                """
+            }
+        }
+        then {
+            assert process.success
+            def p = path(process.out.provenance[0]).json
+            assert p.schema_version == "1.0"
+            assert p.n_samples == 2
+            assert p.stage_summary.assemble.ok == 1 && p.stage_summary.assemble.partial == 1
+            assert p.tool_versions.flye == "2.9.6"
+            assert p.containers["withLabel:report"] == "img"
+        }
+    }
+}

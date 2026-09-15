@@ -9,7 +9,7 @@ process NOVELTY {
   output: tuple val(meta), path("${meta.id}.novelty.json"), emit: json
   script:
   """
-  source "${projectDir}/bin/ff_status.sh"; ff_init novelty "${meta.id}" ${meta.id}.novelty.json
+  source ff_status.sh; ff_init novelty "${meta.id}" ${meta.id}.novelty.json
   ff_version skani -- skani --version
   # genome-ANI novelty needs reference GENOMES (FASTA) — use skani if a genome set is staged;
   # otherwise the ITS-distance signal from Stage 08 is used alone and the skip is recorded.
@@ -18,7 +18,7 @@ process NOVELTY {
   else
     ff_run skani --optional -- bash -c "skani dist -q ${nuclear} -r ${params.data_dir}/refseq_fungi_genomes/*.f* -o skani.tsv 2>skani.log"
   fi
-  ff_run novelty_call -- python3 ${projectDir}/bin/novelty_call.py --sample "${meta.id}" --skani skani.tsv \\
+  ff_run novelty_call -- novelty_call.py --sample "${meta.id}" --skani skani.tsv \\
       --identify-json ${identify_json} --out ${meta.id}.novelty.json
   ff_finalize
   """

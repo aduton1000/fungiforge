@@ -10,7 +10,7 @@ process ASSEMBLY_QC {
   script:
   def lineage = params.busco_lineage == 'auto' ? 'fungi_odb10' : params.busco_lineage
   """
-  source "${projectDir}/bin/ff_status.sh"; ff_init assembly_qc "${meta.id}" ${meta.id}.assemblyqc.json
+  source ff_status.sh; ff_init assembly_qc "${meta.id}" ${meta.id}.assemblyqc.json
   ff_version busco -- busco --version
   ff_version quast -- quast.py --version
   ff_version compleasm -- compleasm --version
@@ -26,7 +26,7 @@ process ASSEMBLY_QC {
     ff_run busco -- busco -i ${nuclear} -o busco -l ${lineage} -m genome -c ${task.cpus} \\
         ${ params.data_dir ? "--download_path ${params.data_dir}/busco --offline" : "" }
   fi
-  ff_run assembly_qc -- python3 ${projectDir}/bin/assembly_qc.py --sample "${meta.id}" --nuclear ${nuclear} \\
+  ff_run assembly_qc -- assembly_qc.py --sample "${meta.id}" --nuclear ${nuclear} \\
       --lineage ${lineage} --compleasm-dir compleasm --busco-dir busco \\
       --out ${meta.id}.assemblyqc.json
   ff_finalize

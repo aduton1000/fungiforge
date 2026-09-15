@@ -1,0 +1,30 @@
+// Stub test for modules/stage01_readqc.nf — the process must run under -stub-run and emit every
+// declared output once, named after the sample (the contract the subworkflow joins on).
+nextflow_process {
+
+    name "READ_QC stub"
+    script "modules/stage01_readqc.nf"
+    process "READ_QC"
+    options "-stub-run"
+
+    test("emits every declared output for one isolate") {
+        when {
+            process {
+                """
+                input[0] = [[id:'S1', assembly_mode:'longread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/test/reads/TESTFUN02.ont.fastq.gz"), file("$baseDir/test/reads/TESTFUN02_R1.fastq.gz"), file("$baseDir/test/reads/TESTFUN02_R2.fastq.gz")]
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert process.out.reads.size() == 1
+            assert process.out.reads[0][1].endsWith('S1.ont.filt.fastq.gz')
+            assert path(process.out.reads[0][1]).exists()
+            assert process.out.json.size() == 1
+            assert process.out.json[0][1].endsWith('S1.readqc.json')
+            assert path(process.out.json[0][1]).exists()
+            def js = path(process.out.json[0][1]).json
+            assert js.sample == 'S1'
+        }
+    }
+}
