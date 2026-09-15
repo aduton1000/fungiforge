@@ -114,3 +114,11 @@ def test_cli_writes_json(tmp_path, helpers):
                         "--out", str(tmp_path / "tr.json")], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert json.load(open(tmp_path / "tr.json"))["tr_type"] == "TR34" and '"tr_detected": true' in r.stdout
+
+
+def test_real_published_c87_assembly_slice_gives_tr34(helpers):
+    """Real sequence: the published A. fumigatus C87 assembly (GCA_949125185) carries TR34."""
+    fx = os.path.join(helpers["ROOT"], "test", "fixtures", "cyp51A")
+    res = tr.detect_tr(os.path.join(fx, "c87_published_cyp51A.fa"), os.path.join(fx, "c87_published_cyp51A.gbk"))
+    assert res["cyp51A_located"] and res["tr_detected"] and res["tr_type"] == "TR34"
+    assert res["unit_len"] == 34 and res["copies"] == 2
