@@ -21,7 +21,7 @@ Legend: `todo` · `in progress` · `built` (code + tests) · `validated` (real-d
 | ID | Item | Status | Commits | Validated on |
 |---|---|---|---|---|
 | W0.1 | Stage status contract, no silent failure | built | develop: `6af3383` | unit (25 tests), stub DAG, Docker fixture run; real-data run pending W0.4 |
-| W0.2 | Pinned versions and full provenance | built | develop: W0.2 commit | unit (48 tests total), stub DAG local + docker engine (provenance.json valid, 9/9 images resolved), two independent image builds identical (453 packages); real-data run pending W0.4 |
+| W0.2 | Pinned versions and full provenance | built | develop: `8deea53` | unit (48 tests total), stub DAG local + docker engine (provenance.json valid, 9/9 images resolved), two independent image builds identical (453 packages); real-data run pending W0.4 |
 | W0.3 | Test framework and CI | todo | | |
 | W0.4 | Cluster development deployment (validate items on real data without touching production) | todo | | |
 | W1.1 | Validation suite, controls, benchmarks | todo | | |
