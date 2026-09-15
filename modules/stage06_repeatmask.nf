@@ -11,12 +11,25 @@ process REPEATMASK {
           tuple val(meta), path("${meta.id}.repeat.json"),  emit: json
   script:
   """
-  BuildDatabase -name ${meta.id}_db ${nuclear}
-  RepeatModeler -database ${meta.id}_db -threads ${task.cpus} -LTRStruct || true
-  cp ${meta.id}_db-families.fa ${meta.id}.telib.fasta 2>/dev/null || touch ${meta.id}.telib.fasta
-  RepeatMasker -pa ${task.cpus} -lib ${meta.id}.telib.fasta -xsmall -dir rm ${nuclear} || true
-  cp rm/*.masked ${meta.id}.masked.fasta 2>/dev/null || cp ${nuclear} ${meta.id}.masked.fasta
-  python3 -c "import json;json.dump({'sample':'${meta.id}','stage':'repeatmask','telib':'${meta.id}.telib.fasta'},open('${meta.id}.repeat.json','w'),indent=2)"
+  source "${projectDir}/bin/ff_status.sh"; ff_init repeatmask "${meta.id}" ${meta.id}.repeat.json
+  ff_run BuildDatabase -- BuildDatabase -name ${meta.id}_db ${nuclear}
+  ff_run RepeatModeler -- RepeatModeler -database ${meta.id}_db -threads ${task.cpus} -LTRStruct
+  MASKED=false; NFAM=0
+  if [ -s ${meta.id}_db-families.fa ]; then
+    cp ${meta.id}_db-families.fa ${meta.id}.telib.fasta
+    NFAM=\$(grep -c '^>' ${meta.id}.telib.fasta)
+    ff_run RepeatMasker -- RepeatMasker -pa ${task.cpus} -lib ${meta.id}.telib.fasta -xsmall -dir rm ${nuclear}
+    if ls rm/*.masked >/dev/null 2>&1; then cp rm/*.masked ${meta.id}.masked.fasta; MASKED=true; else cp ${nuclear} ${meta.id}.masked.fasta; fi
+  else
+    # RepeatModeler found no repeat families (possible for a small, repeat-poor genome):
+    # nothing to mask — recorded, not hidden
+    : > ${meta.id}.telib.fasta
+    ff_skip RepeatMasker "RepeatModeler produced no repeat families; assembly left unmasked"
+    cp ${nuclear} ${meta.id}.masked.fasta
+  fi
+  printf '{"sample":"%s","stage":"repeatmask","telib":"%s.telib.fasta","n_families":%s,"masked":%s}\\n' \\
+    "${meta.id}" "${meta.id}" "\$NFAM" "\$MASKED" > ${meta.id}.repeat.json
+  ff_finalize
   """
   stub:
   "touch ${meta.id}.masked.fasta ${meta.id}.telib.fasta ${meta.id}.repeat.json"

@@ -11,18 +11,17 @@ process RESISTANCE {
   output: tuple val(meta), path("${meta.id}.resistance.json"), emit: json
   script:
   """
+  source "${projectDir}/bin/ff_status.sh"; ff_init resistance "${meta.id}" ${meta.id}.resistance.json
   # Carry the polishing mode through so ONT-only calls are flagged provisional while
   # hybrid-polished calls are high-confidence (the polish.json rides in from Stage 03b).
   MODE=\$(grep -o '"mode"[^,]*' ${polish_json} 2>/dev/null | head -1 | sed -E 's/.*: *"?([a-z_]+)"?.*/\\1/')
   case "\$MODE" in hybrid) PM=hybrid;; illumina_only) PM=illumina_only;; ont_only) PM=ont_only;; *) PM=unknown;; esac
-  python3 ${projectDir}/bin/af_resistance.py \\
+  ff_run af_resistance -- python3 ${projectDir}/bin/af_resistance.py \\
       --sample "${meta.id}" --proteins ${proteins} --species ${species} \\
       --assembly ${nuclear} --gbk ${gbk} --polish-mode "\$PM" \\
       --panel "${params.af_panel}" --data-dir "${params.data_dir ?: ''}" \\
       --out ${meta.id}.resistance.json
-  # NB no silent fallback: a caller crash must FAIL this task (a run that "succeeds" with an
-  # empty resistance result — cyp51A_TR = NA in master_fungi.tsv — is worse than a red stage).
-  # Graceful degradation for missing references is handled inside af_resistance.py itself.
+  ff_finalize
   """
   stub:
   "echo '{\"sample\":\"${meta.id}\",\"stage\":\"resistance\"}' > ${meta.id}.resistance.json"

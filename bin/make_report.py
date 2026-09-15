@@ -24,6 +24,8 @@ MASTER_COLS = [
     "polish_mode",
     # appended 0.1.1: Stage 04 Kraken2 verdict (fungal | likely_fungal | non_fungal | human | mixed | not_run)
     "sample_verdict", "contam_removed_pct", "top_taxon",
+    # appended 0.2.0: stage status contract — any stage not "ok" as stage:status (or "none")
+    "stages_failed",
 ]
 
 
@@ -82,6 +84,8 @@ def build_row(sample, compartment, facility, season, S):
         "sample_verdict": g(dc, "verdict", default="NA"),
         "contam_removed_pct": g(dc, "dropped_bp_pct", default="NA"),
         "top_taxon": top_taxon,
+        "stages_failed": ";".join(f"{st}:{d.get('status')}" for st, d in sorted(S.items())
+                                  if d.get("status") not in (None, "ok")) or "none",
     }
     return row
 

@@ -29,3 +29,6 @@ packages = ["fungiforge"]
 
 [tool.setuptools.package-data]
 fungiforge = ["resources/*.tsv", "report_templates/*.j2"]
+
+[tool.pytest.ini_options]
+testpaths = ["test/unit"]
