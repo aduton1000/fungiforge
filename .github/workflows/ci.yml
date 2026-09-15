@@ -115,6 +115,7 @@ jobs:
         if: always()
         with:
           name: stub-dag-results
+          include-hidden-files: true
           path: |
             results_ci/pipeline_info
             .nextflow.log
