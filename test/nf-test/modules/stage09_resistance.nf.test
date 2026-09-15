@@ -1,0 +1,27 @@
+// Stub test for modules/stage09_resistance.nf — the process must run under -stub-run and emit every
+// declared output once, named after the sample (the contract the subworkflow joins on).
+nextflow_process {
+
+    name "RESISTANCE stub"
+    script "modules/stage09_resistance.nf"
+    process "RESISTANCE"
+    options "-stub-run"
+
+    test("emits every declared output for one isolate") {
+        when {
+            process {
+                """
+                input[0] = [[id:'S1', assembly_mode:'longread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/test/samplesheet.test.csv"), file("$baseDir/assets/NO_ONT"), file("$baseDir/assets/NO_R1"), file("$baseDir/assets/NO_R2"), file("$baseDir/test/reads/TESTFUN01.ont.fastq.gz")]
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert process.out.json.size() == 1
+            assert process.out.json[0][1].endsWith('S1.resistance.json')
+            assert path(process.out.json[0][1]).exists()
+            def js = path(process.out.json[0][1]).json
+            assert js.sample == 'S1'
+        }
+    }
+}

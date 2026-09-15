@@ -1,0 +1,33 @@
+// Stub test for modules/stage08_identify.nf — the process must run under -stub-run and emit every
+// declared output once, named after the sample (the contract the subworkflow joins on).
+nextflow_process {
+
+    name "IDENTIFY stub"
+    script "modules/stage08_identify.nf"
+    process "IDENTIFY"
+    options "-stub-run"
+
+    test("emits every declared output for one isolate") {
+        when {
+            process {
+                """
+                input[0] = [[id:'S1', assembly_mode:'longread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/test/samplesheet.test.csv")]
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert process.out.species.size() == 1
+            assert process.out.species[0][1].endsWith('S1.species.txt')
+            assert path(process.out.species[0][1]).exists()
+            assert process.out.markers.size() == 1
+            assert process.out.markers[0][1].endsWith('S1.markers.fasta')
+            assert path(process.out.markers[0][1]).exists()
+            assert process.out.json.size() == 1
+            assert process.out.json[0][1].endsWith('S1.identify.json')
+            assert path(process.out.json[0][1]).exists()
+            def js = path(process.out.json[0][1]).json
+            assert js.sample == 'S1'
+        }
+    }
+}

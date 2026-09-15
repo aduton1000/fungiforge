@@ -18,7 +18,7 @@ process DB_CHECK {
                   (params.antismash_db   ? "--path antismash=${params.antismash_db} "     : '')
   if (params.data_dir)
     """
-    python3 ${projectDir}/bin/check_databases.py --data-dir "${params.data_dir}" --out db_manifest.json \\
+    check_databases.py --data-dir "${params.data_dir}" --out db_manifest.json \\
         --require ${req.join(',')} ${overrides} ${params.allow_missing_db ? '--allow-missing' : ''}
     """
   else

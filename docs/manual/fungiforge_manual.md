@@ -338,6 +338,20 @@ The `test` profile (`conf/test.config`) supplies a subsampled sample sheet, a mi
 DB, `busco_lineage = saccharomycetes_odb10`, and writes to `results_test/`. Use it to confirm
 an install or a config change.
 
+## 5.4 The test suite
+
+| Layer | What | How |
+|---|---|---|
+| Unit | every helper in `bin/*.py` and the CLI, on synthetic inputs (Kraken2 report fixture, GenBank records built in the test, synthetic proteins / promoters); the scripts are driven as subprocesses the way the pipeline drives them, with subprocess coverage of `bin/` + `fungiforge/` (≥ 85 % enforced) | `pip install -e ".[dev]"`, then `COVERAGE_PROCESS_START=.coveragerc coverage run -m pytest test/unit && coverage combine && coverage report` |
+| Static | `nextflow lint` at zero warnings (strict syntax); shellcheck at warning level on every shell script | `nextflow lint .`; `shellcheck -S warning -x bin/*.sh share/bin/*` |
+| DAG | the 15 stages on the three-mode fixture under `-stub-run` (routing, joins, DB_CHECK gate, provenance) | `nextflow run main.nf -profile local,test -stub-run` |
+| nf-test | `parse_row`/`resolve_path` routing cases (ONT-only, hybrid, Illumina-only, unpaired refused), one stub test per module (every declared output emitted once, named after the sample), the whole DAG with and without the skip flags | `nf-test test` (`nf-test.config`, cases under `test/nf-test/`) |
+| Containers | the fixture through the real images with Docker: DB_CHECK and READ_QC complete in-container, versions are recorded, and the assemblers' failure on the synthetic reads is recorded by the status contract, not hidden | `bash test/run_docker_fixture.sh` |
+| Real data | CEA10 hybrid, DF-005 Illumina-only, C87 TR34/L98H on the development deployment | `docs/UPGRADE_PLAN.md` (W0.4, W1.1) |
+
+The first four layers run on every push (`.github/workflows/ci.yml`); the last two need the
+image set and databases and run locally or on the development deployment.
+
 # 6. Reference databases
 
 FungiForge follows the forge convention: **fetch and checksum every database up front, never
@@ -880,11 +894,13 @@ this manual; do not over-read them.
 
 # 15. Reproducibility & provenance
 
-Every image is version-pinned in `conf/base.config`; every light-stage env is pinned in
-`env/*.yml`; the manifest (`manifest.nextflowVersion = '>=23.10'`) pins the engine floor. Databases
-are recorded in `--data_dir/MANIFEST.tsv` with their source URL, and FungAMR reference building
-records `reference_build.json`. `make_provenance.py` captures the git commit, tool versions and host
-per run, and Nextflow's `pipeline_info/` captures the execution trace. Cite the exact image tags and
+Every image is pinned to a versioned tag or digest in `conf/base.config` (§4.3); the base image
+is built from the explicit conda lock `env/base.linux-64.lock`; the manifest
+(`manifest.nextflowVersion = '>=23.10'`) pins the engine floor. Databases are verified before every
+run (`DB_CHECK`, §6.1) and recorded in `--data_dir/MANIFEST.tsv` with their source URL; FungAMR
+reference building records `reference_build.json`. Every run writes `pipeline_info/provenance.json`
+(§11.3): commit, Nextflow version, effective parameters, the sha256 or digest of every image that
+ran, the database manifest, and every tool version per sample and stage. Cite the image digests and
 database releases recorded there. The One Health analysis pins `set.seed(20260729)`.
 
 # 16. Extending FungiForge

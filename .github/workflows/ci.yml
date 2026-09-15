@@ -1,0 +1,142 @@
+# fungiforge continuous integration (W0.3).
+#
+#   unit      pytest for every bin/*.py helper and the CLI, with subprocess coverage (report
+#             uploaded as an artifact; the job fails below 85 % line coverage of bin/ + fungiforge/)
+#   lint      `nextflow lint` must report zero warnings; shellcheck (warning level) on every shell script
+#   stub-dag  the 15-stage DAG on the three-mode fixture under -stub-run (local profile, no containers)
+#   nf-test   routing functions, every module stub, and the whole DAG through nf-test
+#
+# Real-data validation (CEA10, DF-005, C87) is NOT run here: the reference databases (~40 GB)
+# and the image set (~30 GB) do not fit a hosted runner. It runs on the development deployment
+# (docs/UPGRADE_PLAN.md, W0.4) and is recorded in docs/validation.md. The Docker fixture run
+# (test/run_docker_fixture.sh) is likewise a local check.
+name: ci
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NXF_VER: "26.04.3"
+  NXF_ANSI_LOG: "false"
+
+jobs:
+  unit:
+    name: unit tests + coverage
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+          # subprocess coverage: the tests drive bin/*.py the way the pipeline does
+          echo 'import coverage; coverage.process_startup()' > "$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/sitecustomize.py"
+      - name: pytest
+        env:
+          COVERAGE_PROCESS_START: .coveragerc
+        run: |
+          python -m coverage run -m pytest -q test/unit
+          python -m coverage combine
+          python -m coverage report --fail-under=85 | tee coverage.txt
+          python -m coverage xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-py${{ matrix.python }}
+          path: |
+            coverage.txt
+            coverage.xml
+
+  lint:
+    name: nextflow lint + shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: nf-core/setup-nextflow@v2
+        with:
+          version: ${{ env.NXF_VER }}
+      - name: nextflow lint (zero warnings)
+        run: |
+          nextflow lint . | tee lint.txt
+          if grep -qE '^(Warn|Error)' lint.txt; then echo "::error::nextflow lint reported warnings/errors"; exit 1; fi
+      - name: shellcheck
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q shellcheck
+          shellcheck --version
+          shellcheck -S warning -x bin/*.sh share/bin/* share/fungiforge-env.sh.example test/run_cea10_hybrid.sh test/run_docker_fixture.sh
+
+  stub-dag:
+    name: stub DAG (three-mode fixture)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: nf-core/setup-nextflow@v2
+        with:
+          version: ${{ env.NXF_VER }}
+      - name: run
+        run: |
+          mkdir -p test/mini_db
+          nextflow run main.nf -profile local,test -stub-run --outdir results_ci
+      - name: check outputs
+        run: |
+          test -s results_ci/04_summary/TESTFUN01.master.tsv
+          test -s results_ci/04_summary/TESTFUN02.master.tsv
+          test -s results_ci/04_summary/TESTFUN03.master.tsv
+          python3 bin/make_provenance.py validate results_ci/pipeline_info/provenance.json
+          python3 - <<'PY'
+          import json
+          p = json.load(open("results_ci/pipeline_info/provenance.json"))
+          assert p["n_samples"] == 3, p["n_samples"]
+          assert set(p["samples"]) == {"TESTFUN01", "TESTFUN02", "TESTFUN03"}
+          assert all(r["resolved"] for r in p["images"].values()), p["images"]
+          print("provenance ok:", sorted(p["stage_summary"]))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stub-dag-results
+          path: |
+            results_ci/pipeline_info
+            .nextflow.log
+
+  nf-test:
+    name: nf-test (routing, module stubs, DAG)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: nf-core/setup-nextflow@v2
+        with:
+          version: ${{ env.NXF_VER }}
+      - name: install nf-test
+        run: |
+          curl -fsSL https://get.nf-test.com | bash
+          sudo mv nf-test /usr/local/bin/
+          nf-test version
+      - name: run
+        run: |
+          mkdir -p test/mini_db
+          nf-test test --ci

@@ -19,7 +19,7 @@ process ANNOTATE {
   // DB and covers Asco/Basidiomycota. --busco_seed_species (Augustus species) is left at
   // funannotate's default (anidulans) for organism-agnostic self-training.
   """
-  source "${projectDir}/bin/ff_status.sh"; ff_init annotate "${meta.id}" ${meta.id}.annotate.json
+  source ff_status.sh; ff_init annotate "${meta.id}" ${meta.id}.annotate.json
   ff_version funannotate -- funannotate --version
   ff_version augustus -- augustus --version
   ff_version genemark -- gmes_petap.pl

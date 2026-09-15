@@ -224,12 +224,15 @@ def main():
     # assemblies are high-confidence for point-mutation resistance calls, like hybrid.
     conf = {"hybrid": "high", "illumina_only": "high",
             "ont_only": "provisional_ont_only", "unknown": "provisional"}[a.polish_mode]
-    # species relevance: organism_regex matches the species, or genus matches, or 'spp.'
+    # species relevance: organism_regex names the species ("Aspergillus fumigatus"), the genus
+    # ("Candida spp." — the genus match covers it), or "*" / "Fungi" for a pan-fungal row.
+    # (A bare "spp." must NOT make a row apply to every genus — caught by the unit tests.)
     genus = species.split()[0] if species and species != "unknown" else ""
     def relevant(row):
-        org = row.get("organism_regex", "")
-        return bool(genus) and (re.search(re.escape(species), org, re.I) or
-                                re.search(re.escape(genus), org, re.I) or "spp." in org)
+        org = (row.get("organism_regex", "") or "").strip()
+        return bool(genus) and (re.search(re.escape(species), org, re.I) is not None or
+                                re.search(r"\b" + re.escape(genus) + r"\b", org, re.I) is not None or
+                                org in ("*", "Fungi", "any"))
 
     calls, searched = [], []
     for row in panel:

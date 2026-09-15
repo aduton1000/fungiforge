@@ -103,8 +103,7 @@ def main():
             cv = float(conf)
         except ValueError:
             cv = None
-        for acc in re.split(r"[,; ]+", raw):
-            acc = acc.strip()
+        for acc in dict.fromkeys(a_.strip() for a_ in re.split(r"[,; ]+", raw)):   # de-duplicated, order kept
             if not acc:
                 continue
             accessions.add(acc)

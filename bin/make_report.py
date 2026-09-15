@@ -62,7 +62,8 @@ def build_row(sample, compartment, facility, season, S):
     pol = S.get("polish", {})
     dc  = S.get("decontam", {})
     tops = g(dc, "top_species", default=[])
-    top_taxon = f"{tops[0]['name']} ({tops[0]['pct']}%)" if isinstance(tops, list) and tops else "NA"
+    top_taxon = (f"{tops[0].get('name', '?')} ({tops[0].get('pct', 'NA')}%)"
+                 if isinstance(tops, list) and tops and isinstance(tops[0], dict) else "NA")
     rc = g(res, "summary", "resistant_drug_classes", default=[])
     tr = g(res, "cyp51A_TR", "tr_type", default="NA")
     row = {

@@ -30,6 +30,7 @@ _default_home="$(cd "${_self_dir}/../.." && pwd)"
 # --- site env ---------------------------------------------------------------
 for _env in "${FUNGIFORGE_ENV:-}" "$HOME/.fungiforge-env.sh" \
             "${_default_home}/../fungiforge-env.sh" "${_default_home}/share/fungiforge-env.sh"; do
+  # shellcheck disable=SC1090  # site environment file, located at run time
   if [[ -n "$_env" && -f "$_env" ]]; then source "$_env"; break; fi
 done
 FUNGIFORGE_HOME="${FUNGIFORGE_HOME:-$_default_home}"

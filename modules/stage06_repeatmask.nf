@@ -11,7 +11,7 @@ process REPEATMASK {
           tuple val(meta), path("${meta.id}.repeat.json"),  emit: json
   script:
   """
-  source "${projectDir}/bin/ff_status.sh"; ff_init repeatmask "${meta.id}" ${meta.id}.repeat.json
+  source ff_status.sh; ff_init repeatmask "${meta.id}" ${meta.id}.repeat.json
   ff_version RepeatModeler -- RepeatModeler -version
   ff_version RepeatMasker -- RepeatMasker -v
   ff_run BuildDatabase -- BuildDatabase -name ${meta.id}_db ${nuclear}

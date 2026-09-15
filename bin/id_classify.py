@@ -33,7 +33,8 @@ def parse_unite_b6(path):
     ge = re.search(r"g__([A-Za-z0-9_.\-]+)", target)
     sh = re.search(r"(SH\d+\.\d+FU)", target)
     species = sp.group(1).replace("_", " ") if sp else None
-    if species and re.search(r"_sp$|Incertae|unidentified|uncultured", species, re.I):
+    # "Genus sp" / "Genus_sp." / Incertae sedis / unidentified are not species-level names
+    if species and re.search(r"(^|\s)sp\.?$|Incertae|unidentified|uncultured", species, re.I):
         species = None
     return {"pident": round(pid, 2),
             "species": species,
