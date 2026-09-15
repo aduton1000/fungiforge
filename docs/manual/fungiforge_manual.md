@@ -730,8 +730,28 @@ ploidy, mating_type,
 resistant_classes, n_known_af_mutations, cyp51A_TR,
 novelty, n_bgc, n_mycovirus, te_percent,
 polish_mode,
-sample_verdict, contam_removed_pct, top_taxon
+sample_verdict, contam_removed_pct, top_taxon,
+stages_failed
 ```
+
+### Stage status contract
+
+Every per-stage JSON (`results/<sample>/NN_<stage>/<sample>.<stage>.json`) carries a `status`
+and a `tools` block, written by `bin/ff_status.sh` / `bin/ff_status.py` at the end of the task:
+
+| `status` | Meaning |
+|---|---|
+| `ok` | every tool that ran exited 0 |
+| `partial` | an optional step failed and the documented fallback was used (e.g. Polypolish failed, the medaka assembly was carried forward, resistance confidence dropped to provisional) |
+| `failed` | a required tool failed. The task exits non-zero and the run stops after pending tasks, except for the best-effort stages (BGC, extras), which record `failed` and let the run continue |
+| `skipped` | the stage was deliberately not run |
+
+`tools` records each tool's exit code and wall time; `skipped_tools` records steps not run and why
+(a missing database, not applicable to this isolate). The master table summarises this per isolate in
+`stages_failed` (`stage:status;…` or `none`), so a row with results is never mistaken for a clean run.
+The assembly and medaka steps, which have no scientific JSON of their own, emit small status JSONs
+(`<sample>.assemble.json`, `<sample>.medaka.json`) for the same reason. `|| true` is not used
+anywhere in the task scripts.
 
 One row per isolate; missing values are `NA` (or `none` for `resistant_classes`). This schema is
 deliberately organism-agnostic and mirrors the bacterial study's master table so the two One

@@ -7,7 +7,7 @@ Started 15 September 2026 from v0.1.0 (commit `92a484e`, tagged `v0.1.0`). Devel
 ## Ground rules
 
 1. **Every item ships four things**: the implementation, an automated test (unit test for Python, stub or nf-test for workflow logic), documentation (manual + README where user-facing), and a validation run on real data with recorded results. An item is not done until all four exist.
-2. **No silent failure, anywhere.** Every stage JSON carries `status` (`ok | failed | skipped | not_run`) and the exit status of each tool it ran. A tool failure is either fatal to the task or recorded as `failed` with the log tail; `|| true` is never used to make a stage look successful.
+2. **No silent failure, anywhere.** Every stage JSON carries `status` (`ok | partial | failed | skipped`) and the exit status of each tool it ran. A tool failure is either fatal to the task or recorded as `failed` with the log tail; `|| true` is never used to make a stage look successful.
 3. **Reproducible by construction.** Versioned image tags (no `latest`), exact conda pins, a per-run `provenance.json` listing every tool version, image digest and database release.
 4. **Honest documentation.** The manual describes what the code does today. Aspirational text is labelled as roadmap.
 5. **Validation data are fixed**: CEA10 hybrid (ONT SRR28036069 + Illumina SRR13127874), ASSARM-PHI-DF-005 Illumina-only (*A. flavus*), C87 hybrid TR34/L98H positive (ERR10820709 + ERR9791656), plus the controls added in W1.1. Expected results live in `test/expected/` and `bin/validate_run.py` compares a run against them with tolerances.
@@ -20,9 +20,10 @@ Legend: `todo` · `in progress` · `built` (code + tests) · `validated` (real-d
 
 | ID | Item | Status | Commits | Validated on |
 |---|---|---|---|---|
-| W0.1 | Stage status contract, no silent failure | todo | | |
+| W0.1 | Stage status contract, no silent failure | built | develop: W0.1 commit | unit (25 tests), stub DAG, Docker fixture run; real-data run pending W0.4 |
 | W0.2 | Pinned versions and full provenance | todo | | |
 | W0.3 | Test framework and CI | todo | | |
+| W0.4 | Cluster development deployment (validate items on real data without touching production) | todo | | |
 | W1.1 | Validation suite, controls, benchmarks | todo | | |
 | W2.1 | QC and verdict gating in the DAG | todo | | |
 | W2.2 | Read QC: trimmed reads, k-mer profile, in-pipeline triage | todo | | |
@@ -81,6 +82,9 @@ Everything the assessment and the code audit found, mapped to the item that clos
 
 #### W0.2 Pinned versions and full provenance
 **Goal.** Bit-for-bit reproducibility. **Design.** Replace every `latest` with a versioned tag and record the digest in `conf/base.config`; pin conda specs exactly (`==`) with a `conda-lock` file; `make_provenance.py` gathers all tool versions (from each container), image digests, database releases from `MANIFEST.tsv`, git commit, Nextflow version, and the effective parameters; a `--check-db` launch step verifies database completion markers and versions and fails early. **Validation.** Rebuilt images produce identical version tables on two hosts; provenance JSON validated against a schema in the test suite.
+
+#### W0.4 Cluster development deployment
+**Goal.** Validate each item on real data while production keeps running. **Design.** A second, independent install at `/hpc/opt/fungiforge-dev` (`hpc_install.sh --prefix /hpc/opt/fungiforge-dev --ref develop --db /hpc/data/fungiforge --group <group>` with its own images and site config, no profile.d hook), run directories under `~/runs/dev/`. Items are validated there on CEA10 and DF-005 (and C87 once available) before being marked `validated`. **Validation.** The dev install runs the stub DAG and CEA10 end to end with the develop branch.
 
 #### W0.3 Test framework and CI
 **Goal.** Every later item ships with tests that run automatically. **Design.** `pytest` for all `bin/*.py` with fixtures under `test/fixtures/`; nf-test cases for the routing logic and each module's stub; GitHub Actions running unit tests, the stub DAG on the three-mode fixture, `nextflow lint`, and shellcheck; a nightly optional job running the CEA10 subsample through Docker. **Validation.** CI green on `develop`; coverage report for `bin/`.
@@ -152,3 +156,4 @@ After production runs complete: merge `develop` → `main`, tag `v0.2.0`, `hpc_i
 ## Change log of this document
 
 - 2026-09-15 — created; limitation inventory L1–L25; items W0.1–W5.1 defined; all `todo`.
+- 2026-09-15 — W0.1 built: `bin/ff_status.sh` + `bin/ff_status.py`, all 15 modules converted (no `|| true` masking a tool), assemble/medaka status JSONs, `stages_failed` master column, 25 unit tests, Docker fixture run exercised ok and failed paths. Found and fixed in the process: a bare optional `ff_run` tripped `bash -ue` errexit (now returns 0 and sets `$FF_RC`). Added W0.4 (cluster dev deployment) because real-data validation must not touch the production install.
