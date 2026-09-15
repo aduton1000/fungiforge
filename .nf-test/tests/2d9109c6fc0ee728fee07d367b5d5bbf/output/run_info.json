@@ -1,1 +1,0 @@
-{"pipeline": {"name": "fungiforge", "version": "test"}, "nextflow": {"version": "x"}, "run": {}, "containers": {"withLabel:report": "img"}, "params": {}}

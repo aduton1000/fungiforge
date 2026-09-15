@@ -1,5 +1,0 @@
-[PIPELINE] fungiforge 0.1.0 | profile=local,test
-[WORKDIR] /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/8de6ceaaf6eca7a616a32a6cf0c60572/work
-[PROCESS da/5552a9] READ_QC (S1)
-
-[SUCCESS] completed=1 failed=0 cached=0
