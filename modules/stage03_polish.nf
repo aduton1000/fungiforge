@@ -10,7 +10,7 @@ process MEDAKA {
           tuple val(meta), path("${meta.id}.medaka.json"),  emit: json
   script:
   """
-  source "${projectDir}/bin/ff_status.sh"; ff_init medaka "${meta.id}" ${meta.id}.medaka.json
+  source ff_status.sh; ff_init medaka "${meta.id}" ${meta.id}.medaka.json
   ff_version medaka -- medaka --version
   mkdir -p medaka
   # A failed polish is a failed stage: silently carrying the unpolished assembly forward

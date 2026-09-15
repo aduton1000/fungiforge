@@ -37,6 +37,7 @@
 INVENTORY_VERSION="1.0"
 MODE="login"
 SUBMIT_TEST=0; PULL_TEST=0; PARTITION=""; ACCOUNT=""; WAIT_SECS=900; OUT=""; EXTRA_DB_ROOT=""
+: "${EXTRA_DB_ROOT}"   # (referenced here for shellcheck; expanded inside the eval'd find command below)
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -94,6 +95,7 @@ init_modules(){
     for f in "$LMOD_PKG/init/bash" "$MODULESHOME/init/bash" /etc/profile.d/lmod.sh /etc/profile.d/modules.sh \
              /usr/share/lmod/lmod/init/bash /usr/share/Modules/init/bash /opt/apps/lmod/lmod/init/bash \
              /cm/local/apps/environment-modules/current/init/bash; do
+      # shellcheck disable=SC1090  # module init scripts are discovered at run time
       [ -n "$f" ] && [ -r "$f" ] && { source "$f" >/dev/null 2>&1; type module >/dev/null 2>&1 && break; }
     done
   fi
@@ -238,6 +240,7 @@ survey(){
   run 10 "other JDKs on disk" "ls -d /usr/lib/jvm/* /opt/java* /opt/jdk* /usr/java/* 2>/dev/null"
   sub "nextflow details"
   run 60 "nextflow" "echo NXF_HOME=\${NXF_HOME:-unset} NXF_VER=\${NXF_VER:-unset} NXF_OPTS=\${NXF_OPTS:-unset} NXF_WORK=\${NXF_WORK:-unset} NXF_TEMP=\${NXF_TEMP:-unset} NXF_OFFLINE=\${NXF_OFFLINE:-unset} NXF_SINGULARITY_CACHEDIR=\${NXF_SINGULARITY_CACHEDIR:-unset} NXF_APPTAINER_CACHEDIR=\${NXF_APPTAINER_CACHEDIR:-unset} NXF_CONDA_CACHEDIR=\${NXF_CONDA_CACHEDIR:-unset}; readlink -f \$(command -v nextflow) 2>/dev/null; nextflow info 2>&1 | head -20"
+  # shellcheck disable=SC2088  # the quoted tilde is a display label, not a path
   run 10 "~/.nextflow" "ls -la \$HOME/.nextflow 2>/dev/null | head; du -sh \$HOME/.nextflow 2>/dev/null; cat \$HOME/.nextflow/scm 2>/dev/null | head -5"
   run 10 "nextflow plugins/assets cached" "ls \$HOME/.nextflow/plugins \$HOME/.nextflow/assets 2>/dev/null | head -20"
   run 10 "nextflow installed elsewhere?" "ls -l /usr/local/bin/nextflow /opt/nextflow* /apps/nextflow* /software/nextflow* 2>/dev/null; find /opt /apps /software /usr/local /cm/shared -maxdepth 4 -name 'nextflow' -type f 2>/dev/null | head"

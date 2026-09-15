@@ -99,14 +99,14 @@ def git_state() {
     def q = ['git', '-C', projectDir.toString(), 'status', '--porcelain', '--untracked-files=no'].execute()
     def qo = q.text; q.waitFor()
     if (q.exitValue() == 0) st.dirty = qo.trim() ? true : false
-  } catch (Exception ignored) { }
+  } catch (Exception _ignored) { }
   return st
 }
 
 def run_info_json() {
   def git = git_state()
   def host = null
-  try { host = java.net.InetAddress.getLocalHost().getHostName() } catch (Exception ignored) { }
+  try { host = java.net.InetAddress.getLocalHost().getHostName() } catch (Exception _ignored) { }
   def containers = workflow.container instanceof Map ? workflow.container : [all: workflow.container?.toString()]
   def info = [
     pipeline : [name: workflow.manifest.name, version: workflow.manifest.version,
@@ -132,14 +132,13 @@ workflow {
   // fail-loud guards (forge convention)
   if (!params.samplesheet)
     error "Missing --samplesheet (columns: sample,ont_fastq,illumina_r1,illumina_r2,compartment,facility,season; per row give ONT and/or paired Illumina)"
-  def pkg_containerised = ['docker','singularity','apptainer'].any { workflow.profile.contains(it) }
   if (!params.data_dir && !workflow.stubRun)
     log.warn "--data_dir not set: the DB_CHECK stage will stop the run (pass --allow_missing_db to run without reference databases; identification / decontamination / annotation / resistance / BGC then record skipped)."
   if (params.basecall && !params.dorado_model)
     error "--basecall set but --dorado_model missing."
 
-  samples  = Channel.fromPath(params.samplesheet).splitCsv(header: true).map { parse_row(it) }
-  run_info = Channel.of(run_info_json()).collectFile(name: 'run_info.json', newLine: true)
+  samples  = channel.fromPath(params.samplesheet).splitCsv(header: true).map { row -> parse_row(row) }
+  run_info = channel.of(run_info_json()).collectFile(name: 'run_info.json', newLine: true)
   FUNGIFORGE(samples, run_info)
 
   // provenance: image identities (head node — needs the image cache / docker daemon; W0.2).
@@ -157,7 +156,7 @@ workflow {
     if (!prov_hash) cmd << '--no-hash'
     try {
       def p = cmd.execute(); def out = p.text; p.waitFor()
-      out.trim().eachLine { log.info it }
+      out.trim().eachLine { line -> log.info line }
       if (p.exitValue() != 0) log.warn "provenance image step exited ${p.exitValue()} (provenance.json kept without image identities)"
     } catch (Exception e) {
       log.warn "provenance image step could not run: ${e.message}"

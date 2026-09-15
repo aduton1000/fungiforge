@@ -10,15 +10,15 @@ process MOBILE {
   output: tuple val(meta), path("${meta.id}.mobile.json"), emit: json
   script:
   """
-  source "${projectDir}/bin/ff_status.sh"; ff_init mobile "${meta.id}" ${meta.id}.mobile.json
+  source ff_status.sh; ff_init mobile "${meta.id}" ${meta.id}.mobile.json
   ff_version genomad -- genomad --version
-  ff_run te_summary -- python3 ${projectDir}/bin/te_summary.py --telib ${telib} --out te_summary.json
+  ff_run te_summary -- te_summary.py --telib ${telib} --out te_summary.json
   if [ "${params.skip_mge}" = "true" ]; then ff_skip genomad "disabled (--skip_mge)"
   elif [ -z "${params.data_dir ?: ''}" ] || [ ! -d "${params.data_dir ?: ''}/genomad_db" ]; then ff_skip genomad "geNomad database not staged under --data_dir (genomad_db)"
   else
     ff_run genomad --optional -- bash -c "genomad end-to-end --cleanup ${mito} genomad_out '${params.data_dir}/genomad_db' > genomad.log 2>&1"
   fi
-  ff_run mobile_merge -- python3 ${projectDir}/bin/mobile_merge.py --sample "${meta.id}" --te te_summary.json \\
+  ff_run mobile_merge -- mobile_merge.py --sample "${meta.id}" --te te_summary.json \\
       --genomad genomad_out --out ${meta.id}.mobile.json
   ff_finalize
   """

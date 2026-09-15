@@ -12,7 +12,7 @@ process IDENTIFY {
           tuple val(meta), path("${meta.id}.identify.json"),emit: json
   script:
   """
-  source "${projectDir}/bin/ff_status.sh"; ff_init identify "${meta.id}" ${meta.id}.identify.json
+  source ff_status.sh; ff_init identify "${meta.id}" ${meta.id}.identify.json
   ff_version barrnap -- barrnap --version
   ff_version ITSx -- ITSx --version
   ff_version vsearch -- vsearch --version
@@ -21,7 +21,7 @@ process IDENTIFY {
   ff_version mlst -- mlst --version
   # rRNA operon -> short region so ITSx doesn't hit the HMMER >100 kb limit on chromosomes
   ff_run barrnap -- bash -c "barrnap --kingdom fun --threads ${task.cpus} ${nuclear} > rrna.gff 2>barrnap.log"
-  ff_run extract_rrna -- python3 ${projectDir}/bin/extract_rrna_region.py --assembly ${nuclear} --gff rrna.gff --out rrna_region.fasta
+  ff_run extract_rrna -- extract_rrna_region.py --assembly ${nuclear} --gff rrna.gff --out rrna_region.fasta
   ff_run ITSx -- bash -c "ITSx -i rrna_region.fasta -o itsx --cpu ${task.cpus} --preserve T --save_regions all 2>itsx.log"
   for f in itsx.full.fasta itsx.ITS1.fasta itsx.ITS2.fasta; do [ -f "\$f" ] && cat "\$f"; done > its.fasta
   cat its.fasta rrna_region.fasta > ${meta.id}.markers.fasta
@@ -40,7 +40,7 @@ process IDENTIFY {
   else
     ff_skip sourmash "genome-level identification disabled (--genome_id false) or no --data_dir"
   fi
-  ff_run id_classify -- python3 ${projectDir}/bin/id_classify.py --sample "${meta.id}" --its its.fasta \\
+  ff_run id_classify -- id_classify.py --sample "${meta.id}" --its its.fasta \\
       --unite-b6 unite.b6 --gather gather.csv \\
       --out-species ${meta.id}.species.txt --out-json ${meta.id}.identify.json
   ff_finalize

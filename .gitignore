@@ -34,3 +34,14 @@ test/reads/*
 !test/reads/TESTFUN0?_R?.fastq.gz
 results_cea10/
 results_*/
+# tests / coverage
+.nf-test/
+.coverage
+.coverage.*
+coverage.xml
+coverage.txt
+lint.txt
+results_ci/
+work_docker_fixture/
+results_docker_fixture.log
+.nf-test.log

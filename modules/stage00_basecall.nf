@@ -9,7 +9,7 @@ process BASECALL {
           tuple val(meta), path("${meta.id}.basecall.json"),  emit: json
   script:
   """
-  source "${projectDir}/bin/ff_status.sh"; ff_init basecall "${meta.id}" ${meta.id}.basecall.json
+  source ff_status.sh; ff_init basecall "${meta.id}" ${meta.id}.basecall.json
   ff_version dorado -- dorado --version
   ff_run dorado -- bash -o pipefail -c "dorado basecaller ${params.dorado_duplex ? 'duplex' : params.dorado_model} ${pod5} --emit-fastq > ${meta.id}.ont.fastq"
   ff_run gzip -- gzip -f ${meta.id}.ont.fastq

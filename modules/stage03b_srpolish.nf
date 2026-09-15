@@ -24,7 +24,7 @@ process SRPOLISH {
   def do_hybrid = !is_shortread && (params.hybrid == 'on' || (params.hybrid == 'auto' && has_illumina))
   if (is_shortread)
     """
-    source "${projectDir}/bin/ff_status.sh"; ff_init polish "${meta.id}" ${meta.id}.polish.json
+    source ff_status.sh; ff_init polish "${meta.id}" ${meta.id}.polish.json
     ff_skip polypolish "Illumina-only assembly: short-read base accuracy needs no polishing"
     cp ${medaka} ${meta.id}.polished.fasta
     printf '{"sample":"%s","stage":"polish","mode":"illumina_only","short_read_polisher":"none","assembler":"%s","polypolish_bp_changed":"NA","resistance_confidence":"high"}\\n' \\
@@ -33,7 +33,7 @@ process SRPOLISH {
     """
   else if (do_hybrid)
     """
-    source "${projectDir}/bin/ff_status.sh"; ff_init polish "${meta.id}" ${meta.id}.polish.json
+    source ff_status.sh; ff_init polish "${meta.id}" ${meta.id}.polish.json
     ff_version polypolish -- polypolish --version
     ff_version bwa -- bwa
     # Each step is optional: a failure falls back to the medaka assembly, the mode records it
@@ -61,7 +61,7 @@ process SRPOLISH {
     """
   else
     """
-    source "${projectDir}/bin/ff_status.sh"; ff_init polish "${meta.id}" ${meta.id}.polish.json
+    source ff_status.sh; ff_init polish "${meta.id}" ${meta.id}.polish.json
     ff_skip polypolish "no Illumina reads for this isolate (ONT-only)"
     cp ${medaka} ${meta.id}.polished.fasta
     printf '{"sample":"%s","stage":"polish","mode":"ont_only","short_read_polisher":"none","polypolish_bp_changed":"NA","resistance_confidence":"provisional_ont_only"}\\n' \\

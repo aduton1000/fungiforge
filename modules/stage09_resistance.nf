@@ -11,7 +11,7 @@ process RESISTANCE {
   output: tuple val(meta), path("${meta.id}.resistance.json"), emit: json
   script:
   """
-  source "${projectDir}/bin/ff_status.sh"; ff_init resistance "${meta.id}" ${meta.id}.resistance.json
+  source ff_status.sh; ff_init resistance "${meta.id}" ${meta.id}.resistance.json
   ff_version python -- python3 --version
   ff_version biopython -- python3 -c "import Bio; print(Bio.__version__)"
   ff_version hmmer -- bash -c "hmmsearch -h | grep -m1 HMMER"
@@ -21,7 +21,7 @@ process RESISTANCE {
   # hybrid-polished calls are high-confidence (the polish.json rides in from Stage 03b).
   MODE=\$(grep -o '"mode"[^,]*' ${polish_json} 2>/dev/null | head -1 | sed -E 's/.*: *"?([a-z_]+)"?.*/\\1/')
   case "\$MODE" in hybrid) PM=hybrid;; illumina_only) PM=illumina_only;; ont_only) PM=ont_only;; *) PM=unknown;; esac
-  ff_run af_resistance -- python3 ${projectDir}/bin/af_resistance.py \\
+  ff_run af_resistance -- af_resistance.py \\
       --sample "${meta.id}" --proteins ${proteins} --species ${species} \\
       --assembly ${nuclear} --gbk ${gbk} --polish-mode "\$PM" \\
       --panel "${params.af_panel}" --data-dir "${params.data_dir ?: ''}" \\

@@ -12,7 +12,7 @@ process DECONTAM {
           tuple val(meta), path("${meta.id}.decontam.json"), emit: json
   script:
   """
-  source "${projectDir}/bin/ff_status.sh"; ff_init decontam "${meta.id}" ${meta.id}.decontam.json
+  source ff_status.sh; ff_init decontam "${meta.id}" ${meta.id}.decontam.json
   ff_version kraken2 -- kraken2 --version
   if [ "${params.skip_decontam}" = "true" ] || [ -z "${params.data_dir ?: ''}" ] || [ ! -f "${params.data_dir ?: ''}/kraken2/hash.k2d" ]; then
     ff_skip kraken2 "decontamination skipped (--skip_decontam, or no kraken2 DB under --data_dir)"
@@ -23,7 +23,7 @@ process DECONTAM {
     # A non-fungal isolate (verdict non_fungal/human) is kept WHOLE and flagged — there is
     # nothing to decontaminate, the sample is simply not a fungus (see kraken_taxonomy.py).
     ff_run kraken2 -- bash -c "kraken2 --db '${params.data_dir}/kraken2' --threads ${task.cpus} ${assembly} --output k2.out --report k2.report 2>k2.log"
-    ff_run classify_contigs -- python3 ${projectDir}/bin/kraken_taxonomy.py classify-contigs k2.report k2.out ${assembly} \\
+    ff_run classify_contigs -- kraken_taxonomy.py classify-contigs k2.report k2.out ${assembly} \\
         --sample "${meta.id}" --mito ${meta.id}.mito.fasta \\
         --out-fasta ${meta.id}.nuclear.fasta --out-json ${meta.id}.decontam.json
   fi

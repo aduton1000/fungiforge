@@ -16,7 +16,7 @@ process SR_ASSEMBLE {
   script:
   def mem_gb = (task.memory ? task.memory.toGiga() : 64)
   """
-  source "${projectDir}/bin/ff_status.sh"; ff_init assemble "${meta.id}" ${meta.id}.assemble.json
+  source ff_status.sh; ff_init assemble "${meta.id}" ${meta.id}.assemble.json
   ff_version ${params.sr_assembler} -- ${params.sr_assembler == "spades" ? "spades.py --version" : "megahit --version"}
   case ${params.sr_assembler} in
     spades)

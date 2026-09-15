@@ -1,0 +1,74 @@
+// Whole-DAG stub tests on the three-mode fixture (ONT-only, hybrid, Illumina-only).
+// -stub-run exercises routing, channel wiring, DB_CHECK gating and the run-level
+// PROVENANCE stage without running any tool (machinery, not data quality).
+nextflow_pipeline {
+
+    name "fungiforge stub DAG"
+    script "main.nf"
+    options "-stub-run"
+
+    test("three-mode fixture runs every stage and writes provenance") {
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+        }
+        then {
+            assert workflow.success
+            // 1 DB_CHECK + 3 x (READ_QC, SRPOLISH, DECONTAM, ASSEMBLY_QC, REPEATMASK, ANNOTATE,
+            // IDENTIFY, RESISTANCE, MOBILE, BGC, NOVELTY, EXTRAS, REPORT) + 2 ASSEMBLE + 2 MEDAKA
+            // + 1 SR_ASSEMBLE + 1 PROVENANCE = 46
+            assert workflow.trace.succeeded().size() == 46
+            assert workflow.trace.failed().size() == 0
+            def names = workflow.trace.tasks().collect { it.name }
+            assert names.count { it.startsWith("FUNGIFORGE:ASSEMBLE ") } == 2       // ONT-only + hybrid
+            assert names.count { it.startsWith("FUNGIFORGE:SR_ASSEMBLE") } == 1     // Illumina-only
+            assert names.count { it.startsWith("FUNGIFORGE:MEDAKA") } == 2
+            assert names.count { it.startsWith("FUNGIFORGE:DB_CHECK") } == 1
+            assert names.count { it.startsWith("FUNGIFORGE:PROVENANCE") } == 1
+            // per-isolate master rows + run-level provenance
+            assert path("$outputDir/04_summary/TESTFUN01.master.tsv").exists()
+            assert path("$outputDir/04_summary/TESTFUN02.master.tsv").exists()
+            assert path("$outputDir/04_summary/TESTFUN03.master.tsv").exists()
+            def prov = path("$outputDir/pipeline_info/provenance.json").json
+            assert prov.schema_version == "1.0"
+            assert prov.n_samples == 3
+            assert prov.samples.keySet() == ["TESTFUN01", "TESTFUN02", "TESTFUN03"] as Set
+            assert prov.run.stub_run == true
+            assert prov.containers.keySet().any { it.contains("assembly") }
+            assert prov.databases.stub == true
+            assert path("$outputDir/pipeline_info/db_manifest.json").exists()
+        }
+    }
+
+    test("skip flags remove the optional stages from the DAG") {
+        when {
+            params {
+                outdir = "$outputDir"
+                skip_bgc = true
+                skip_mge = true
+                skip_novelty = true
+                skip_extras = true
+            }
+        }
+        then {
+            assert workflow.success
+            def names = workflow.trace.tasks().collect { it.name }
+            assert !names.any { it.contains("BGC") || it.contains("MOBILE") || it.contains("NOVELTY") || it.contains("EXTRAS") }
+            assert workflow.trace.succeeded().size() == 46 - 4 * 3
+            assert path("$outputDir/pipeline_info/provenance.json").json.n_samples == 3
+        }
+    }
+
+    test("--help prints usage and runs nothing") {
+        when {
+            params {
+                help = true
+            }
+        }
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().size() == 0     // usage goes to the log, no process is launched
+        }
+    }
+}

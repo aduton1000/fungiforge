@@ -202,6 +202,28 @@ Compose one from each group:
 - **[Preflight QC](docs/preflight_qc.md)** — fast ONT triage before a long run.
 - **[HPC deployment](docs/hpc_deployment.md)** — running on a Slurm cluster.
 
+## Testing
+
+Every push to `main`/`develop` runs the CI matrix in `.github/workflows/ci.yml`: the unit suite
+(pytest, every `bin/*.py` helper and the CLI, subprocess coverage of `bin/` + `fungiforge/`
+enforced at ≥ 85 %), `nextflow lint` at zero warnings, shellcheck, the 15-stage stub DAG on the
+three-mode fixture, and nf-test (routing functions, one stub test per module, the whole DAG).
+Locally:
+
+```bash
+pip install -e ".[dev]"
+COVERAGE_PROCESS_START=.coveragerc coverage run -m pytest test/unit && coverage combine && coverage report
+nextflow lint . && shellcheck -S warning -x bin/*.sh share/bin/*
+nextflow run main.nf -profile local,test -stub-run
+nf-test test                       # needs nf-test: curl -fsSL https://get.nf-test.com | bash
+bash test/run_docker_fixture.sh    # real containers on the fixture (assemblers are expected to fail on it)
+```
+
+Real-data validation (CEA10, DF-005, C87) does not fit a hosted runner; it runs on the
+development deployment and is recorded in `docs/` (see `docs/UPGRADE_PLAN.md`).
+
 ## Status
 
-Scaffold validated end-to-end (`-profile test -stub-run`, all 15 stages) across all three input modes — ONT-only, Illumina-only, and hybrid. Stage implementations, the comparative analysis layer, HPC packaging, and a real-SRA test are in progress — see `docs/`.
+v0.1.0 (`main`) is deployed and validated on real isolates (hybrid *A. fumigatus* CEA10,
+Illumina-only *A. flavus*); the v0.2 upgrade programme (`develop`, `docs/UPGRADE_PLAN.md`)
+is in progress with a status board per work item.

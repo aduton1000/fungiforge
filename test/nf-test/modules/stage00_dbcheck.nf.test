@@ -1,0 +1,23 @@
+// Stub test for modules/stage00_dbcheck.nf — the run-level database check.
+nextflow_process {
+
+    name "DB_CHECK stub"
+    script "modules/stage00_dbcheck.nf"
+    process "DB_CHECK"
+    options "-stub-run"
+
+    test("emits the database manifest") {
+        when {
+            process {
+                """
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert process.out.manifest.size() == 1
+            def m = path(process.out.manifest[0]).json
+            assert m.ok == true && m.stub == true
+        }
+    }
+}

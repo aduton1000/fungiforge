@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # ─────────────────────────────────────────────────────────────────────────────
 #  fungiforge — site environment (EXAMPLE). bin/hpc_install.sh writes a filled-in
 #  copy to <install_root>/fungiforge-env.sh; users get it via /etc/profile.d or

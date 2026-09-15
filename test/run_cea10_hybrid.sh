@@ -18,7 +18,7 @@ SHEET="${SAMPLESHEET:-$REPO/test/sra/samplesheet.AFUM_CEA10_HYBRID.csv}"
 cd "$REPO"
 # stale-lock hygiene
 pkill -9 -f nextflow.cli.Launcher 2>/dev/null || true
-find .nextflow -name LOCK -o -name '*.lock' 2>/dev/null | xargs -r rm -f
+find .nextflow \( -name LOCK -o -name '*.lock' \) -delete 2>/dev/null || true
 BGC_FLAG="--skip_bgc"
 [ -f "$ASDB/.done" ] || [ -f "$DB/antismash/.done" ] && BGC_FLAG=""   # enable BGC once the antiSMASH DB is prebuilt
 echo "[run] BGC flag: '${BGC_FLAG:-<enabled>}'"

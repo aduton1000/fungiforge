@@ -10,10 +10,10 @@ process EXTRAS {
   output: tuple val(meta), path("${meta.id}.extras.json"), emit: json
   script:
   """
-  source "${projectDir}/bin/ff_status.sh"; ff_init extras "${meta.id}" ${meta.id}.extras.json --best-effort
+  source ff_status.sh; ff_init extras "${meta.id}" ${meta.id}.extras.json --best-effort
   ff_version python -- python3 --version
   ff_version biopython -- python3 -c "import Bio; print(Bio.__version__)"
-  ff_run extras -- python3 ${projectDir}/bin/extras.py --sample "${meta.id}" --proteins ${proteins} \\
+  ff_run extras -- extras.py --sample "${meta.id}" --proteins ${proteins} \\
       --ont ${ont} --data-dir "${params.data_dir ?: ''}" --out ${meta.id}.extras.json
   ff_finalize
   """

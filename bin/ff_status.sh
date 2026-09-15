@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # fungiforge — stage status contract (bash side). Source at the top of every task script:
 #
-#   source "${projectDir}/bin/ff_status.sh"
+#   source ff_status.sh          # bin/ is on PATH inside every task
 #   ff_init  <stage> <sample> <stage.json> [--best-effort]
 #   ff_run   <label> [--optional] -- <command ...>      # run a tool, record its exit code (in $FF_RC)
 #   ff_skip  <label> <reason>                            # record a tool deliberately not run
@@ -67,6 +67,7 @@ ff_run() {
   local t0=$SECONDS rc=0
   # `cmd && rc=0 || rc=$?` keeps errexit from aborting inside the function
   "$@" && rc=0 || rc=$?
+  # shellcheck disable=SC2034  # FF_RC is read by the calling task script
   FF_RC=$rc
   printf '%s\t%s\t%s\t%s\n' "$label" "$rc" "$optional" "$((SECONDS - t0))" >> "$FF_TOOLS"
   if [ "$rc" -ne 0 ]; then

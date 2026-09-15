@@ -15,13 +15,13 @@ process PROVENANCE {
   output: path('provenance.json'), emit: provenance
   script:
   """
-  python3 ${projectDir}/bin/make_provenance.py aggregate --run-info ${run_info} --db-manifest ${db_manifest} \\
+  make_provenance.py aggregate --run-info ${run_info} --db-manifest ${db_manifest} \\
       --jsons stage_json/*.json --out provenance.json
-  python3 ${projectDir}/bin/make_provenance.py validate provenance.json
+  make_provenance.py validate provenance.json
   """
   stub:
   """
-  python3 ${projectDir}/bin/make_provenance.py aggregate --run-info ${run_info} --db-manifest ${db_manifest} \\
+  make_provenance.py aggregate --run-info ${run_info} --db-manifest ${db_manifest} \\
       --jsons stage_json/*.json --out provenance.json
   """
 }
