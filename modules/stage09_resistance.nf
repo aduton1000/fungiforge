@@ -12,6 +12,11 @@ process RESISTANCE {
   script:
   """
   source "${projectDir}/bin/ff_status.sh"; ff_init resistance "${meta.id}" ${meta.id}.resistance.json
+  ff_version python -- python3 --version
+  ff_version biopython -- python3 -c "import Bio; print(Bio.__version__)"
+  ff_version hmmer -- bash -c "hmmsearch -h | grep -m1 HMMER"
+  ff_version diamond -- diamond version
+  ff_version minimap2 -- minimap2 --version
   # Carry the polishing mode through so ONT-only calls are flagged provisional while
   # hybrid-polished calls are high-confidence (the polish.json rides in from Stage 03b).
   MODE=\$(grep -o '"mode"[^,]*' ${polish_json} 2>/dev/null | head -1 | sed -E 's/.*: *"?([a-z_]+)"?.*/\\1/')

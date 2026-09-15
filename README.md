@@ -174,7 +174,7 @@ results/
 │   ├── 10_mobile/  11_bgc/  12_novelty/  13_extras/   # *.json
 │   └── 14_report/       # <sample>.report.html  ← self-contained per-isolate report
 ├── 04_summary/          # master_fungi.tsv  ← one row per isolate (the Layer-2 handoff)
-└── pipeline_info/       # execution_report.html, timeline.html, trace.txt
+└── pipeline_info/       # provenance.json, db_manifest.json, execution_report.html, timeline.html, trace.txt
 ```
 
 Every stage emits a small `*.json` with a stable schema; Stage 14 merges them into the HTML report and appends the isolate's row to `04_summary/master_fungi.tsv`, which Layer 2 (`analysis/`) consumes.
@@ -191,7 +191,8 @@ Compose one from each group:
 - **Input-mode–aware resistance confidence:** ONT homopolymer indels create false frameshifts exactly where antifungal-resistance point-mutations live, so **ONT-only** calls are flagged **provisional until hybrid-polished** (Medaka is applied; Polypolish adds Illumina when present). **Hybrid** and **Illumina-only** assemblies carry **high-confidence** calls — short-read base accuracy has no homopolymer-indel problem.
 - **Antifungal resistance** uses a curated **FungAMR/MARDy** allele+mutation panel plus a dedicated *A. fumigatus* **cyp51A TR34/TR46** promoter-repeat detector (structural, not SNP).
 - **Identification** uses ITS/LSU (UNITE) + genome ANI (sourmash/skani) with multi-locus **GCPSR** concordance — there is no GTDB for fungi.
-- **No silent failure:** every stage JSON carries `status` (`ok | partial | failed | skipped`) and per-tool exit codes; the master table's `stages_failed` column names anything that was not `ok`.
+- **No silent failure:** every stage JSON carries `status` (`ok | partial | failed | skipped`) and per-tool exit codes and versions; the master table's `stages_failed` column names anything that was not `ok`.
+- **Reproducible by construction:** every container image is a versioned tag or digest (recorded with its manifest digest in `conf/base.config`), the base image is built from an explicit conda lock (`env/base.linux-64.lock`), the databases are verified before any compute (`DB_CHECK`), and every run writes `pipeline_info/provenance.json` — commit, Nextflow version, effective parameters, the sha256/digest of every image that ran, database manifest, and every tool version per sample and stage.
 - **Storage:** databases (~150–250 GB) and Nextflow `work/` live on an external drive via `--data_dir` / `-w`.
 
 ## Documentation

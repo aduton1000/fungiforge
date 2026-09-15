@@ -13,6 +13,12 @@ process IDENTIFY {
   script:
   """
   source "${projectDir}/bin/ff_status.sh"; ff_init identify "${meta.id}" ${meta.id}.identify.json
+  ff_version barrnap -- barrnap --version
+  ff_version ITSx -- ITSx --version
+  ff_version vsearch -- vsearch --version
+  ff_version sourmash -- sourmash --version
+  ff_version blastn -- blastn -version
+  ff_version mlst -- mlst --version
   # rRNA operon -> short region so ITSx doesn't hit the HMMER >100 kb limit on chromosomes
   ff_run barrnap -- bash -c "barrnap --kingdom fun --threads ${task.cpus} ${nuclear} > rrna.gff 2>barrnap.log"
   ff_run extract_rrna -- python3 ${projectDir}/bin/extract_rrna_region.py --assembly ${nuclear} --gff rrna.gff --out rrna_region.fasta
@@ -40,5 +46,5 @@ process IDENTIFY {
   ff_finalize
   """
   stub:
-  "printf 'unknown\\t0\\n' > ${meta.id}.species.txt; touch ${meta.id}.markers.fasta ${meta.id}.identify.json"
+  "printf 'unknown\\t0\\n' > ${meta.id}.species.txt; touch ${meta.id}.markers.fasta; echo '{\"sample\":\"${meta.id}\",\"stage\":\"identify\"}' > ${meta.id}.identify.json"
 }

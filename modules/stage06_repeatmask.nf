@@ -12,6 +12,8 @@ process REPEATMASK {
   script:
   """
   source "${projectDir}/bin/ff_status.sh"; ff_init repeatmask "${meta.id}" ${meta.id}.repeat.json
+  ff_version RepeatModeler -- RepeatModeler -version
+  ff_version RepeatMasker -- RepeatMasker -v
   ff_run BuildDatabase -- BuildDatabase -name ${meta.id}_db ${nuclear}
   ff_run RepeatModeler -- RepeatModeler -database ${meta.id}_db -threads ${task.cpus} -LTRStruct
   MASKED=false; NFAM=0
@@ -32,5 +34,5 @@ process REPEATMASK {
   ff_finalize
   """
   stub:
-  "touch ${meta.id}.masked.fasta ${meta.id}.telib.fasta ${meta.id}.repeat.json"
+  "touch ${meta.id}.masked.fasta ${meta.id}.telib.fasta; echo '{\"sample\":\"${meta.id}\",\"stage\":\"repeatmask\"}' > ${meta.id}.repeat.json"
 }

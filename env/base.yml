@@ -2,38 +2,44 @@
 # public image (identify, resistance, mge, extras-lite, report, read filtering).
 # Baked into the aduton1000/fungiforge base image (env/Dockerfile) and the Apptainer
 # .def. Pure-ish; solves on linux-64 (native on x86_64 Linux, emulated on arm64 hosts).
+#
+# Versions are pinned exactly (W0.2) to what the validated image contains. The image build
+# itself installs from env/base.linux-64.lock (an explicit, URL+md5 lock of the full solved
+# environment, exported from the validated image), so a rebuild is byte-identical in its
+# conda layer. To upgrade a tool: change the pin here, re-solve, regenerate the lock with
+# bin/lock_env.sh, rebuild, re-validate.
 name: fungiforge-base
 channels: [conda-forge, bioconda]
 dependencies:
-  - python=3.11
-  - procps-ng          # `ps` — required by Nextflow's task wrapper (all nf-core images ship it)
-  - fastp>=0.23        # Illumina read QC (hybrid path)
+  - python==3.11.9
+  - procps-ng==4.0.6          # `ps` — required by Nextflow's task wrapper (all nf-core images ship it)
+  - fastp==1.3.6        # Illumina read QC (hybrid path)
   # identification / novelty
-  - itsx>=1.1.3
-  - barrnap>=0.9
-  - sourmash>=4.8
-  - skani>=0.2.2
-  - fastani>=1.34
-  - blast>=2.15
-  - diamond>=2.1
-  - vsearch>=2.28
-  - mlst>=2.23
-  - iqtree>=2.3
-  - mafft>=7.5
+  - itsx==1.1.3
+  - barrnap==1.10.6
+  - sourmash==4.9.4
+  - skani==0.3.2
+  - fastani==1.34
+  - blast==2.16.0
+  - diamond==2.1.10
+  - vsearch==2.29.1
+  - mlst==2.35.0
+  - iqtree==3.1.3
+  - mafft==7.526
   # resistance / mge
-  - hmmer>=3.4
-  - pyhmmer>=0.10
-  - minimap2>=2.26
-  - samtools>=1.19
-  - genomad>=1.8
-  - kraken2>=2.1.3      # Stage 04 contig decontamination + bin/triage_reads.sh (was only in decontam.yml)
-  - seqkit>=2.6
+  - hmmer==3.4
+  - pyhmmer==0.12.1
+  - minimap2==2.28
+  - samtools==1.21
+  - genomad==1.12.0
+  - kraken2==2.1.3      # Stage 04 contig decontamination + bin/triage_reads.sh (was only in decontam.yml)
+  - seqkit==2.13.0
   # read filtering (light)
-  - chopper>=0.9
-  - nanoplot>=1.42
+  - chopper==0.9.0
+  - nanoplot==1.47.1
   # report / glue
-  - biopython>=1.81
-  - pandas>=2.0
-  - numpy>=1.24
-  - jinja2>=3.1
+  - biopython==1.87
+  - pandas==2.3.3
+  - numpy==1.26.4
+  - jinja2==3.1.6
   - pip

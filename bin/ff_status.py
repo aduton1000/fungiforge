@@ -5,6 +5,7 @@ Every stage's JSON carries:
   "status": ok | partial | failed | skipped
   "tools":  {label: {"exit": int, "optional": bool, "seconds": int}}
   "skipped_tools": {label: reason}
+  "versions": {label: version string}   (ff_version; also copied onto tools[label]["version"])
   "note":   free text (set on failure/partial)
 
   ok       every tool that ran exited 0
@@ -13,8 +14,8 @@ Every stage's JSON carries:
   skipped  the stage was deliberately not run (--stage-skipped REASON)
 
 Sub-commands
-  finalize  --stage S --sample X --json F --tools T.tsv [--skips S.tsv] [--best-effort]
-            [--stage-skipped REASON]   -> merges status into F (creates F if the stage's own
+  finalize  --stage S --sample X --json F --tools T.tsv [--skips S.tsv] [--versions V.tsv]
+            [--best-effort] [--stage-skipped REASON]   -> merges status into F (creates F if the stage's own
             writer never ran), prints one line, exits 1 if failed and not best-effort
   status    F.json [F2.json ...]        -> prints "stage<TAB>status" per file (for tests/CI)
 """
@@ -42,6 +43,16 @@ def read_skips(path):
     return skips
 
 
+def read_versions(path):
+    versions = {}
+    if path and os.path.exists(path):
+        for line in open(path):
+            f = line.rstrip("\n").split("\t")
+            if len(f) >= 2 and f[0]:
+                versions[f[0]] = f[1]
+    return versions
+
+
 def compute_status(tools, stage_skipped=None):
     if stage_skipped:
         return "skipped", f"stage skipped: {stage_skipped}"
@@ -55,7 +66,10 @@ def compute_status(tools, stage_skipped=None):
 
 
 def cmd_finalize(a):
-    tools, skips = read_tools(a.tools), read_skips(a.skips)
+    tools, skips, versions = read_tools(a.tools), read_skips(a.skips), read_versions(a.versions)
+    for label, v in versions.items():
+        if label in tools:
+            tools[label]["version"] = v
     status, note = compute_status(tools, a.stage_skipped)
     doc = {}
     if os.path.exists(a.json):
@@ -71,6 +85,7 @@ def cmd_finalize(a):
     doc["status"] = status
     doc["tools"] = tools
     doc["skipped_tools"] = skips
+    doc["versions"] = versions
     if note:
         doc["note"] = (doc.get("note") + " | " if doc.get("note") else "") + note
     json.dump(doc, open(a.json, "w"), indent=2)
@@ -93,7 +108,8 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     f = sub.add_parser("finalize")
     f.add_argument("--stage", required=True); f.add_argument("--sample", required=True); f.add_argument("--json", required=True)
-    f.add_argument("--tools", required=True); f.add_argument("--skips"); f.add_argument("--best-effort", action="store_true")
+    f.add_argument("--tools", required=True); f.add_argument("--skips"); f.add_argument("--versions")
+    f.add_argument("--best-effort", action="store_true")
     f.add_argument("--stage-skipped", default=None); f.set_defaults(fn=cmd_finalize)
     s = sub.add_parser("status"); s.add_argument("files", nargs="+"); s.set_defaults(fn=cmd_status)
     a = ap.parse_args(); a.fn(a)

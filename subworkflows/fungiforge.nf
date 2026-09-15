@@ -1,5 +1,6 @@
 // FungiForge Layer-1 subworkflow — route each isolate through the 15 stages, then
 // aggregate every per-stage result.json into one per-isolate report + master row.
+include { DB_CHECK }    from '../modules/stage00_dbcheck.nf'
 include { BASECALL }    from '../modules/stage00_basecall.nf'
 include { READ_QC }     from '../modules/stage01_readqc.nf'
 include { ASSEMBLE }    from '../modules/stage02_assemble.nf'
@@ -17,13 +18,18 @@ include { BGC }         from '../modules/stage11_bgc.nf'
 include { NOVELTY }     from '../modules/stage12_novelty.nf'
 include { EXTRAS }      from '../modules/stage13_extras.nf'
 include { REPORT }      from '../modules/stage14_report.nf'
+include { PROVENANCE }  from '../modules/stage15_provenance.nf'
 
 workflow FUNGIFORGE {
   take:
     samples          // tuple(meta, filesMap[ont,r1,r2])
+    run_info         // path: run_info.json (pipeline/nextflow/params/container map, from main.nf)
 
   main:
-    reads0 = samples.map { meta, f -> tuple(meta, f.ont, f.r1, f.r2) }
+    // 00. database check — one task per run, BEFORE any compute: every isolate's first stage
+    //     waits for it, so a missing database fails the run in seconds, not hours.
+    DB_CHECK()
+    reads0 = samples.combine(DB_CHECK.out.manifest).map { meta, f, manifest -> tuple(meta, f.ont, f.r1, f.r2) }
 
     // 0. optional Dorado basecalling (ont column = pod5 dir when --basecall).
     //    Only long-read isolates carry ONT/pod5; short-read-only rows pass through.
@@ -31,8 +37,10 @@ workflow FUNGIFORGE {
       lr0 = reads0.filter { it[0].assembly_mode == 'longread' }
       sr0 = reads0.filter { it[0].assembly_mode == 'shortread' }
       reads_bc = BASECALL(lr0).reads.mix(sr0)
+      basecall_json = BASECALL.out.json
     } else {
       reads_bc = reads0
+      basecall_json = Channel.empty()
     }
 
     // 1. read QC + filtering (ONT chopper/NanoPlot; Illumina fastp — mode-aware)
@@ -94,7 +102,7 @@ workflow FUNGIFORGE {
 
     // 14. aggregate every per-stage result.json per isolate -> report + master row
     all_json = READ_QC.out.json
-      .mix(ASSEMBLE.out.json, SR_ASSEMBLE.out.json, MEDAKA.out.json,
+      .mix(basecall_json, ASSEMBLE.out.json, SR_ASSEMBLE.out.json, MEDAKA.out.json,
            SRPOLISH.out.json, DECONTAM.out.json, ASSEMBLY_QC.out.json, REPEATMASK.out.json,
            ANNOTATE.out.json, IDENTIFY.out.json, RESISTANCE.out.json,
            mobile_ch, bgc_ch, novelty_ch, extras_ch)
@@ -103,7 +111,15 @@ workflow FUNGIFORGE {
       .map { id, metas, jsons -> tuple(metas[0], jsons) }
     REPORT(all_json)
 
+    // 15. run-level provenance: every stage JSON of every isolate + DB manifest + run metadata.
+    //     Waits for all reports (masters.collect()) so it is the last task of the run.
+    PROVENANCE(run_info,
+               DB_CHECK.out.manifest,
+               all_json.map { meta, jsons -> jsons }.flatten().collect(),
+               REPORT.out.master.collect())
+
   emit:
-    master  = REPORT.out.master
-    reports = REPORT.out.report
+    master     = REPORT.out.master
+    reports    = REPORT.out.report
+    provenance = PROVENANCE.out.provenance
 }
