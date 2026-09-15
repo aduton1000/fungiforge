@@ -1,5 +1,0 @@
-[PIPELINE] fungiforge 0.1.0 | profile=local,test
-[WORKDIR] /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/2f24de5ce095c703474e247230a2e939/work
-[PROCESS d2/567b9f] ASSEMBLY_QC (S1)
-
-[SUCCESS] completed=1 failed=0 cached=0
