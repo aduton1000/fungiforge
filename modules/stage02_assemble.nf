@@ -9,7 +9,7 @@ process ASSEMBLE {
           tuple val(meta), path("${meta.id}.assemble.json"),   emit: json
   script:
   """
-  source "${projectDir}/bin/ff_status.sh"; ff_init assemble "${meta.id}" ${meta.id}.assemble.json
+  source ff_status.sh; ff_init assemble "${meta.id}" ${meta.id}.assemble.json
   ff_version ${params.assembler} -- ${params.assembler == "flye" ? "flye --version" : params.assembler == "raven" ? "raven --version" : "canu -version"}
   ff_version minimap2 -- minimap2 --version
   ff_version purge_dups -- purge_dups -h

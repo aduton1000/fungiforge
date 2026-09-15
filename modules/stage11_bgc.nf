@@ -10,7 +10,7 @@ process BGC {
           tuple val(meta), path("${meta.id}.regions.gbk"),   emit: regions, optional: true
   script:
   """
-  source "${projectDir}/bin/ff_status.sh"; ff_init bgc "${meta.id}" ${meta.id}.bgc.json --best-effort
+  source ff_status.sh; ff_init bgc "${meta.id}" ${meta.id}.bgc.json --best-effort
   ff_version antismash -- antismash --version
   # Best-effort stage: an antiSMASH failure is RECORDED (status failed, n_clusters null -> NA
   # in master_fungi.tsv) but does not stop a multi-hour run.
@@ -23,7 +23,7 @@ process BGC {
     if [ "\$FF_RC" -eq 0 ]; then STATUS=ok; else STATUS=failed; tail -20 as.log >&2; fi
   fi
   if ls as/*.region*.gbk >/dev/null 2>&1; then cat as/*.region*.gbk > ${meta.id}.regions.gbk; fi
-  ff_run bgc_summary -- python3 ${projectDir}/bin/bgc_summary.py --sample "${meta.id}" --as-dir as --status "\$STATUS" \\
+  ff_run bgc_summary -- bgc_summary.py --sample "${meta.id}" --as-dir as --status "\$STATUS" \\
       --log as.log --out ${meta.id}.bgc.json
   ff_finalize
   """

@@ -16,7 +16,7 @@ process READ_QC {
   def platform     = is_shortread ? 'illumina' : (has_illumina ? 'hybrid' : 'ont')
   if (is_shortread)
     """
-    source "${projectDir}/bin/ff_status.sh"; ff_init readqc "${meta.id}" ${meta.id}.readqc.json
+    source ff_status.sh; ff_init readqc "${meta.id}" ${meta.id}.readqc.json
     ff_version fastp -- fastp --version
     ff_run fastp -- fastp -i ${r1} -I ${r2} -o r1.fp.fq.gz -O r2.fp.fq.gz --json fastp.json --thread ${task.cpus}
     : | gzip > ${meta.id}.ont.filt.fastq.gz   # no ONT for this isolate — empty placeholder
@@ -26,7 +26,7 @@ process READ_QC {
     """
   else
     """
-    source "${projectDir}/bin/ff_status.sh"; ff_init readqc "${meta.id}" ${meta.id}.readqc.json
+    source ff_status.sh; ff_init readqc "${meta.id}" ${meta.id}.readqc.json
     ff_version chopper -- chopper --version
     ff_version nanoplot -- NanoPlot --version
     ff_version fastp -- fastp --version

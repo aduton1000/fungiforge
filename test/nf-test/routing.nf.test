@@ -1,0 +1,112 @@
+// Routing logic in main.nf: parse_row() decides assembly_mode from the inputs present and
+// refuses malformed rows; resolve_path() finds fixture reads next to the samplesheet.
+nextflow_function {
+
+    name "parse_row routing"
+    script "main.nf"
+
+    test("ONT only -> longread") {
+        function "parse_row"
+        when {
+            params { samplesheet = "$baseDir/test/samplesheet.test.csv" }
+            function {
+                """
+                input[0] = [sample:'X1', ont_fastq:'reads/TESTFUN01.ont.fastq.gz', illumina_r1:'', illumina_r2:'', compartment:'AIR', facility:'F1', season:'Dry']
+                """
+            }
+        }
+        then {
+            assert function.success
+            def (meta, files) = function.result
+            assert meta.id == 'X1' && meta.assembly_mode == 'longread'
+            assert meta.compartment == 'AIR' && meta.facility == 'F1' && meta.season == 'Dry'
+            assert files.ont.toString().endsWith('test/reads/TESTFUN01.ont.fastq.gz')   // resolved next to the sheet
+            assert files.r1.toString().endsWith('assets/NO_R1') && files.r2.toString().endsWith('assets/NO_R2')
+        }
+    }
+
+    test("ONT + paired Illumina -> longread (hybrid polish)") {
+        function "parse_row"
+        when {
+            params { samplesheet = "$baseDir/test/samplesheet.test.csv" }
+            function {
+                """
+                input[0] = [sample:'X2', ont_fastq:'reads/TESTFUN02.ont.fastq.gz', illumina_r1:'reads/TESTFUN02_R1.fastq.gz', illumina_r2:'reads/TESTFUN02_R2.fastq.gz']
+                """
+            }
+        }
+        then {
+            assert function.success
+            def (meta, files) = function.result
+            assert meta.assembly_mode == 'longread'
+            assert files.r1.toString().endsWith('TESTFUN02_R1.fastq.gz') && files.r2.toString().endsWith('TESTFUN02_R2.fastq.gz')
+            assert meta.compartment == 'NA' && meta.facility == 'NA' && meta.season == 'NA'   // blank metadata -> NA
+        }
+    }
+
+    test("paired Illumina only -> shortread") {
+        function "parse_row"
+        when {
+            params { samplesheet = "$baseDir/test/samplesheet.test.csv" }
+            function {
+                """
+                input[0] = [sample:'X3', ont_fastq:'', illumina_r1:'reads/TESTFUN03_R1.fastq.gz', illumina_r2:'reads/TESTFUN03_R2.fastq.gz']
+                """
+            }
+        }
+        then {
+            assert function.success
+            def (meta, files) = function.result
+            assert meta.assembly_mode == 'shortread'
+            assert files.ont.toString().endsWith('assets/NO_ONT')
+        }
+    }
+
+    test("unpaired Illumina is refused") {
+        function "parse_row"
+        when {
+            params { samplesheet = "$baseDir/test/samplesheet.test.csv" }
+            function {
+                """
+                input[0] = [sample:'BAD', ont_fastq:'', illumina_r1:'reads/TESTFUN03_R1.fastq.gz', illumina_r2:'']
+                """
+            }
+        }
+        then {
+            assert function.failed
+            assert function.stdout.any { it.contains('Illumina must be PAIRED') }
+        }
+    }
+
+    test("a row with no reads at all is refused") {
+        function "parse_row"
+        when {
+            params { samplesheet = "$baseDir/test/samplesheet.test.csv" }
+            function {
+                """
+                input[0] = [sample:'EMPTY', ont_fastq:'', illumina_r1:'', illumina_r2:'']
+                """
+            }
+        }
+        then {
+            assert function.failed
+            assert function.stdout.any { it.contains('needs ont_fastq OR both') }
+        }
+    }
+
+    test("absolute paths are kept as given") {
+        function "resolve_path"
+        when {
+            params { samplesheet = "$baseDir/test/samplesheet.test.csv" }
+            function {
+                """
+                input[0] = '/absolute/somewhere/reads.fastq.gz'
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.toString() == '/absolute/somewhere/reads.fastq.gz'
+        }
+    }
+}
