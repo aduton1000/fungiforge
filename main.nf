@@ -87,6 +87,44 @@ def parse_row(row) {
   return tuple(meta, files)
 }
 
+// ── run metadata for provenance.json ─────────────────────────────────────────
+// Written once per run into the work dir and handed to the PROVENANCE process (W0.2).
+// The git commit is read here (head node) because the containers need not carry git.
+def git_state() {
+  def st = [commit: null, dirty: null]
+  try {
+    def p = ['git', '-C', projectDir.toString(), 'rev-parse', 'HEAD'].execute()
+    def out = p.text.trim(); p.waitFor()
+    if (p.exitValue() == 0 && out) st.commit = out
+    def q = ['git', '-C', projectDir.toString(), 'status', '--porcelain', '--untracked-files=no'].execute()
+    def qo = q.text; q.waitFor()
+    if (q.exitValue() == 0) st.dirty = qo.trim() ? true : false
+  } catch (Exception ignored) { }
+  return st
+}
+
+def run_info_json() {
+  def git = git_state()
+  def host = null
+  try { host = java.net.InetAddress.getLocalHost().getHostName() } catch (Exception ignored) { }
+  def containers = workflow.container instanceof Map ? workflow.container : [all: workflow.container?.toString()]
+  def info = [
+    pipeline : [name: workflow.manifest.name, version: workflow.manifest.version,
+                repository: workflow.repository, revision: workflow.revision,
+                commit_id: workflow.commitId ?: git.commit, git_dirty: git.dirty,
+                script_id: workflow.scriptId, project_dir: projectDir.toString()],
+    nextflow : [version: nextflow.version.toString(), build: nextflow.build],
+    run      : [session_id: workflow.sessionId.toString(), run_name: workflow.runName,
+                start: workflow.start.toString(), command_line: workflow.commandLine,
+                launch_dir: workflow.launchDir.toString(), work_dir: workflow.workDir.toString(),
+                profile: workflow.profile, container_engine: workflow.containerEngine,
+                stub_run: workflow.stubRun, resume: workflow.resume, user: workflow.userName, host: host],
+    containers: containers,
+    params   : params,
+  ]
+  return groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(info))
+}
+
 // ── dispatch ─────────────────────────────────────────────────────────────────
 workflow {
   if (params.help) { help(); return }
@@ -96,10 +134,34 @@ workflow {
     error "Missing --samplesheet (columns: sample,ont_fastq,illumina_r1,illumina_r2,compartment,facility,season; per row give ONT and/or paired Illumina)"
   def pkg_containerised = ['docker','singularity','apptainer'].any { workflow.profile.contains(it) }
   if (!params.data_dir && !workflow.stubRun)
-    log.warn "--data_dir not set: identification / resistance / BGC / novelty stages need reference DBs (see bin/fetch_references.sh)."
+    log.warn "--data_dir not set: the DB_CHECK stage will stop the run (pass --allow_missing_db to run without reference databases; identification / decontamination / annotation / resistance / BGC then record skipped)."
   if (params.basecall && !params.dorado_model)
     error "--basecall set but --dorado_model missing."
 
-  samples = Channel.fromPath(params.samplesheet).splitCsv(header: true).map { parse_row(it) }
-  FUNGIFORGE(samples)
+  samples  = Channel.fromPath(params.samplesheet).splitCsv(header: true).map { parse_row(it) }
+  run_info = Channel.of(run_info_json()).collectFile(name: 'run_info.json', newLine: true)
+  FUNGIFORGE(samples, run_info)
+
+  // provenance: image identities (head node — needs the image cache / docker daemon; W0.2).
+  // `params` is not visible inside the handler closure once the run has finished, so the
+  // values it needs are captured here.
+  def prov_out   = "${params.outdir}/pipeline_info/provenance.json"
+  def prov_hash  = params.provenance_hash_images as boolean
+  def prov_cache = params.image_cache_dir ?: System.getenv('NXF_APPTAINER_CACHEDIR') ?: System.getenv('NXF_SINGULARITY_CACHEDIR') ?: ''
+  def prov_bin   = "${projectDir}/bin/make_provenance.py"
+  workflow.onComplete = {
+    def prov = file(prov_out)
+    if (!workflow.success || !prov.exists()) return
+    def cmd = ['python3', prov_bin, 'images', '--provenance', prov.toString(),
+               '--engine', (workflow.containerEngine ?: 'none'), '--cache-dir', prov_cache, '--work-dir', workflow.workDir.toString()]
+    if (!prov_hash) cmd << '--no-hash'
+    try {
+      def p = cmd.execute(); def out = p.text; p.waitFor()
+      out.trim().eachLine { log.info it }
+      if (p.exitValue() != 0) log.warn "provenance image step exited ${p.exitValue()} (provenance.json kept without image identities)"
+    } catch (Exception e) {
+      log.warn "provenance image step could not run: ${e.message}"
+    }
+  }
+  }
 }

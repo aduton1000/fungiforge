@@ -13,6 +13,10 @@ params {
   genome_id        = true
 
   // slurm_partition = 'global'   // or leave to FUNGIFORGE_PARTITION / cluster default
+
+  // provenance: where the pre-pulled public images live (same as apptainer.cacheDir below), so
+  // provenance.json can record the sha256 of every image that ran
+  image_cache_dir = '/hpc/opt/fungiforge/images/cache'
 }
 
 // The two fungiforge-built images are NOT on Docker Hub — point their labels at the local

@@ -11,6 +11,9 @@ process ASSEMBLY_QC {
   def lineage = params.busco_lineage == 'auto' ? 'fungi_odb10' : params.busco_lineage
   """
   source "${projectDir}/bin/ff_status.sh"; ff_init assembly_qc "${meta.id}" ${meta.id}.assemblyqc.json
+  ff_version busco -- busco --version
+  ff_version quast -- quast.py --version
+  ff_version compleasm -- compleasm --version
   ff_run quast --optional -- quast.py ${nuclear} -o quast --threads ${task.cpus} --silent
   COMPLEASM_OK=0
   if command -v compleasm >/dev/null 2>&1 && [ -n "${params.data_dir ?: ''}" ]; then
@@ -29,5 +32,5 @@ process ASSEMBLY_QC {
   ff_finalize
   """
   stub:
-  "touch ${meta.id}.assemblyqc.json"
+  "echo '{\"sample\":\"${meta.id}\",\"stage\":\"assembly_qc\"}' > ${meta.id}.assemblyqc.json"
 }
