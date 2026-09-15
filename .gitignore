@@ -34,3 +34,6 @@ test/reads/*
 !test/reads/TESTFUN0?_R?.fastq.gz
 results_cea10/
 results_*/
+# nf-test run artefacts
+.nf-test/
+.nf-test.log

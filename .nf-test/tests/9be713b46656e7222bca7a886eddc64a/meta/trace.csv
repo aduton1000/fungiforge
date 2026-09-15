@@ -1,2 +1,0 @@
-task_id	hash	native_id	name	status	exit	submit	duration	realtime	%cpu	peak_rss	peak_vmem	rchar	wchar
-1	c8/8eb2ed	46270	DECONTAM (S1)	COMPLETED	0	2026-09-15 07:08:52.463	40ms	8ms	-	-	-	-	-

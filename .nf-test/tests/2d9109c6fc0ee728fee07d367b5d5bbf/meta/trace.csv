@@ -1,2 +1,0 @@
-task_id	hash	native_id	name	status	exit	submit	duration	realtime	%cpu	peak_rss	peak_vmem	rchar	wchar
-1	e9/8d312d	47310	PROVENANCE (run)	COMPLETED	0	2026-09-15 07:09:24.829	113ms	50ms	-	-	-	-	-

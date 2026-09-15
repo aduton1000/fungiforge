@@ -1,3 +1,0 @@
-
-[FAILED] completed=0 failed=0 cached=0
-[ERROR] Sample 'EMPTY': needs ont_fastq OR both illumina_r1+illumina_r2 (got ont='', r1='', r2='').

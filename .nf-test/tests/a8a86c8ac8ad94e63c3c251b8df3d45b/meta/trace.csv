@@ -1,2 +1,0 @@
-task_id	hash	native_id	name	status	exit	submit	duration	realtime	%cpu	peak_rss	peak_vmem	rchar	wchar
-1	49/1793b9	46099	MEDAKA (S1)	COMPLETED	0	2026-09-15 07:08:46.632	44ms	8ms	-	-	-	-	-
