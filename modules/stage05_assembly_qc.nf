@@ -10,16 +10,23 @@ process ASSEMBLY_QC {
   script:
   def lineage = params.busco_lineage == 'auto' ? 'fungi_odb10' : params.busco_lineage
   """
-  quast.py ${nuclear} -o quast --threads ${task.cpus} --silent || true
+  source "${projectDir}/bin/ff_status.sh"; ff_init assembly_qc "${meta.id}" ${meta.id}.assemblyqc.json
+  ff_run quast --optional -- quast.py ${nuclear} -o quast --threads ${task.cpus} --silent
+  COMPLEASM_OK=0
   if command -v compleasm >/dev/null 2>&1 && [ -n "${params.data_dir ?: ''}" ]; then
-    compleasm run -a ${nuclear} -o compleasm -l ${lineage} -L "${params.data_dir}/busco" -t ${task.cpus} || true
+    ff_run compleasm --optional -- compleasm run -a ${nuclear} -o compleasm -l ${lineage} -L "${params.data_dir}/busco" -t ${task.cpus}
+    if [ "\$FF_RC" -eq 0 ]; then COMPLEASM_OK=1; fi
   else
-    busco -i ${nuclear} -o busco -l ${lineage} -m genome -c ${task.cpus} \\
-        ${ params.data_dir ? "--download_path ${params.data_dir}/busco --offline" : "" } || true
+    ff_skip compleasm "compleasm not available in this image; using BUSCO"
   fi
-  python3 ${projectDir}/bin/assembly_qc.py --sample "${meta.id}" --nuclear ${nuclear} \\
+  if [ "\$COMPLEASM_OK" -eq 0 ]; then
+    ff_run busco -- busco -i ${nuclear} -o busco -l ${lineage} -m genome -c ${task.cpus} \\
+        ${ params.data_dir ? "--download_path ${params.data_dir}/busco --offline" : "" }
+  fi
+  ff_run assembly_qc -- python3 ${projectDir}/bin/assembly_qc.py --sample "${meta.id}" --nuclear ${nuclear} \\
       --lineage ${lineage} --compleasm-dir compleasm --busco-dir busco \\
       --out ${meta.id}.assemblyqc.json
+  ff_finalize
   """
   stub:
   "touch ${meta.id}.assemblyqc.json"

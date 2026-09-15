@@ -94,7 +94,8 @@ workflow FUNGIFORGE {
 
     // 14. aggregate every per-stage result.json per isolate -> report + master row
     all_json = READ_QC.out.json
-      .mix(SRPOLISH.out.json, DECONTAM.out.json, ASSEMBLY_QC.out.json, REPEATMASK.out.json,
+      .mix(ASSEMBLE.out.json, SR_ASSEMBLE.out.json, MEDAKA.out.json,
+           SRPOLISH.out.json, DECONTAM.out.json, ASSEMBLY_QC.out.json, REPEATMASK.out.json,
            ANNOTATE.out.json, IDENTIFY.out.json, RESISTANCE.out.json,
            mobile_ch, bgc_ch, novelty_ch, extras_ch)
       .map { meta, j -> tuple(meta.id, meta, j) }

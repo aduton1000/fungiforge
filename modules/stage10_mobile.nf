@@ -10,12 +10,16 @@ process MOBILE {
   output: tuple val(meta), path("${meta.id}.mobile.json"), emit: json
   script:
   """
-  python3 ${projectDir}/bin/te_summary.py --telib ${telib} --out te_summary.json || echo '{}' > te_summary.json
-  if [ "${params.skip_mge}" != "true" ] && [ -n "${params.data_dir ?: ''}" ]; then
-    genomad end-to-end --cleanup ${mito} genomad_out "${params.data_dir}/genomad_db" 2>/dev/null || true
+  source "${projectDir}/bin/ff_status.sh"; ff_init mobile "${meta.id}" ${meta.id}.mobile.json
+  ff_run te_summary -- python3 ${projectDir}/bin/te_summary.py --telib ${telib} --out te_summary.json
+  if [ "${params.skip_mge}" = "true" ]; then ff_skip genomad "disabled (--skip_mge)"
+  elif [ -z "${params.data_dir ?: ''}" ] || [ ! -d "${params.data_dir ?: ''}/genomad_db" ]; then ff_skip genomad "geNomad database not staged under --data_dir (genomad_db)"
+  else
+    ff_run genomad --optional -- bash -c "genomad end-to-end --cleanup ${mito} genomad_out '${params.data_dir}/genomad_db' > genomad.log 2>&1"
   fi
-  python3 ${projectDir}/bin/mobile_merge.py --sample "${meta.id}" --te te_summary.json \\
-      --genomad genomad_out --out ${meta.id}.mobile.json || echo '{"sample":"${meta.id}","stage":"mobile"}' > ${meta.id}.mobile.json
+  ff_run mobile_merge -- python3 ${projectDir}/bin/mobile_merge.py --sample "${meta.id}" --te te_summary.json \\
+      --genomad genomad_out --out ${meta.id}.mobile.json
+  ff_finalize
   """
   stub:
   "echo '{\"sample\":\"${meta.id}\",\"stage\":\"mobile\"}' > ${meta.id}.mobile.json"

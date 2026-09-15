@@ -10,9 +10,10 @@ process EXTRAS {
   output: tuple val(meta), path("${meta.id}.extras.json"), emit: json
   script:
   """
-  python3 ${projectDir}/bin/extras.py --sample "${meta.id}" --proteins ${proteins} \\
-      --ont ${ont} --data-dir "${params.data_dir ?: ''}" --out ${meta.id}.extras.json \\
-      || echo '{"sample":"${meta.id}","stage":"extras"}' > ${meta.id}.extras.json
+  source "${projectDir}/bin/ff_status.sh"; ff_init extras "${meta.id}" ${meta.id}.extras.json --best-effort
+  ff_run extras -- python3 ${projectDir}/bin/extras.py --sample "${meta.id}" --proteins ${proteins} \\
+      --ont ${ont} --data-dir "${params.data_dir ?: ''}" --out ${meta.id}.extras.json
+  ff_finalize
   """
   stub:
   "echo '{\"sample\":\"${meta.id}\",\"stage\":\"extras\"}' > ${meta.id}.extras.json"

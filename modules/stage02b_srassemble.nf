@@ -12,16 +12,18 @@ process SR_ASSEMBLE {
   publishDir { "${params.outdir}/${meta.id}/02_assembly" }, mode: 'copy'
   input:  tuple val(meta), path(ont), path(r1), path(r2)
   output: tuple val(meta), path("${meta.id}.assembly.fasta"), emit: assembly
+          tuple val(meta), path("${meta.id}.assemble.json"),   emit: json
   script:
   def mem_gb = (task.memory ? task.memory.toGiga() : 64)
   """
+  source "${projectDir}/bin/ff_status.sh"; ff_init assemble "${meta.id}" ${meta.id}.assemble.json
   case ${params.sr_assembler} in
     spades)
-      spades.py --isolate -1 ${r1} -2 ${r2} -o spades -t ${task.cpus} -m ${mem_gb}
-      cp spades/scaffolds.fasta raw.fasta 2>/dev/null || cp spades/contigs.fasta raw.fasta
+      ff_run spades -- spades.py --isolate -1 ${r1} -2 ${r2} -o spades -t ${task.cpus} -m ${mem_gb}
+      if [ -s spades/scaffolds.fasta ]; then cp spades/scaffolds.fasta raw.fasta; else cp spades/contigs.fasta raw.fasta; fi
       ;;
     megahit)
-      megahit -1 ${r1} -2 ${r2} -o megahit -t ${task.cpus}
+      ff_run megahit -- megahit -1 ${r1} -2 ${r2} -o megahit -t ${task.cpus}
       cp megahit/final.contigs.fa raw.fasta
       ;;
     *)
@@ -30,14 +32,18 @@ process SR_ASSEMBLE {
   # Keep contigs >= --min_contig_len with >= 4 distinct bases. Short-read assemblers emit
   # thousands of tiny fragments and the odd homopolymer stub (e.g. 78 bp of G); funannotate
   # refuses an assembly containing the latter, and the former only inflate contig counts.
-  awk -v min=${params.min_contig_len} 'BEGIN{RS=">"; ORS=""}
+  ff_run contig_filter -- awk -v min=${params.min_contig_len} 'BEGIN{RS=">"; ORS=""}
     NR>1 { n=index(\$0,"\\n"); hdr=substr(\$0,1,n-1); seq=substr(\$0,n+1); gsub(/\\n/,"",seq)
            if (length(seq) < min) next
            s=seq; a=gsub(/[Aa]/,"",s); s=seq; c=gsub(/[Cc]/,"",s); s=seq; g=gsub(/[Gg]/,"",s); s=seq; t=gsub(/[Tt]/,"",s)
            if ((a>0)+(c>0)+(g>0)+(t>0) < 4) next
            printf(">%s\\n%s\\n", hdr, seq) }' raw.fasta > ${meta.id}.assembly.fasta
-  echo "[sr_assemble] kept \$(grep -c '>' ${meta.id}.assembly.fasta) of \$(grep -c '>' raw.fasta) contigs (>= ${params.min_contig_len} bp, >= 4 bases)"
+  KEPT=\$(grep -c '^>' ${meta.id}.assembly.fasta); RAW=\$(grep -c '^>' raw.fasta)
+  echo "[sr_assemble] kept \$KEPT of \$RAW contigs (>= ${params.min_contig_len} bp, >= 4 bases)"
+  printf '{"sample":"%s","stage":"assemble","assembler":"%s","n_contigs_raw":%s,"n_contigs":%s,"min_contig_len":%s}\\n' \\
+    "${meta.id}" "${params.sr_assembler}" "\$RAW" "\$KEPT" "${params.min_contig_len}" > ${meta.id}.assemble.json
+  ff_finalize
   """
   stub:
-  "touch ${meta.id}.assembly.fasta"
+  "touch ${meta.id}.assembly.fasta; echo '{\"sample\":\"${meta.id}\",\"stage\":\"assemble\"}' > ${meta.id}.assemble.json"
 }

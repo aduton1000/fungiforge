@@ -19,6 +19,7 @@ process ANNOTATE {
   // DB and covers Asco/Basidiomycota. --busco_seed_species (Augustus species) is left at
   // funannotate's default (anidulans) for organism-agnostic self-training.
   """
+  source "${projectDir}/bin/ff_status.sh"; ff_init annotate "${meta.id}" ${meta.id}.annotate.json
   export FUNANNOTATE_DB="${params.funannotate_db ?: params.data_dir + '/funannotate'}"
   # Augustus (funannotate's BUSCO self-training) must WRITE species params into
   # AUGUSTUS_CONFIG_PATH; the container default (/usr/share/augustus/config) is root-owned
@@ -29,34 +30,31 @@ process ANNOTATE {
   export AUGUSTUS_CONFIG_PATH=/tmp/augustus/config
   if [ ! -d "\$AUGUSTUS_CONFIG_PATH/species" ]; then
     mkdir -p /tmp/augustus/bin
-    cp -r /usr/share/augustus/config /tmp/augustus/config 2>/dev/null || true
-    ln -sf /usr/share/augustus/scripts /tmp/augustus/scripts 2>/dev/null || true
-    ln -sf "\$(command -v bam2hints || echo /usr/bin/bam2hints)" /tmp/augustus/bin/bam2hints 2>/dev/null || true
+    [ -d /usr/share/augustus/config ]  && cp -r /usr/share/augustus/config /tmp/augustus/config
+    [ -d /usr/share/augustus/scripts ] && ln -sf /usr/share/augustus/scripts /tmp/augustus/scripts
+    B2H=\$(command -v bam2hints || true); [ -n "\$B2H" ] && ln -sf "\$B2H" /tmp/augustus/bin/bam2hints
   fi
-  ${ params.genemark_key ? "cp ${params.genemark_key} ~/.gm_key || true" : "" }
+  ${ params.genemark_key ? "cp ${params.genemark_key} ~/.gm_key" : "ff_skip genemark 'no --genemark_key given (GeneMark-ES ab-initio prediction skipped by funannotate)'" }
   # funannotate requires short (<=16 char), space-free FASTA headers. Polypolish appends
   # " polypolish" to every contig (>contig_30 polypolish) which blows the 16-char limit and
   # aborts predict. funannotate 'sort' renames headers (contig_1..N, longest first) + is the
-  # documented preprocessing step; sed-strip of the description is the fallback.
-  funannotate sort -i ${masked} -o clean.fasta -b contig --minlen ${params.min_contig_len} 2>sort.log \\
-    || sed '/^>/ s/[[:space:]].*//' ${masked} > clean.fasta
-  funannotate predict -i clean.fasta -o fun -s "${meta.id}" \\
-      --cpus ${task.cpus} --busco_db ${params.funannotate_busco} || true
-  EGG=""; [ -n "\$(ls -A ${params.data_dir}/eggnog 2>/dev/null)" ] && EGG="--eggnog ${params.data_dir}/eggnog"
-  funannotate annotate -i fun --cpus ${task.cpus} ${ips} \$EGG || true
-  cp fun/predict_results/*.proteins.fa ${meta.id}.proteins.faa 2>/dev/null || \\
-     cp fun/annotate_results/*.proteins.fa ${meta.id}.proteins.faa 2>/dev/null || touch ${meta.id}.proteins.faa
-  cp fun/annotate_results/*.gbk ${meta.id}.gbk 2>/dev/null || cp fun/predict_results/*.gbk ${meta.id}.gbk 2>/dev/null || touch ${meta.id}.gbk
-  # Fail LOUD on an empty annotation: a 0-protein result silently poisons resistance/BGC
-  # downstream (they find nothing and report false 'not_detected'). grep -c prints "0" and
-  # exits 1 on no match, so guard the substitution, don't append a second 0.
-  NPROT=\$(grep -c '^>' ${meta.id}.proteins.faa 2>/dev/null || true); NPROT=\${NPROT:-0}
-  if [ "\$NPROT" -lt 1 ]; then
-    echo "ERROR: funannotate produced 0 proteins for ${meta.id} — annotation failed (see fun/logfiles + sort.log)." >&2
-    exit 1
-  fi
+  # documented preprocessing step; sed-strip of the description is the fallback (partial).
+  ff_run funannotate_sort --optional -- bash -c "funannotate sort -i ${masked} -o clean.fasta -b contig --minlen ${params.min_contig_len} 2>sort.log"
+  if [ "\$FF_RC" -ne 0 ]; then sed '/^>/ s/[[:space:]].*//' ${masked} > clean.fasta; fi
+  ff_run funannotate_predict -- funannotate predict -i clean.fasta -o fun -s "${meta.id}" \\
+      --cpus ${task.cpus} --busco_db ${params.funannotate_busco}
+  EGG=""; if [ -n "\$(ls -A ${params.data_dir}/eggnog 2>/dev/null)" ]; then EGG="--eggnog ${params.data_dir}/eggnog"; else ff_skip eggnog "eggNOG database not staged under --data_dir"; fi
+  ff_run funannotate_annotate -- funannotate annotate -i fun --cpus ${task.cpus} ${ips} \$EGG
+  if ls fun/annotate_results/*.proteins.fa >/dev/null 2>&1; then cp fun/annotate_results/*.proteins.fa ${meta.id}.proteins.faa
+  else cp fun/predict_results/*.proteins.fa ${meta.id}.proteins.faa; fi
+  if ls fun/annotate_results/*.gbk >/dev/null 2>&1; then cp fun/annotate_results/*.gbk ${meta.id}.gbk
+  else cp fun/predict_results/*.gbk ${meta.id}.gbk; fi
+  # A 0-protein result would silently poison resistance/BGC downstream — treat it as a failure.
+  NPROT=\$(grep -c '^>' ${meta.id}.proteins.faa || true)
+  ff_run protein_count -- test "\${NPROT:-0}" -ge 1
   printf '{"sample":"%s","stage":"annotate","proteins":"%s.proteins.faa","n_proteins":%s,"interproscan":%s}\\n' \\
-    "${meta.id}" "${meta.id}" "\$NPROT" "${params.run_interproscan.toString()}" > ${meta.id}.annotate.json
+    "${meta.id}" "${meta.id}" "\$NPROT" "${(params.run_interproscan && params.iprscan_xml) ? 'true' : 'false'}" > ${meta.id}.annotate.json
+  ff_finalize
   """
   stub:
   "touch ${meta.id}.proteins.faa ${meta.id}.gbk ${meta.id}.annotate.json"
