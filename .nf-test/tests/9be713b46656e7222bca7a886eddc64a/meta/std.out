@@ -1,0 +1,5 @@
+[PIPELINE] fungiforge 0.1.0 | profile=local,test
+[WORKDIR] /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/9be713b46656e7222bca7a886eddc64a/work
+[PROCESS c8/8eb2ed] DECONTAM (S1)
+
+[SUCCESS] completed=1 failed=0 cached=0

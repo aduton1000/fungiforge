@@ -1,0 +1,266 @@
+Sept-15 07:09:32.204 [main] DEBUG nextflow.cli.Launcher - $> nextflow -quiet -log /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/meta/nextflow.log run /Users/brightadu/Documents/Claude/Projects/fungiforge/main.nf -c /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config -c /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config -params-file /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/meta/params.json -ansi-log false -profile local,test -with-trace /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/meta/trace.csv -w /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work -stub-run
+Sept-15 07:09:32.248 [main] DEBUG nextflow.plugin.PluginsFacade - Setting up plugin manager > mode=prod; embedded=false; plugins-dir=/Users/brightadu/.nextflow/plugins; core-plugins: nf-amazon@3.9.1,nf-azure@1.22.5,nf-cloudcache@0.6.0,nf-codecommit@0.5.2,nf-console@1.3.0,nf-google@1.27.3,nf-k8s@1.5.4,nf-seqera@0.20.1,nf-tower@1.28.0,nf-wave@1.21.0
+Sept-15 07:09:32.260 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Enabled plugins: []
+Sept-15 07:09:32.260 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Disabled plugins: []
+Sept-15 07:09:32.262 [main] INFO  org.pf4j.DefaultPluginManager - PF4J version 3.14.1 in 'deployment' mode
+Sept-15 07:09:32.269 [main] DEBUG nextflow.util.RetryConfig - Missing nextflow session - using default retry config
+Sept-15 07:09:32.333 [main] DEBUG nextflow.plugin.PluginUpdater - Using plugin repository: HttpPluginRepository [registry]; url=https://registry.nextflow.io/api
+Sept-15 07:09:32.335 [main] INFO  org.pf4j.AbstractPluginManager - No plugins
+Sept-15 07:09:32.354 [main] DEBUG nextflow.config.ConfigBuilder - Found config base: /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config
+Sept-15 07:09:32.355 [main] DEBUG nextflow.config.ConfigBuilder - User config file: /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config
+Sept-15 07:09:32.356 [main] DEBUG nextflow.config.ConfigBuilder - User config file: /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config
+Sept-15 07:09:32.356 [main] DEBUG nextflow.config.ConfigBuilder - Parsing config file: /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config
+Sept-15 07:09:32.357 [main] DEBUG nextflow.config.ConfigBuilder - Parsing config file: /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config
+Sept-15 07:09:32.357 [main] DEBUG nextflow.config.ConfigBuilder - Parsing config file: /Users/brightadu/Documents/Claude/Projects/fungiforge/nextflow.config
+Sept-15 07:09:32.358 [main] DEBUG nextflow.config.ConfigParserFactory - Using config parser v2
+Sept-15 07:09:32.366 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `local,test`
+Sept-15 07:09:32.665 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `local,test`
+Sept-15 07:09:32.733 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `local,test`
+Sept-15 07:09:32.783 [main] DEBUG nextflow.config.ConfigBuilder - Available config profiles: [local, hpc_slurm, conda, mamba, docker, singularity, apptainer, test]
+Sept-15 07:09:32.805 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins default=[]
+Sept-15 07:09:32.805 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins resolved requirement=[]
+Sept-15 07:09:32.812 [main] DEBUG n.secret.LocalSecretsProvider - Secrets store: /Users/brightadu/.nextflow/secrets/store.json
+Sept-15 07:09:32.813 [main] DEBUG nextflow.secret.SecretsLoader - Discovered secrets providers: [nextflow.secret.LocalSecretsProvider@7f2d31af] - activable => nextflow.secret.LocalSecretsProvider@7f2d31af
+Sept-15 07:09:32.856 [main] DEBUG nextflow.Session - Session UUID: 94a82bf3-e0ae-4100-b217-8fa97ebab475
+Sept-15 07:09:32.856 [main] DEBUG nextflow.Session - Run name: festering_brown
+Sept-15 07:09:32.857 [main] DEBUG nextflow.Session - Executor pool size: 16
+Sept-15 07:09:32.860 [main] DEBUG nextflow.file.FilePorter - File porter settings maxRetries=3; maxTransfers=50; pollTimeout=null
+Sept-15 07:09:32.863 [main] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'FileTransfer' minSize=10; maxSize=48; workQueue=LinkedBlockingQueue[-1]; allowCoreThreadTimeout=false
+Sept-15 07:09:32.877 [main] DEBUG nextflow.cli.CmdRun - 
+  Version: 26.04.3 build 12259
+  Created: 28-05-2026 08:48 UTC (08:48 GMT)
+  System: Mac OS X 26.5.2
+  Runtime: Groovy 4.0.31 on OpenJDK 64-Bit Server VM 25.0.2+10-LTS
+  Encoding: UTF-8 (UTF-8)
+  Process: 48928@Brights-MacBook-Pro.local [127.94.0.2]
+  CPUs: 16 - Mem: 128 GB (52.6 GB) - Swap: 0 (0)
+Sept-15 07:09:32.886 [main] DEBUG nextflow.Session - Work-dir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work [Mac OS X]
+Sept-15 07:09:32.903 [main] DEBUG nextflow.executor.ExecutorFactory - Extension executors providers=[]
+Sept-15 07:09:32.915 [main] DEBUG nextflow.Session - Observer factory (v2): LinObserverFactory
+Sept-15 07:09:32.916 [main] DEBUG nextflow.Session - Observer factory (v2): DefaultObserverFactory
+Sept-15 07:09:32.929 [main] DEBUG nextflow.cache.CacheFactory - Using Nextflow cache factory: nextflow.cache.DefaultCacheFactory
+Sept-15 07:09:32.933 [main] DEBUG nextflow.util.CustomThreadPool - Creating default thread pool > poolSize: 17; maxThreads: 1000
+Sept-15 07:09:32.958 [main] DEBUG nextflow.Session - Session start
+Sept-15 07:09:32.960 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow started -- trace file: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/meta/trace.csv
+Sept-15 07:09:32.961 [main] DEBUG nextflow.script.ScriptLoaderFactory - Using script parser v2
+Sept-15 07:09:33.467 [main] DEBUG nextflow.script.ScriptRunner - > Launching execution
+Sept-15 07:09:33.643 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withLabel:report` matches labels `report` for process with name FUNGIFORGE:DB_CHECK
+Sept-15 07:09:33.645 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Sept-15 07:09:33.645 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Sept-15 07:09:33.648 [main] DEBUG nextflow.executor.Executor - [warm up] executor > local
+Sept-15 07:09:33.651 [main] DEBUG n.processor.LocalPollingMonitor - Creating local task monitor for executor 'local' > cpus=16; memory=128 GB; capacity=16; pollInterval=100ms; dumpInterval=5m
+Sept-15 07:09:33.652 [main] DEBUG n.processor.TaskPollingMonitor - >>> barrier register (monitor: local)
+Sept-15 07:09:33.668 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FUNGIFORGE:DB_CHECK': maxForks=0; fair=false; array=0
+Sept-15 07:09:33.687 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withLabel:readqc` matches labels `readqc` for process with name FUNGIFORGE:READ_QC
+Sept-15 07:09:33.688 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Sept-15 07:09:33.688 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Sept-15 07:09:33.688 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FUNGIFORGE:READ_QC': maxForks=0; fair=false; array=0
+Sept-15 07:09:33.692 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withLabel:assembly` matches labels `assembly` for process with name FUNGIFORGE:ASSEMBLE
+Sept-15 07:09:33.693 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Sept-15 07:09:33.693 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Sept-15 07:09:33.694 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FUNGIFORGE:ASSEMBLE': maxForks=0; fair=false; array=0
+Sept-15 07:09:33.695 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withLabel:srassembly` matches labels `srassembly` for process with name FUNGIFORGE:SR_ASSEMBLE
+Sept-15 07:09:33.696 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Sept-15 07:09:33.696 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Sept-15 07:09:33.696 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FUNGIFORGE:SR_ASSEMBLE': maxForks=0; fair=false; array=0
+Sept-15 07:09:33.702 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withLabel:polish` matches labels `polish` for process with name FUNGIFORGE:MEDAKA
+Sept-15 07:09:33.702 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Sept-15 07:09:33.702 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Sept-15 07:09:33.703 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FUNGIFORGE:MEDAKA': maxForks=0; fair=false; array=0
+Sept-15 07:09:33.707 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withLabel:srpolish` matches labels `srpolish` for process with name FUNGIFORGE:SRPOLISH
+Sept-15 07:09:33.709 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Sept-15 07:09:33.709 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Sept-15 07:09:33.709 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FUNGIFORGE:SRPOLISH': maxForks=0; fair=false; array=0
+Sept-15 07:09:33.711 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withLabel:decontam` matches labels `decontam` for process with name FUNGIFORGE:DECONTAM
+Sept-15 07:09:33.711 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Sept-15 07:09:33.711 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Sept-15 07:09:33.712 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FUNGIFORGE:DECONTAM': maxForks=0; fair=false; array=0
+Sept-15 07:09:33.713 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withLabel:busco` matches labels `busco` for process with name FUNGIFORGE:ASSEMBLY_QC
+Sept-15 07:09:33.715 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Sept-15 07:09:33.715 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Sept-15 07:09:33.715 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FUNGIFORGE:ASSEMBLY_QC': maxForks=0; fair=false; array=0
+Sept-15 07:09:33.717 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withLabel:repeat` matches labels `repeat` for process with name FUNGIFORGE:REPEATMASK
+Sept-15 07:09:33.718 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Sept-15 07:09:33.718 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Sept-15 07:09:33.718 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FUNGIFORGE:REPEATMASK': maxForks=0; fair=false; array=0
+Sept-15 07:09:33.720 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withLabel:annotate` matches labels `annotate` for process with name FUNGIFORGE:ANNOTATE
+Sept-15 07:09:33.721 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Sept-15 07:09:33.721 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Sept-15 07:09:33.721 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FUNGIFORGE:ANNOTATE': maxForks=0; fair=false; array=0
+Sept-15 07:09:33.723 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withLabel:identify` matches labels `identify` for process with name FUNGIFORGE:IDENTIFY
+Sept-15 07:09:33.724 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Sept-15 07:09:33.724 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Sept-15 07:09:33.724 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FUNGIFORGE:IDENTIFY': maxForks=0; fair=false; array=0
+Sept-15 07:09:33.728 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withLabel:resistance` matches labels `resistance` for process with name FUNGIFORGE:RESISTANCE
+Sept-15 07:09:33.728 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Sept-15 07:09:33.728 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Sept-15 07:09:33.729 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FUNGIFORGE:RESISTANCE': maxForks=0; fair=false; array=0
+Sept-15 07:09:33.739 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withLabel:report` matches labels `report` for process with name FUNGIFORGE:REPORT
+Sept-15 07:09:33.739 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Sept-15 07:09:33.739 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Sept-15 07:09:33.740 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FUNGIFORGE:REPORT': maxForks=0; fair=false; array=0
+Sept-15 07:09:33.745 [main] DEBUG n.script.dsl.ProcessConfigBuilder - Config settings `withLabel:report` matches labels `report` for process with name FUNGIFORGE:PROVENANCE
+Sept-15 07:09:33.745 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: local
+Sept-15 07:09:33.745 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Sept-15 07:09:33.746 [main] DEBUG nextflow.processor.TaskProcessor - Creating process 'FUNGIFORGE:PROVENANCE': maxForks=0; fair=false; array=0
+Sept-15 07:09:33.747 [main] DEBUG nextflow.Session - Process names: FUNGIFORGE:SRPOLISH, FUNGIFORGE:ASSEMBLE, FUNGIFORGE:RESISTANCE, IDENTIFY, FUNGIFORGE:READ_QC, FUNGIFORGE:REPEATMASK, SR_ASSEMBLE, FUNGIFORGE:DECONTAM, FUNGIFORGE:MOBILE, FUNGIFORGE:ANNOTATE, FUNGIFORGE:MEDAKA, FUNGIFORGE:PROVENANCE, REPEATMASK, FUNGIFORGE:SR_ASSEMBLE, FUNGIFORGE:BASECALL, EXTRAS, BGC, ANNOTATE, FUNGIFORGE:DB_CHECK, FUNGIFORGE:ASSEMBLY_QC, READ_QC, REPORT, FUNGIFORGE:NOVELTY, FUNGIFORGE:EXTRAS, FUNGIFORGE:BGC, DECONTAM, NOVELTY, SRPOLISH, ASSEMBLY_QC, FUNGIFORGE:IDENTIFY, FUNGIFORGE:REPORT, ASSEMBLE, RESISTANCE, MEDAKA, PROVENANCE, DB_CHECK, BASECALL, MOBILE
+Sept-15 07:09:33.749 [main] DEBUG nextflow.Session - Igniting dataflow network (21)
+Sept-15 07:09:33.752 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FUNGIFORGE:DB_CHECK
+Sept-15 07:09:33.752 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FUNGIFORGE:READ_QC
+Sept-15 07:09:33.752 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FUNGIFORGE:ASSEMBLE
+Sept-15 07:09:33.752 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FUNGIFORGE:SR_ASSEMBLE
+Sept-15 07:09:33.752 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FUNGIFORGE:MEDAKA
+Sept-15 07:09:33.752 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FUNGIFORGE:SRPOLISH
+Sept-15 07:09:33.752 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FUNGIFORGE:DECONTAM
+Sept-15 07:09:33.752 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FUNGIFORGE:ASSEMBLY_QC
+Sept-15 07:09:33.752 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FUNGIFORGE:REPEATMASK
+Sept-15 07:09:33.752 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FUNGIFORGE:ANNOTATE
+Sept-15 07:09:33.752 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FUNGIFORGE:IDENTIFY
+Sept-15 07:09:33.752 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FUNGIFORGE:RESISTANCE
+Sept-15 07:09:33.753 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FUNGIFORGE:REPORT
+Sept-15 07:09:33.753 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FUNGIFORGE:PROVENANCE
+Sept-15 07:09:33.754 [main] DEBUG nextflow.script.ScriptRunner - Parsed script files:
+  _nf_script_92c3ef39bf3c7fcf: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage09_resistance.nf
+  _nf_script_39de17f20d00a22c: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage02b_srassemble.nf
+  _nf_script_32b94b37e160f7ce: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage02_assemble.nf
+  _nf_script_a5b97214fe9f2831: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage08_identify.nf
+  _nf_script_1c1f98b4715b8aff: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage05_assembly_qc.nf
+  _nf_script_327aab5aa34c2615: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage03b_srpolish.nf
+  _nf_script_6970c1b2c9c5a3a4: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage01_readqc.nf
+  _nf_script_c81ea0f3d2cb7750: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage11_bgc.nf
+  _nf_script_af59dbd2d07ff4ff: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage07_annotate.nf
+  _nf_script_23be7f55efbcc390: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage15_provenance.nf
+  _nf_script_1da71ed522b7511a: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage00_dbcheck.nf
+  _nf_script_9a026347cfbed10d: /Users/brightadu/Documents/Claude/Projects/fungiforge/subworkflows/fungiforge.nf
+  _nf_script_56d6fb7b6bf16dd0: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage14_report.nf
+  _nf_script_56a80dc6c10c6fd4: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage00_basecall.nf
+  _nf_script_14e8dfef6c148033: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage04_decontam.nf
+  _nf_script_454ef1ff06d19d63: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage13_extras.nf
+  _nf_script_c0b2ab57b1cdbfba: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage06_repeatmask.nf
+  _nf_script_d941b15b2b91663a: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage12_novelty.nf
+  _nf_script_efbe4d5176c10e0c: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage10_mobile.nf
+  Main: /Users/brightadu/Documents/Claude/Projects/fungiforge/main.nf
+  _nf_script_f5bc7f7df560f092: /Users/brightadu/Documents/Claude/Projects/fungiforge/modules/stage03_polish.nf
+Sept-15 07:09:33.754 [main] DEBUG nextflow.script.ScriptRunner - > Awaiting termination 
+Sept-15 07:09:33.754 [main] DEBUG nextflow.Session - Session await
+Sept-15 07:09:33.794 [Actor Thread 14] DEBUG nextflow.sort.BigSort - Sort completed -- entries: 1; slices: 1; internal sort time: 0.0 s; external sort time: 0.007 s; total time: 0.007 s
+Sept-15 07:09:33.796 [Actor Thread 14] DEBUG nextflow.file.FileCollector - Saved collect-files list to: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/collect-file/7230ebe38813069f28b5aa55f1144110
+Sept-15 07:09:33.800 [Actor Thread 14] DEBUG nextflow.file.FileCollector - Deleting file collector temp dir: /var/folders/5r/wsfh2n4129v6q_8jqq6zg3gh0000gn/T/nxf-13293333511745328053
+Sept-15 07:09:33.879 [Task submitter] WARN  n.executor.BashWrapperBuilder - Task runtime metrics are not reported when using macOS without a container engine
+Sept-15 07:09:33.885 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:33.886 [Task submitter] INFO  nextflow.Session - [85/bb2bb3] Submitted process > FUNGIFORGE:DB_CHECK (databases)
+Sept-15 07:09:33.924 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 1; name: FUNGIFORGE:DB_CHECK (databases); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/85/bb2bb36f5e6d7bf411c2230a41986e]
+Sept-15 07:09:33.924 [Task monitor] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'TaskFinalizer' minSize=10; maxSize=48; workQueue=LinkedBlockingQueue[-1]; allowCoreThreadTimeout=false
+Sept-15 07:09:33.934 [TaskFinalizer-1] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'PublishDir' minSize=10; maxSize=48; workQueue=LinkedBlockingQueue[-1]; allowCoreThreadTimeout=false
+Sept-15 07:09:33.947 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:33.948 [Task submitter] INFO  nextflow.Session - [b4/f108eb] Submitted process > FUNGIFORGE:READ_QC (TESTFUN01)
+Sept-15 07:09:33.952 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:33.952 [Task submitter] INFO  nextflow.Session - [93/eed3dc] Submitted process > FUNGIFORGE:READ_QC (TESTFUN02)
+Sept-15 07:09:33.955 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:33.955 [Task submitter] INFO  nextflow.Session - [0b/39e30a] Submitted process > FUNGIFORGE:READ_QC (TESTFUN03)
+Sept-15 07:09:34.003 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 2; name: FUNGIFORGE:READ_QC (TESTFUN01); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/b4/f108ebe1d51a32c01a7be41e724156]
+Sept-15 07:09:34.008 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 3; name: FUNGIFORGE:READ_QC (TESTFUN02); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/93/eed3dc14de809c29ad2cf6ad49445f]
+Sept-15 07:09:34.008 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 4; name: FUNGIFORGE:READ_QC (TESTFUN03); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/0b/39e30a09c0d4d1a4e9558576af6bda]
+Sept-15 07:09:34.020 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.020 [Task submitter] INFO  nextflow.Session - [66/49b50b] Submitted process > FUNGIFORGE:ASSEMBLE (TESTFUN02)
+Sept-15 07:09:34.068 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 6; name: FUNGIFORGE:ASSEMBLE (TESTFUN02); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/66/49b50bf819c9c0c141fc70c7d36bf9]
+Sept-15 07:09:34.077 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.077 [Task submitter] INFO  nextflow.Session - [1b/601c83] Submitted process > FUNGIFORGE:ASSEMBLE (TESTFUN01)
+Sept-15 07:09:34.124 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 5; name: FUNGIFORGE:ASSEMBLE (TESTFUN01); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/1b/601c837a160c1153887323bcc5a427]
+Sept-15 07:09:34.127 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.127 [Task submitter] INFO  nextflow.Session - [d9/6a3ae5] Submitted process > FUNGIFORGE:SR_ASSEMBLE (TESTFUN03)
+Sept-15 07:09:34.173 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 7; name: FUNGIFORGE:SR_ASSEMBLE (TESTFUN03); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/d9/6a3ae5c7c9b2a1891776c4a0a45fa7]
+Sept-15 07:09:34.175 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.176 [Task submitter] INFO  nextflow.Session - [65/b857b9] Submitted process > FUNGIFORGE:MEDAKA (TESTFUN02)
+Sept-15 07:09:34.178 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.178 [Task submitter] INFO  nextflow.Session - [80/7b54ec] Submitted process > FUNGIFORGE:MEDAKA (TESTFUN01)
+Sept-15 07:09:34.217 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 8; name: FUNGIFORGE:MEDAKA (TESTFUN02); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/65/b857b976a9c97bccb893c9fba4400d]
+Sept-15 07:09:34.220 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 9; name: FUNGIFORGE:MEDAKA (TESTFUN01); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/80/7b54ec0ec9b7236e5923d3645d7cda]
+Sept-15 07:09:34.220 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.220 [Task submitter] INFO  nextflow.Session - [85/416785] Submitted process > FUNGIFORGE:SRPOLISH (TESTFUN03)
+Sept-15 07:09:34.223 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.224 [Task submitter] INFO  nextflow.Session - [9c/8f5f86] Submitted process > FUNGIFORGE:SRPOLISH (TESTFUN02)
+Sept-15 07:09:34.268 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 10; name: FUNGIFORGE:SRPOLISH (TESTFUN03); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/85/4167859b44edd1ef1fbd26f2ecdcdb]
+Sept-15 07:09:34.270 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 11; name: FUNGIFORGE:SRPOLISH (TESTFUN02); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/9c/8f5f86cb74c476335cf62d3441d231]
+Sept-15 07:09:34.270 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.271 [Task submitter] INFO  nextflow.Session - [fa/5b9a98] Submitted process > FUNGIFORGE:SRPOLISH (TESTFUN01)
+Sept-15 07:09:34.278 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.278 [Task submitter] INFO  nextflow.Session - [0e/921040] Submitted process > FUNGIFORGE:DECONTAM (TESTFUN03)
+Sept-15 07:09:34.318 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 13; name: FUNGIFORGE:DECONTAM (TESTFUN03); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/0e/9210409833fe69b84c9acd6c027fee]
+Sept-15 07:09:34.321 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 12; name: FUNGIFORGE:SRPOLISH (TESTFUN01); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/fa/5b9a986b9f2fdf36bc012270106364]
+Sept-15 07:09:34.321 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.321 [Task submitter] INFO  nextflow.Session - [51/ceb247] Submitted process > FUNGIFORGE:DECONTAM (TESTFUN02)
+Sept-15 07:09:34.357 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 14; name: FUNGIFORGE:DECONTAM (TESTFUN02); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/51/ceb2477a2acfd513d529e3964f8f9d]
+Sept-15 07:09:34.360 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.360 [Task submitter] INFO  nextflow.Session - [ca/7235d0] Submitted process > FUNGIFORGE:REPEATMASK (TESTFUN03)
+Sept-15 07:09:34.399 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 16; name: FUNGIFORGE:REPEATMASK (TESTFUN03); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/ca/7235d0ad505404310c58a08c8e63bc]
+Sept-15 07:09:34.401 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.401 [Task submitter] INFO  nextflow.Session - [cb/0f86af] Submitted process > FUNGIFORGE:DECONTAM (TESTFUN01)
+Sept-15 07:09:34.404 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.404 [Task submitter] INFO  nextflow.Session - [db/b6577b] Submitted process > FUNGIFORGE:ASSEMBLY_QC (TESTFUN03)
+Sept-15 07:09:34.442 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 18; name: FUNGIFORGE:DECONTAM (TESTFUN01); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/cb/0f86af77773acc94ba6052a892a42a]
+Sept-15 07:09:34.442 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 17; name: FUNGIFORGE:ASSEMBLY_QC (TESTFUN03); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/db/b6577b6d7cf838d13094129f4e708f]
+Sept-15 07:09:34.444 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.444 [Task submitter] INFO  nextflow.Session - [c2/8fbbfc] Submitted process > FUNGIFORGE:IDENTIFY (TESTFUN03)
+Sept-15 07:09:34.446 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.446 [Task submitter] INFO  nextflow.Session - [72/4620c1] Submitted process > FUNGIFORGE:ASSEMBLY_QC (TESTFUN02)
+Sept-15 07:09:34.481 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 21; name: FUNGIFORGE:ASSEMBLY_QC (TESTFUN02); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/72/4620c1ec28b03a7764b4c341f9528c]
+Sept-15 07:09:34.484 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.484 [Task submitter] INFO  nextflow.Session - [9b/51ad7e] Submitted process > FUNGIFORGE:IDENTIFY (TESTFUN02)
+Sept-15 07:09:34.518 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 15; name: FUNGIFORGE:IDENTIFY (TESTFUN03); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/c2/8fbbfc06a8575bc59610c13e349eba]
+Sept-15 07:09:34.519 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 19; name: FUNGIFORGE:IDENTIFY (TESTFUN02); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/9b/51ad7e2834bed5b182af64492c4c38]
+Sept-15 07:09:34.521 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.521 [Task submitter] INFO  nextflow.Session - [90/18952d] Submitted process > FUNGIFORGE:IDENTIFY (TESTFUN01)
+Sept-15 07:09:34.523 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.523 [Task submitter] INFO  nextflow.Session - [1d/97d473] Submitted process > FUNGIFORGE:ASSEMBLY_QC (TESTFUN01)
+Sept-15 07:09:34.557 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 24; name: FUNGIFORGE:ASSEMBLY_QC (TESTFUN01); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/1d/97d473331dfa8b75d366f6caae78fb]
+Sept-15 07:09:34.558 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 23; name: FUNGIFORGE:IDENTIFY (TESTFUN01); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/90/18952d29d251516e06e69455fdb0ce]
+Sept-15 07:09:34.560 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.560 [Task submitter] INFO  nextflow.Session - [4d/74b0f0] Submitted process > FUNGIFORGE:REPEATMASK (TESTFUN02)
+Sept-15 07:09:34.596 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 20; name: FUNGIFORGE:REPEATMASK (TESTFUN02); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/4d/74b0f0c866a4a24bf54b1e3dd94728]
+Sept-15 07:09:34.599 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.599 [Task submitter] INFO  nextflow.Session - [e2/f8edb3] Submitted process > FUNGIFORGE:ANNOTATE (TESTFUN03)
+Sept-15 07:09:34.635 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 22; name: FUNGIFORGE:ANNOTATE (TESTFUN03); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/e2/f8edb3501aa7616bec173fb1ca8e26]
+Sept-15 07:09:34.637 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.637 [Task submitter] INFO  nextflow.Session - [d3/3a56f0] Submitted process > FUNGIFORGE:REPEATMASK (TESTFUN01)
+Sept-15 07:09:34.674 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 25; name: FUNGIFORGE:REPEATMASK (TESTFUN01); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/d3/3a56f03b8f560e4f16be9b1e74536d]
+Sept-15 07:09:34.677 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.677 [Task submitter] INFO  nextflow.Session - [24/84a738] Submitted process > FUNGIFORGE:ANNOTATE (TESTFUN02)
+Sept-15 07:09:34.679 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.679 [Task submitter] INFO  nextflow.Session - [31/308fdc] Submitted process > FUNGIFORGE:RESISTANCE (TESTFUN03)
+Sept-15 07:09:34.715 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 26; name: FUNGIFORGE:ANNOTATE (TESTFUN02); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/24/84a738522ef36366904722f9c79cae]
+Sept-15 07:09:34.717 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.717 [Task submitter] INFO  nextflow.Session - [fe/e655a4] Submitted process > FUNGIFORGE:ANNOTATE (TESTFUN01)
+Sept-15 07:09:34.733 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 27; name: FUNGIFORGE:RESISTANCE (TESTFUN03); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/31/308fdc38858dda93d0377655282eb7]
+Sept-15 07:09:34.736 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.736 [Task submitter] INFO  nextflow.Session - [81/cb57ce] Submitted process > FUNGIFORGE:RESISTANCE (TESTFUN02)
+Sept-15 07:09:34.755 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 28; name: FUNGIFORGE:ANNOTATE (TESTFUN01); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/fe/e655a4bbe08e3a41329cc85f8ddf3b]
+Sept-15 07:09:34.762 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.762 [Task submitter] INFO  nextflow.Session - [86/4b955f] Submitted process > FUNGIFORGE:RESISTANCE (TESTFUN01)
+Sept-15 07:09:34.792 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 29; name: FUNGIFORGE:RESISTANCE (TESTFUN02); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/81/cb57ce93db4c44287204b66150d451]
+Sept-15 07:09:34.818 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 30; name: FUNGIFORGE:RESISTANCE (TESTFUN01); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/86/4b955fa83e69190ee8cd913fbc8541]
+Sept-15 07:09:34.826 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.826 [Task submitter] INFO  nextflow.Session - [d9/e817c2] Submitted process > FUNGIFORGE:REPORT (TESTFUN01)
+Sept-15 07:09:34.829 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.829 [Task submitter] INFO  nextflow.Session - [68/b36e17] Submitted process > FUNGIFORGE:REPORT (TESTFUN02)
+Sept-15 07:09:34.831 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.831 [Task submitter] INFO  nextflow.Session - [9f/2ce4a5] Submitted process > FUNGIFORGE:REPORT (TESTFUN03)
+Sept-15 07:09:34.910 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 31; name: FUNGIFORGE:REPORT (TESTFUN01); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/d9/e817c2e8bc0639c7629b85aca6e152]
+Sept-15 07:09:34.913 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 32; name: FUNGIFORGE:REPORT (TESTFUN02); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/68/b36e17b3b512d1193eaa1528bc2156]
+Sept-15 07:09:34.914 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 33; name: FUNGIFORGE:REPORT (TESTFUN03); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/9f/2ce4a5c2471ba5626566d9e420f757]
+Sept-15 07:09:34.926 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Sept-15 07:09:34.926 [Task submitter] INFO  nextflow.Session - [99/561b1c] Submitted process > FUNGIFORGE:PROVENANCE (run)
+Sept-15 07:09:35.222 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 34; name: FUNGIFORGE:PROVENANCE (run); status: COMPLETED; exit: 0; error: -; workDir: /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/work/99/561b1cf74073cc2ce4c18e6ec9d790]
+Sept-15 07:09:35.224 [main] DEBUG nextflow.Session - Session await > all processes finished
+Sept-15 07:09:35.326 [Task monitor] DEBUG n.processor.TaskPollingMonitor - <<< barrier arrives (monitor: local) - terminating tasks monitor poll loop
+Sept-15 07:09:35.326 [main] DEBUG nextflow.Session - Session await > all barriers passed
+Sept-15 07:09:35.327 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'TaskFinalizer' shutdown completed (hard=false)
+Sept-15 07:09:35.328 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'PublishDir' shutdown completed (hard=false)
+Sept-15 07:09:35.382 [main] INFO  nextflow.Nextflow - [provenance] images: 9/9 resolved (size only) -> /Users/brightadu/Documents/Claude/Projects/fungiforge/.nf-test/tests/b4472275bc0f8e4a9cfc30343ae8e3a0/output/pipeline_info/provenance.json
+Sept-15 07:09:35.384 [main] DEBUG n.trace.WorkflowStatsObserver - Workflow completed > WorkflowStats[succeededCount=34; failedCount=0; ignoredCount=0; cachedCount=0; pendingCount=0; submittedCount=0; runningCount=0; retriesCount=0; abortedCount=0; succeedDuration=2s; failedDuration=0ms; cachedDuration=0ms;loadCpus=0; loadMemory=0; peakRunning=3; peakCpus=16; peakMemory=80 GB; ]
+Sept-15 07:09:35.384 [main] DEBUG nextflow.trace.ReportObserver - Workflow completed -- rendering execution report
+Sept-15 07:09:35.739 [main] DEBUG nextflow.trace.TimelineObserver - Workflow completed -- rendering execution timeline
+Sept-15 07:09:35.796 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow completed -- saving trace file
+Sept-15 07:09:35.798 [main] DEBUG nextflow.cache.CacheDB - Closing CacheDB done
+Sept-15 07:09:35.802 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'FileTransfer' shutdown completed (hard=false)
+Sept-15 07:09:35.802 [main] DEBUG nextflow.script.ScriptRunner - > Execution complete -- Goodbye

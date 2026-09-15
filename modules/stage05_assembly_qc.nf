@@ -10,6 +10,7 @@ process ASSEMBLY_QC {
   script:
   def lineage = params.busco_lineage == 'auto' ? 'fungi_odb10' : params.busco_lineage
   """
+  export TMPDIR="\$PWD/tmp"; mkdir -p "\$TMPDIR"   # node /tmp is a shared tmpfs; keep scratch on disk
   quast.py ${nuclear} -o quast --threads ${task.cpus} --silent || true
   if command -v compleasm >/dev/null 2>&1 && [ -n "${params.data_dir ?: ''}" ]; then
     compleasm run -a ${nuclear} -o compleasm -l ${lineage} -L "${params.data_dir}/busco" -t ${task.cpus} || true
