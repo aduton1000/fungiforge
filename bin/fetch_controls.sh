@@ -13,7 +13,10 @@
 #   afum_wt_157DB3          SRR39591705  no TR, no L98H, same F46Y/M172V/N284T/D255E/E427K background
 #   afum_CEA10              SRR28036069 (ONT) + SRR13127874 (Illumina)  wild-type reference isolate
 # Downloads use ENA's FASTQ mirror when the run is mirrored, else `fasterq-dump` (sra-tools)
-# if installed. Reads are 4–8 GB per ONT run.
+# if installed, else NCBI's FASTQ streaming endpoint (no tools needed, slower). Reads are 4–8 GB
+# per ONT run. The read-level check needs minimap2: set FUNGIFORGE_TOOL_RUNNER to a command
+# prefix that provides it when it is not on PATH, e.g. on the cluster
+#   FUNGIFORGE_TOOL_RUNNER="apptainer exec -B /hpc,$HOME /hpc/opt/fungiforge-dev/images/fungiforge-0.1.0.sif"
 set -uo pipefail
 DB="${FUNGIFORGE_DB:?set FUNGIFORGE_DB to the reference-database root}"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -48,14 +51,18 @@ fetch_run(){  # fetch_run <run> <dir>  -> files <dir>/<run>*.fastq.gz
     log "$run not on the ENA mirror — fasterq-dump"
     ( cd "$dir" && fasterq-dump --split-files --threads 8 -O . "$run" && gzip -f "$run"*.fastq ) || return 1
   else
-    log "$run: not on ENA and sra-tools not installed — install sra-tools or download manually into $dir"; return 1
+    log "$run not on the ENA mirror and sra-tools not installed — streaming FASTQ from NCBI (slow)"
+    ( cd "$dir" && curl -L --retry 10 --retry-delay 30 -sS "https://trace.ncbi.nlm.nih.gov/Traces/sra-reads-be/fastq?acc=$run" \
+        | gzip > "$run.fastq.gz.part" && [ -s "$run.fastq.gz.part" ] && gzip -t "$run.fastq.gz.part" && mv "$run.fastq.gz.part" "$run.fastq.gz" ) \
+      || { rm -f "$dir/$run.fastq.gz.part"; return 1; }
   fi
 }
 
 verify(){  # verify <control> <spec-control-name> <platform> <reads...>
   local name="$1" ctrl="$2" platform="$3"; shift 3
   local args=(); local r; for r in "$@"; do args+=(--reads "$r"); done
-  python3 "$REPO_DIR/bin/control_genotype.py" --spec "$REPO_DIR/test/controls/afum_cyp51A_controls.json" \
+  # shellcheck disable=SC2086  # the runner prefix is a command with arguments
+  ${FUNGIFORGE_TOOL_RUNNER:-} python3 "$REPO_DIR/bin/control_genotype.py" --spec "$REPO_DIR/test/controls/afum_cyp51A_controls.json" \
       --control "$ctrl" --platform "$platform" --threads 8 --out "$CDIR/$name/genotype_check.json" "${args[@]}" \
       >"$CDIR/$name/genotype_check.log" 2>&1
 }
