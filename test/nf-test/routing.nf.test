@@ -94,6 +94,22 @@ nextflow_function {
         }
     }
 
+    test("a missing read file is refused at launch") {
+        function "parse_row"
+        when {
+            params { samplesheet = "$baseDir/test/samplesheet.test.csv" }
+            function {
+                """
+                input[0] = [sample:'GHOST', ont_fastq:'reads/does_not_exist.fastq.gz', illumina_r1:'', illumina_r2:'']
+                """
+            }
+        }
+        then {
+            assert function.failed
+            assert function.stdout.any { it.contains("ont_fastq file not found") }
+        }
+    }
+
     test("absolute paths are kept as given") {
         function "resolve_path"
         when {
