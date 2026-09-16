@@ -347,7 +347,7 @@ an install or a config change.
 | DAG | the 15 stages on the three-mode fixture under `-stub-run` (routing, joins, DB_CHECK gate, provenance) | `nextflow run main.nf -profile local,test -stub-run` |
 | nf-test | `parse_row`/`resolve_path` routing cases (ONT-only, hybrid, Illumina-only, unpaired refused), one stub test per module (every declared output emitted once, named after the sample), the whole DAG with and without the skip flags | `nf-test test` (`nf-test.config`, cases under `test/nf-test/`) |
 | Containers | the fixture through the real images with Docker: DB_CHECK and READ_QC complete in-container, versions are recorded, and the assemblers' failure on the synthetic reads is recorded by the status contract, not hidden | `bash test/run_docker_fixture.sh` |
-| Real data | CEA10 hybrid, DF-005 Illumina-only, C87 TR34/L98H on the development deployment | `docs/UPGRADE_PLAN.md` (W0.4, W1.1) |
+| Real data | CEA10 hybrid and DF-005 Illumina-only compared with `test/expected/*.json` (`fungiforge validate`), assemblies benchmarked against A1163 / NRRL 3357 (`bin/benchmark_assembly.py`), and cyp51A TR34/L98H controls whose genotype is first confirmed from their reads (`bin/control_genotype.py`, `bin/fetch_controls.sh`) | `docs/validation.md` |
 
 The first four layers run on every push (`.github/workflows/ci.yml`); the last two need the
 image set and databases and run locally or on the development deployment.

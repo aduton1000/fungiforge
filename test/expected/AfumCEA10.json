@@ -1,0 +1,32 @@
+{
+  "sample": "AfumCEA10",
+  "description": "Aspergillus fumigatus CEA10, ONT + Illumina hybrid (SRR28036069 + SRR13127874). Azole-susceptible, wild-type cyp51A. Reference-quality benchmark for the long-read/hybrid path.",
+  "source": {
+    "recorded_from": "production run on the shared cluster, fungiforge v0.1.0, 2026-09-11 (15/15 stages, 2h09m, 49 CPU-h)",
+    "values": "29.9 Mb, 43 contigs, BUSCO 99.7 %, 9,630 proteins, 50 BGC regions, ITS 100 % A. fumigatus, cyp51A wild-type; earlier workstation run 30.0 Mb / 43 contigs / N50 1.92 Mb / 9,603 proteins / 51 BGC",
+    "tolerances": "assembly length ±2 %, contigs ≤ 60, N50 ≥ 1.5 Mb, BUSCO ≥ 98 %, proteins ±5 %, BGC ±15 %"
+  },
+  "checks": {
+    "stages_all_ok":      {"from": "master.stages_failed",        "equals": "none"},
+    "verdict":            {"from": "decontam.verdict",            "one_of": ["fungal", "likely_fungal"]},
+    "assembly_len":       {"from": "assembly_qc.assembly_len",    "expected": 29900000, "rel_tol": 0.02},
+    "n_contigs":          {"from": "assembly_qc.n_contigs",       "max": 60},
+    "n50":                {"from": "assembly_qc.n50",             "min": 1500000},
+    "busco_complete":     {"from": "assembly_qc.busco_complete",  "min": 98.0},
+    "qc_pass":            {"from": "assembly_qc.qc_pass",         "equals": true},
+    "polish_mode":        {"from": "polish.mode",                 "equals": "hybrid"},
+    "n_proteins":         {"from": "annotate.n_proteins",         "expected": 9630, "rel_tol": 0.05},
+    "species":            {"from": "identify.species",            "equals": "Aspergillus fumigatus"},
+    "species_confidence": {"from": "identify.confidence",         "one_of": ["high"]},
+    "its_present":        {"from": "identify.its_present",        "equals": true},
+    "its_identity":       {"from": "identify.its_identity",       "min": 99.0},
+    "resistant_classes":  {"from": "master.resistant_classes",    "equals": "none"},
+    "n_known_mutations":  {"from": "resistance.summary.n_known_mutations", "equals": 0},
+    "cyp51A_TR":          {"from": "resistance.cyp51A_TR.tr_type", "equals": "none"},
+    "cyp51A_located":     {"from": "resistance.cyp51A_TR.cyp51A_located", "equals": true},
+    "bgc_status":         {"from": "bgc.status",                  "equals": "ok"},
+    "n_bgc":              {"from": "bgc.n_clusters",              "expected": 50, "rel_tol": 0.15},
+    "novelty":            {"from": "novelty.verdict",             "equals": "known_species"},
+    "provenance_samples": {"from": "provenance.n_samples",        "min": 1, "optional": true}
+  }
+}

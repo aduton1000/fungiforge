@@ -220,8 +220,27 @@ step_rvdb(){
     && mark rvdb "$RVDB_URL" || fail rvdb "$RVDB_URL"
 }
 
+# ---- reference genomes for the assembly benchmarks (W1.1; small) -------------
+# A. fumigatus A1163 (CEA10 lineage) for the CEA10 hybrid benchmark and A. flavus NRRL 3357
+# for the Illumina-only benchmark. NCBI Datasets zip -> <acc>.fna; bin/benchmark_assembly.py.
+step_benchmarks(){
+  is_done benchmarks && { log "benchmark references present — skip"; return; }
+  local ok=1 acc
+  mkdir -p "$DB/benchmarks"
+  for acc in GCA_000150145.1 GCA_009017415.1; do
+    [ -s "$DB/benchmarks/$acc.fna" ] && { log "have $acc — skip"; continue; }
+    log "downloading $acc -> $DB/benchmarks/$acc.fna"
+    ( cd "$DB/benchmarks" \
+      && dl "https://api.ncbi.nlm.nih.gov/datasets/v2/genome/accession/$acc/download?include_annotation_type=GENOME_FASTA&filename=$acc.zip" "$acc.zip" \
+      && unzip -o -q "$acc.zip" -d "$acc.tmp" \
+      && cat "$acc.tmp"/ncbi_dataset/data/$acc/*.fna > "$acc.fna" && rm -rf "$acc.tmp" "$acc.zip" ) >>"$LOGDIR/benchmarks.log" 2>&1 \
+      || { fail benchmarks "$acc"; ok=0; }
+  done
+  [ "$ok" = 1 ] && mark benchmarks "A1163 GCA_000150145.1 + NRRL3357 GCA_009017415.1"
+}
+
 # ---- driver -----------------------------------------------------------------
-STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggnog busco unite kraken2 refseq_fungi fungamr rvdb)
+STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggnog busco unite kraken2 refseq_fungi fungamr rvdb benchmarks)
 log "==== fungiforge fetch_references start · DB=$DB · steps: ${STEPS[*]} ===="
 for s in "${STEPS[@]}"; do "step_$s"; done
 log "==== fetch_references finished ===="
