@@ -84,6 +84,12 @@ def parse_row(row) {
   def files = [ ont: has_ont ? resolve_path(row.ont_fastq)   : file("${projectDir}/assets/NO_ONT"),
                 r1 : has_r1  ? resolve_path(row.illumina_r1) : file("${projectDir}/assets/NO_R1"),
                 r2 : has_r2  ? resolve_path(row.illumina_r2) : file("${projectDir}/assets/NO_R2") ]
+  // Fail at launch, not inside the first tool: Nextflow stages a missing input as a dangling
+  // link, and the read-QC tool then dies with an unhelpful "failed to open file".
+  [ont_fastq: files.ont, illumina_r1: files.r1, illumina_r2: files.r2].each { col, p ->
+    if (!p.exists())
+      error "Sample '${row.sample}': ${col} file not found: '${row[col]}' (looked in the launch directory and next to the samplesheet)."
+  }
   return tuple(meta, files)
 }
 
