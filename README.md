@@ -219,8 +219,11 @@ nf-test test                       # needs nf-test: curl -fsSL https://get.nf-te
 bash test/run_docker_fixture.sh    # real containers on the fixture (assemblers are expected to fail on it)
 ```
 
-Real-data validation (CEA10, DF-005, C87) does not fit a hosted runner; it runs on the
-development deployment and is recorded in `docs/` (see `docs/UPGRADE_PLAN.md`).
+Real-data validation does not fit a hosted runner; it runs on the development deployment and is
+recorded in `docs/validation.md`: `fungiforge validate --results <outdir> --sample <id>` compares a
+run with `test/expected/<id>.json`, `bin/benchmark_assembly.py` scores an assembly against a reference
+genome, and `bin/control_genotype.py` confirms a resistance control's genotype from its own reads
+before it is trusted.
 
 ## Status
 

@@ -70,3 +70,12 @@ def test_console_script_entry_point_runs():
     r = subprocess.run([sys.executable, "-m", "fungiforge.cli", "version"], capture_output=True, text=True,
                        cwd=os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     assert r.returncode == 0 and r.stdout.startswith("FungiForge v")
+
+
+def test_validate_subcommand_runs_validate_run(monkeypatch, tmp_path):
+    seen = {}
+    monkeypatch.setattr(cli.subprocess, "call", lambda cmd: seen.setdefault("cmd", cmd) and 0)
+    cli.main(["validate", "--results", "res", "--sample", "AfumCEA10", "-o", str(tmp_path / "v.tsv")])
+    cmd = seen["cmd"]
+    assert cmd[1].endswith("validate_run.py") and cmd[cmd.index("--expected") + 1].endswith(os.path.join("test", "expected", "AfumCEA10.json"))
+    assert "--sample" in cmd and "--out" in cmd
