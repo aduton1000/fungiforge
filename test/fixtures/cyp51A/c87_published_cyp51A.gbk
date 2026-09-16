@@ -7,8 +7,10 @@ SOURCE      .
   ORGANISM  .
             .
 FEATURES             Location/Qualifiers
-     gene            2001..3594
+     gene            1887..3505
                      /gene="cyp51A"
+                     /note="AF338659 gene structure: CDS
+                     join(1887..2087,2159..3505) 1-based"
 ORIGIN
         1 gaatgcctgc acatcggggt gactgtcaca caatcaaagg tcagcgcgga ctcgatcaga
        61 cctggagaag gcccctgtcc gatgtgcggc cgcccactaa aatttcgcgg ggcgcatgca

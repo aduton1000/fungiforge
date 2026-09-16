@@ -13,9 +13,9 @@ process ASSEMBLY_QC {
   export TMPDIR="\$PWD/tmp"; mkdir -p "\$TMPDIR"   # node /tmp is a shared tmpfs; keep scratch on disk
   source ff_status.sh; ff_init assembly_qc "${meta.id}" ${meta.id}.assemblyqc.json
   ff_version busco -- busco --version
-  ff_version quast -- quast.py --version
-  ff_version compleasm -- compleasm --version
-  ff_run quast --optional -- quast.py ${nuclear} -o quast --threads ${task.cpus} --silent
+    ff_version compleasm -- compleasm --version
+  # Contiguity statistics come from assembly_qc.py (no QUAST in the images; the reference
+  # benchmark lives in bin/benchmark_assembly.py, run by the validation suite, not per isolate).
   COMPLEASM_OK=0
   if command -v compleasm >/dev/null 2>&1 && [ -n "${params.data_dir ?: ''}" ]; then
     ff_run compleasm --optional -- compleasm run -a ${nuclear} -o compleasm -l ${lineage} -L "${params.data_dir}/busco" -t ${task.cpus}

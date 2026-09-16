@@ -5,6 +5,7 @@ Subcommands:
   samplesheet  build a samplesheet CSV from directories of ONT and/or Illumina reads
                (ONT-only, Illumina-only, or hybrid — per sample, whichever are found)
   fetch-refs   print the reference-database fetch command (bin/fetch_references.sh)
+  validate     compare a finished run with an expected-results file (bin/validate_run.py)
   version
 """
 from __future__ import annotations
@@ -86,6 +87,15 @@ def cmd_fetch_refs(a):
     print(f'bash {os.path.join(REPO, "bin", "fetch_references.sh")}')
 
 
+def cmd_validate(a):
+    """Compare results/ with test/expected/<sample>.json (exit 1 on any failed check)."""
+    exp = a.expected or os.path.join(REPO, "test", "expected", f"{a.sample}.json")
+    cmd = [sys.executable, os.path.join(REPO, "bin", "validate_run.py"), "--results", a.results, "--expected", exp]
+    if a.sample: cmd += ["--sample", a.sample]
+    if a.out:    cmd += ["--out", a.out]
+    return subprocess.call(cmd)
+
+
 def cmd_version(a):
     print(f"FungiForge v{__version__}")
 
@@ -112,6 +122,13 @@ def build_parser():
     f = sub.add_parser("fetch-refs", help="print the reference-DB fetch command")
     f.add_argument("--data_dir", required=True)
     f.set_defaults(func=cmd_fetch_refs)
+
+    va = sub.add_parser("validate", help="compare a finished run with an expected-results file")
+    va.add_argument("--results", required=True, help="the run's --outdir")
+    va.add_argument("--sample", default=None, help="sample id (default: from the expected file)")
+    va.add_argument("--expected", default=None, help="expected JSON (default: test/expected/<sample>.json)")
+    va.add_argument("-o", "--out", default=None, help="write the check table as TSV")
+    va.set_defaults(func=cmd_validate)
 
     v = sub.add_parser("version"); v.set_defaults(func=cmd_version)
     return p
