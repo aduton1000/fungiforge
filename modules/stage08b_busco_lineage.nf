@@ -20,9 +20,10 @@ process BUSCO_LINEAGE {
   ff_version compleasm -- compleasm --version
   LINEAGE=\$(head -1 ${lineage_file} | tr -d '[:space:]')
   STAGED=""
-  for d in "${data}/busco/\$LINEAGE" "${data}/busco/lineages/\$LINEAGE" "${data}/busco/busco_downloads/lineages/\$LINEAGE"; do
+  for d in "${data}/busco/lineages/\$LINEAGE" "${data}/busco/\$LINEAGE" "${data}/busco/busco_downloads/lineages/\$LINEAGE"; do
     [ -d "\$d" ] && STAGED="\$d" && break
   done
+  LDIR=\$(dirname "\$STAGED")   # compleasm takes the parent directory + the lineage name
   if [ "${params.busco_lineage}" != "auto" ]; then
     ff_skip busco "--busco_lineage ${params.busco_lineage} is fixed; stage 05 already scored it"
     busco_lineage.py --sample "${meta.id}" --lineage "\$LINEAGE" --qc-lineage "${qc_lineage}" --skipped fixed_lineage --out ${meta.id}.busco_lineage.json
@@ -35,11 +36,11 @@ process BUSCO_LINEAGE {
   else
     OK=0
     if command -v compleasm >/dev/null 2>&1; then
-      ff_run compleasm --optional -- compleasm run -a ${nuclear} -o compleasm -l "\$LINEAGE" -L "${data}/busco" -t ${task.cpus}
+      ff_run compleasm --optional -- compleasm run -a ${nuclear} -o compleasm -l "\$LINEAGE" -L "\$LDIR" -t ${task.cpus}
       [ "\$FF_RC" -eq 0 ] && OK=1
     fi
     if [ "\$OK" -eq 0 ]; then
-      ff_run busco -- busco -i ${nuclear} -o busco -l "\$LINEAGE" -m genome -c ${task.cpus} --download_path "${data}/busco" --offline
+      ff_run busco -- busco -i ${nuclear} -o busco -l "\$STAGED" -m genome -c ${task.cpus} --offline
     fi
     busco_lineage.py --sample "${meta.id}" --lineage "\$LINEAGE" --qc-lineage "${qc_lineage}" --compleasm-dir compleasm --busco-dir busco --out ${meta.id}.busco_lineage.json
   fi

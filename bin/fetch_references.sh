@@ -124,19 +124,25 @@ step_eggnog(){
 step_busco(){
   # fungi_odb10 is the lineage of the early QC gate (stage 05); the others are the species-aware
   # lineages stage 08b re-runs BUSCO with (fungiforge/resources/busco_lineages.tsv). Override the
-  # set with BUSCO_LINEAGES="fungi_odb10 eurotiales_odb10 ..." (space-separated).
+  # set with BUSCO_LINEAGES="fungi_odb10 eurotiales_odb10 ..." (space-separated). Lineages are
+  # downloaded straight from the BUSCO data server (no container needed) into
+  # $DB/busco/lineages/<lineage>, the layout `busco --download_path $DB/busco --offline` and
+  # compleasm `-L $DB/busco/lineages` read; file_versions.tsv is refreshed alongside.
   is_done busco && { log "busco lineages present — skip"; return; }
   local lineages="${BUSCO_LINEAGES:-fungi_odb10 eurotiales_odb10 saccharomycetes_odb10 hypocreales_odb10 tremellomycetes_odb10 mucorales_odb10 onygenales_odb10 sordariomycetes_odb10}"
-  local ok=1 l
-  log "fetching BUSCO lineages ($lineages) -> $DB/busco"
+  local base="${BUSCO_DATA_URL:-https://busco-data.ezlab.org/v5/data}"
+  local ok=1 l ver
+  mkdir -p "$DB/busco/lineages"
+  log "fetching BUSCO lineages ($lineages) -> $DB/busco/lineages"
+  ( cd "$DB/busco" && dl "$base/file_versions.tsv" file_versions.tsv ) >>"$LOGDIR/busco.log" 2>&1 \
+    || { fail busco "file_versions.tsv from $base"; return; }
   for l in $lineages; do
-    if [ -d "$DB/busco/$l" ] || [ -d "$DB/busco/lineages/$l" ] || [ -d "$DB/busco/busco_downloads/lineages/$l" ]; then log "have $l — skip"; continue; fi
-    if command -v compleasm >/dev/null 2>&1; then
-      compleasm download "$l" -L "$DB/busco" >>"$LOGDIR/busco.log" 2>&1 || { fail busco "compleasm download $l"; ok=0; }
-    else
-      docker run --rm --platform linux/amd64 -v "$DB/busco":/busco -w /busco \
-          ezlabgva/busco:v5.7.1_cv1 busco --download "$l" >>"$LOGDIR/busco.log" 2>&1 || { fail busco "busco --download $l"; ok=0; }
-    fi
+    if [ -d "$DB/busco/lineages/$l" ] || [ -d "$DB/busco/$l" ] || [ -d "$DB/busco/busco_downloads/lineages/$l" ]; then log "have $l — skip"; continue; fi
+    ver=$(awk -v L="$l" -F'\t' '$1==L {print $2; exit}' "$DB/busco/file_versions.tsv")
+    if [ -z "$ver" ]; then fail busco "$l not in file_versions.tsv"; ok=0; continue; fi
+    log "downloading $l ($ver)"
+    ( cd "$DB/busco/lineages" && dl "$base/lineages/$l.$ver.tar.gz" "$l.tar.gz" && tar xzf "$l.tar.gz" && rm -f "$l.tar.gz" ) >>"$LOGDIR/busco.log" 2>&1 \
+      && [ -d "$DB/busco/lineages/$l" ] || { fail busco "download/extract $l"; ok=0; }
   done
   [ "$ok" = 1 ] && mark busco "$lineages"
 }
