@@ -31,11 +31,19 @@ import argparse, csv, glob, json, os, re, sys
 
 
 def load_stage_json(results, sample, stage):
-    hits = glob.glob(os.path.join(results, sample, "*", f"{sample}.{stage}.json"))
-    if not hits:
-        return None
-    with open(sorted(hits)[0]) as fh:
-        return json.load(fh)
+    """The stage JSON whose `stage` field equals `stage` (file names do not always match the
+    stage name: assembly_qc writes <sample>.assemblyqc.json); falls back to the file name."""
+    candidates = sorted(glob.glob(os.path.join(results, sample, "*", f"{sample}.*.json")))
+    by_name = [p for p in candidates if p.endswith(f".{stage}.json")]
+    for p in by_name + [c for c in candidates if c not in by_name]:
+        try:
+            with open(p) as fh:
+                doc = json.load(fh)
+        except Exception:  # noqa: BLE001
+            continue
+        if doc.get("stage") == stage or p in by_name:
+            return doc
+    return None
 
 
 def load_master(results, sample):
