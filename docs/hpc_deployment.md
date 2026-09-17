@@ -69,14 +69,36 @@ copy the `.sif` files into `<prefix>/images/`, and rerun the installer with `--s
 ## 2. Reference databases (one-time, hours, resumable)
 
 ```bash
-fungiforge-fetch-refs                       # all steps into $FUNGIFORGE_DB
-fungiforge-fetch-refs unite fungamr busco   # or selected steps
+/hpc/opt/fungiforge/bin/fungiforge-fetch-refs                 # every default step
+/hpc/opt/fungiforge/bin/fungiforge-fetch-refs eggnog genomad  # selected steps
 ```
 
-Some steps run downloader tools inside containers via `docker run` (antiSMASH,
-funannotate, eggNOG) — on a cluster where Docker is available to the installer this
-works as-is; files land root-owned but world-readable. Optional: a free academic
-GeneMark key in `~/.gm_key` (funannotate uses it if present).
+Each database is guarded by a `.done` marker, one failing step never aborts the others, and the
+manifest (`$FUNGIFORGE_DB/MANIFEST.tsv`) records what succeeded. The two databases that are built
+*through* their tool container (funannotate, antiSMASH) run under **Apptainer/Singularity** when
+present and Docker otherwise, so no Docker daemon is needed on a cluster.
+
+| Step | What it stages | Size |
+|:--|:--|:--|
+| `images` | every public image into the shared Apptainer cache | ~40 GB |
+| `funannotate`, `antismash` | annotation and BGC databases (through their containers) | ~40 GB, ~9 GB |
+| `eggnog` | eggNOG 5.0.2 (`eggnog.db`, `eggnog_proteins.dmnd`, taxa) — direct download | ~12 GB |
+| `busco` | `fungi_odb10` plus the order/class lineages of `busco_lineages.tsv`, direct from the BUSCO data server | ~1 GB |
+| `unite`, `kraken2`, `refseq_fungi` | ITS reference, contamination DB, sourmash signatures | ~15 GB |
+| `fungamr` | resistance catalogue + reference proteins + derived panel | small |
+| `markers`, `mlst` | type-material sets for CaM/BenA/TEF1/RPB2/LSU; PubMLST fungal schemes | ~100 MB |
+| `dbcan`, `phibase`, `effectorp` | CAZyme HMMs, virulence proteins, EffectorP 3 | ~300 MB |
+| `genomad` | geNomad database v1.9 | 0.8 GB |
+| `benchmarks` | A1163 and NRRL 3357 reference genomes | ~80 MB |
+| `genomes` *(on request)* | one reference genome per species of `novelty_genera.txt`, for genome-ANI novelty | tens of GB |
+| `interproscan` *(on request)* | InterProScan data release matching the image tag | 6.9 GB |
+
+Two resources are **licensed** and staged by hand (Appendix A of the upgrade plan):
+
+- **GeneMark-ES** — unpack the academic tarball and pass `--genemark_dir <dir> --genemark_key <key>`
+  to the run; the profiles bind the directory into the annotation container.
+- **SignalP 6** — `bash bin/hpc_install.sh … --signalp <signalp-6.0*.fast.tar.gz>` builds a
+  site-only image from it and points the extras stage at it in `site.config`.
 
 ## 3. Run (any user)
 

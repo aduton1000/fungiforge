@@ -43,6 +43,40 @@ dl(){  # dl <url> <output-filename>   (run inside the target dir)
   fi
 }
 
+# ---- run a command inside a container image, whatever runtime the host has (L24) -------------
+# crun <image> <host_dir>:<container_dir> [<host_dir>:<container_dir> ...] -- <command...>
+# Apptainer/Singularity first (the cluster path: no daemon, no root), then Docker. Apptainer
+# ignores an image ENTRYPOINT with `exec`, which is what both callers below need; under Docker the
+# entrypoint is cleared explicitly. Images are cached under $DB/containers for the apptainer path.
+crun(){
+  local img="$1"; shift
+  local binds=() mounts=()
+  while [ "${1:-}" != "--" ] && [ $# -gt 0 ]; do binds+=("$1"); shift; done
+  [ "${1:-}" = "--" ] && shift
+  local rt=""
+  command -v apptainer >/dev/null 2>&1 && rt=apptainer
+  [ -z "$rt" ] && command -v singularity >/dev/null 2>&1 && rt=singularity
+  if [ -n "$rt" ]; then
+    local cache="${NXF_APPTAINER_CACHEDIR:-${NXF_SINGULARITY_CACHEDIR:-$DB/containers}}"
+    mkdir -p "$cache"
+    local sif
+    sif="$cache/$(echo "$img" | sed -E 's#[/:]#-#g').img"
+    if [ ! -s "$sif" ]; then
+      log "  $rt pull $img"
+      rm -f "$sif.part"
+      $rt pull --name "$sif.part" "docker://$img" >>"$LOGDIR/containers.log" 2>&1 || return 1
+      mv "$sif.part" "$sif"
+    fi
+    for b in "${binds[@]}"; do mounts+=(-B "$b"); done
+    $rt exec "${mounts[@]}" "$sif" "$@"
+  elif command -v docker >/dev/null 2>&1; then
+    for b in "${binds[@]}"; do mounts+=(-v "$b"); done
+    docker run --rm --platform linux/amd64 --entrypoint "" "${mounts[@]}" "$img" "$@"
+  else
+    echo "no apptainer/singularity/docker on PATH" >&2; return 127
+  fi
+}
+
 is_done(){ [ -f "$DB/$1/.done" ]; }
 mark(){ date '+%F %T' > "$DB/$1/.done"; echo -e "$1\t$2\tOK\t$(date '+%F %T')" >> "$MANIFEST"; log "✓ $1 done ($2)"; }
 fail(){ echo -e "$1\t$2\tFAILED\t$(date '+%F %T')" >> "$MANIFEST"; log "✗ $1 FAILED ($2) — continuing"; }
@@ -92,10 +126,9 @@ step_images(){
 step_antismash(){
   is_done antismash && { log "antismash db present — skip"; return; }
   log "downloading antiSMASH databases -> $DB/antismash"
-  # The image entrypoint is `antismash`; the DB downloader is a separate console
-  # script, so override the entrypoint. `download-antismash-databases` takes --database-dir.
-  docker run --rm --platform linux/amd64 --entrypoint download-antismash-databases \
-      -v "$DB/antismash":/db antismash/standalone:8.0.0 --database-dir /db >>"$LOGDIR/antismash.log" 2>&1 \
+  # The image entrypoint is `antismash`; the DB downloader is a separate console script, so the
+  # entrypoint is bypassed (crun does that for both runtimes). It takes --database-dir.
+  crun antismash/standalone:8.0.0 "$DB/antismash:/db" -- download-antismash-databases --database-dir /db >>"$LOGDIR/antismash.log" 2>&1 \
     && mark antismash "antismash8 db" || fail antismash "download-antismash-databases"
 }
 
@@ -103,8 +136,7 @@ step_antismash(){
 step_funannotate(){
   is_done funannotate && { log "funannotate db present — skip"; return; }
   log "funannotate setup -i all -> $DB/funannotate (large, hours)"
-  docker run --rm --platform linux/amd64 -e FUNANNOTATE_DB=/data -v "$DB/funannotate":/data \
-      nextgenusfs/funannotate:latest funannotate setup -i all -d /data >>"$LOGDIR/funannotate.log" 2>&1 \
+  FUNANNOTATE_DB=/data crun nextgenusfs/funannotate:latest "$DB/funannotate:/data" -- funannotate setup -i all -d /data >>"$LOGDIR/funannotate.log" 2>&1 \
     && mark funannotate "funannotate setup all" || fail funannotate "funannotate setup"
 }
 
