@@ -375,6 +375,7 @@ external/scratch drive.
 | **InterProScan** data release 5.78-109.0 (6.9 GB; matches the image tag) | InterProScan domains / GO | 07c | `interproscan` (on request) |
 | **dbCAN** family HMMs (V14), **PHI-base** FASTA, **EffectorP 3** (repository with WEKA) | CAZymes, virulence, effectors | 13 | `dbcan`, `phibase`, `effectorp` |
 | **geNomad** database v1.9 (0.8 GB) | viruses / plasmids / proviruses | 10 | `genomad` |
+| **Reference genome set** (NCBI Datasets, one reference genome per species of the genera in `novelty_genera.txt`; tens of GB) | genome-ANI novelty | 12 | `genomes` (on request) |
 | **BUSCO / compleasm** `fungi_odb10` + the order/class lineages of `busco_lineages.tsv` | assembly completeness (gate, then species-aware) | 05, 08b | `busco` (`BUSCO_LINEAGES` overrides the set) |
 | **UNITE** general FASTA (Fungi v10.0, 2025) | ITS species identification | 08 | `unite` |
 | **Kraken2** (PlusPF-8 GB) | decontamination | 04 | `kraken2` |
@@ -774,10 +775,15 @@ region GBKs.
 
 ## 9.14 Stage 12 — Novelty
 
-`novelty_call.py` combines **skani genome ANI** (<95% → candidate novel; the strong signal when a
-reference genome set is staged under `refseq_fungi_genomes/`) with the **ITS distance** fallback
-(<98.5% → candidate novel), and reports the verdict with the GCPSR/polyphasic caveat. Skippable
-with `--skip_novelty`. Emits `novelty.json`.
+**skani** ANI of the nuclear assembly against the staged reference genome set
+(`--data_dir/refseq_fungi_genomes`: the reference genome of every species in the genera of
+`fungiforge/resources/novelty_genera.txt`, `fetch_references.sh genomes`; aligned-fraction floor
+`--novelty_min_af`). `novelty_call.py` then rules: ANI ≥ 95 % → `known_species` (flagged when the
+Stage 08 species differs from the nearest genome's); 90–95 % → `candidate_novel_species` unless
+ITS and a secondary locus agree at high confidence with that species; < 90 % or no aligned
+reference → `candidate_novel_or_unrepresented`; without a genome set the ITS identity alone
+decides (< 98.5 % → candidate novel). Emits `novelty.json` with the five nearest genomes.
+Skippable with `--skip_novelty`.
 
 ## 9.15 Stage 13 — Eukaryote extras
 

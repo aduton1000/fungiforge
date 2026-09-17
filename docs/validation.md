@@ -113,6 +113,12 @@ categories on both isolates. In-image RVDB screen on the local CEA10 assembly: 3
 partitivirus coat-protein EVE candidate (81 % identity), te_percent 4.67 from the RepeatMasker table
 (details in UPGRADE_PLAN W2.8).
 
+### 1.7 Novelty (W2.9)
+
+Pending on the dev deployment after `fetch_references.sh genomes`: CEA10 and DF-005 `known_species`
+with their nearest reference genomes (Af293 / NRRL 3357) above 98 % ANI. In-image skani check on
+the local CEA10 assembly: 99.59 % ANI to Af293 (aligned fraction 94 %), known_species.
+
 ## 2. Reference-genome benchmarks
 
 | Isolate | Reference | Status |

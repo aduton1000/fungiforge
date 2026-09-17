@@ -13,7 +13,7 @@
 #   bin/fetch_references.sh images antismash funannotate   # selected steps
 #
 # Steps: images antismash funannotate eggnog busco unite kraken2 refseq_fungi
-#        fungamr rvdb benchmarks markers mlst dbcan phibase effectorp genomad interproscan
+#        fungamr rvdb benchmarks markers mlst dbcan phibase effectorp genomad genomes interproscan
 #
 # NB several DBs are downloaded THROUGH their tool container (funannotate setup,
 # eggnog, antismash) so the relevant image is pulled first. Version/URL-sensitive
@@ -337,8 +337,23 @@ step_genomad(){
     && [ -s "$DB/genomad_db/genomad_db" ] || [ -s "$DB/genomad_db/version.txt" ] && mark genomad_db "$url" || fail genomad_db "$url"
 }
 
+# ---- reference genome set for genome-ANI novelty (W2.9, stage 12) -----------------
+# The reference genome of every species in the genera of fungiforge/resources/novelty_genera.txt
+# (NCBI Datasets; override with GENOMES_GENERA="Aspergillus,Candida" or add GENOMES_ACCESSIONS).
+# Tens of GB for the default list; resumable (present files are kept).
+step_genomes(){
+  is_done refseq_fungi_genomes && { log "reference genome set present — skip"; return; }
+  mkdir -p "$DB/refseq_fungi_genomes"
+  log "fetching the reference genome set -> $DB/refseq_fungi_genomes"
+  python3 "$REPO_DIR/bin/fetch_reference_genomes.py" --out-dir "$DB/refseq_fungi_genomes" \
+      ${GENOMES_GENERA:+--genera "$GENOMES_GENERA"} --genera-file "$REPO_DIR/fungiforge/resources/novelty_genera.txt" \
+      ${GENOMES_ACCESSIONS:+--accessions "$GENOMES_ACCESSIONS"} >>"$LOGDIR/genomes.log" 2>&1 \
+    && mark refseq_fungi_genomes "$(ls "$DB/refseq_fungi_genomes"/*.fna 2>/dev/null | wc -l | tr -d ' ') genomes (fetch_reference_genomes.py)" \
+    || fail refseq_fungi_genomes "fetch_reference_genomes.py (see logs/genomes.log)"
+}
+
 # ---- driver -----------------------------------------------------------------
-STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggnog busco unite kraken2 refseq_fungi fungamr rvdb benchmarks markers mlst dbcan phibase effectorp genomad)   # interproscan: on request (6.9 GB + hours per genome)
+STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggnog busco unite kraken2 refseq_fungi fungamr rvdb benchmarks markers mlst dbcan phibase effectorp genomad)   # genomes (tens of GB) and interproscan: on request (6.9 GB + hours per genome)
 log "==== fungiforge fetch_references start · DB=$DB · steps: ${STEPS[*]} ===="
 for s in "${STEPS[@]}"; do "step_$s"; done
 log "==== fetch_references finished ===="
