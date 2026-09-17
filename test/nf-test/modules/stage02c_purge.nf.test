@@ -1,0 +1,23 @@
+// Stub test for modules/stage02c_purge.nf — haplotig purging in the base image (W4.1 / L30).
+nextflow_process {
+
+    name "PURGE_DUPS stub"
+    script "modules/stage02c_purge.nf"
+    process "PURGE_DUPS"
+    options "-stub-run"
+
+    test("emits the purged assembly and its JSON") {
+        when {
+            process {
+                """
+                input[0] = [[id:'S1', assembly_mode:'longread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/test/samplesheet.test.csv"), file("$baseDir/test/reads/TESTFUN01.ont.fastq.gz")]
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert process.out.assembly[0][1].endsWith('S1.purged.fasta')
+            assert path(process.out.json[0][1]).json.stage == 'purge'
+        }
+    }
+}
