@@ -32,5 +32,8 @@ process DECONTAM {
   ff_finalize
   """
   stub:
-  "touch ${meta.id}.nuclear.fasta ${meta.id}.mito.fasta; echo '{\"sample\":\"${meta.id}\",\"stage\":\"decontam\"}' > ${meta.id}.decontam.json"
+  // --stub_verdicts 'ID=non_fungal,ID2=human' lets the DAG tests exercise the gate
+  def forced = (params.stub_verdicts ?: '').toString().split(',').collect { kv -> kv.split('=') }.findAll { kv -> kv.size() == 2 }.collectEntries { kv -> [(kv[0].trim()): kv[1].trim()] }
+  def verdict = forced[meta.id] ?: 'fungal'
+  "touch ${meta.id}.nuclear.fasta ${meta.id}.mito.fasta; echo '{\"sample\":\"${meta.id}\",\"stage\":\"decontam\",\"verdict\":\"${verdict}\"}' > ${meta.id}.decontam.json"
 }
