@@ -11,10 +11,11 @@ def row(S):
 
 def test_columns_are_append_only_and_end_with_status_columns():
     assert m.MASTER_COLS[:4] == ["sample", "compartment", "facility", "season"]
-    assert m.MASTER_COLS[-4:] == ["te_ltr_pct", "n_genomad_virus", "n_genomad_plasmid", "n_mito_heg"]
-    assert m.MASTER_COLS[-9:-4] == ["mito_size_kb", "mito_core_genes", "mito_circular", "mito_copy_ratio", "mito_heteroplasmic_sites"]
-    assert m.MASTER_COLS[-13:-9] == ["n_secreted", "n_effectors", "n_cazymes", "n_phibase_hits"]
-    assert m.MASTER_COLS[-36:-13] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
+    assert m.MASTER_COLS[-3:] == ["mycotoxin_clusters", "bioactive_clusters", "n_bgc_mibig_hits"]
+    assert m.MASTER_COLS[-7:-3] == ["te_ltr_pct", "n_genomad_virus", "n_genomad_plasmid", "n_mito_heg"]
+    assert m.MASTER_COLS[-12:-7] == ["mito_size_kb", "mito_core_genes", "mito_circular", "mito_copy_ratio", "mito_heteroplasmic_sites"]
+    assert m.MASTER_COLS[-16:-12] == ["n_secreted", "n_effectors", "n_cazymes", "n_phibase_hits"]
+    assert m.MASTER_COLS[-39:-16] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
                                    "read_verdict", "genome_size_est", "heterozygosity_pct", "ploidy_hint", "coverage",
                                    "id_loci_agree", "id_flags", "mlst_st", "busco_lineage_specific", "busco_complete_specific",
                                    "resistance_read_support", "copy_number_flags",
@@ -161,3 +162,13 @@ def test_mobile_columns_w28():
     r = row(S)
     assert (r["te_percent"], r["te_ltr_pct"], r["n_genomad_virus"], r["n_mycovirus"], r["n_mito_heg"]) == (4.67, 2.93, 1, 2, 5)
     assert r["n_genomad_plasmid"] == 0
+
+
+def test_bgc_mycotoxin_columns_w32():
+    S = {"bgc": {"status": "ok", "n_clusters": 50, "knownclusterblast": {"ran": True, "n_regions_with_mibig_hit": 12}, "mycotoxin_compounds": ["gliotoxin", "fumitremorgin"], "bioactive_compounds": ["pseurotin"]}}
+    r = row(S)
+    assert (r["mycotoxin_clusters"], r["bioactive_clusters"], r["n_bgc_mibig_hits"]) == ("fumitremorgin;gliotoxin" if False else "gliotoxin;fumitremorgin", "pseurotin", 12)
+    r2 = row({"bgc": {"status": "ok", "n_clusters": 3, "knownclusterblast": {"ran": True, "n_regions_with_mibig_hit": 0}, "mycotoxin_compounds": [], "bioactive_compounds": []}})
+    assert r2["mycotoxin_clusters"] == "none" and r2["bioactive_clusters"] == "none"
+    r3 = row({"bgc": {"status": "ok", "n_clusters": 3, "knownclusterblast": {"ran": False}}})
+    assert r3["mycotoxin_clusters"] == "NA" and r3["n_bgc_mibig_hits"] == "NA"
