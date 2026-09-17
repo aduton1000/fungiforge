@@ -538,6 +538,27 @@ filters by quality (`--ont_min_qual`, default Q10) and length (`--ont_min_len`, 
 placeholder is emitted to keep the tuple contract. `readqc.json` records the `platform`
 (`ont` \| `hybrid` \| `illumina`) and the filtered ONT FASTQ (long-read) is carried forward.
 
+### Stage 00b — read-level triage (W2.2)
+
+Kraken2 on a subsample of the QC'd reads (`--triage_reads`, default 200,000; Illumina when
+present, ONT otherwise) gives an early verdict with the same rules as the contig-level verdict
+after assembly. An isolate that is `non_fungal` or `human` at read level is stopped **before
+assembly** (gate reason `read_triage:<verdict>`), so a bacterium on a fungal plate costs a few
+minutes rather than hours; its master row carries `read_verdict`, the top taxon and the gate
+reason. `likely_fungal` and `mixed` proceed. `--read_triage false` disables the stage;
+`--force_all` disables the gate. Without a Kraken2 database the verdict is `not_run`.
+
+### Stage 01b — k-mer profile (W2.2)
+
+KMC counts k-mers (`--kmer_k`, default 21) in the trimmed Illumina reads (or the filtered ONT
+reads) and GenomeScope2 models the spectrum at ploidy 1 and 2. The stage JSON and master row
+report the estimated genome size, heterozygosity, a ploidy hint (diploid only when the ploidy-2
+model fits at least as well and heterozygosity is at least 0.5 %), k-mer coverage and read
+coverage. Models that do not converge (low coverage, very noisy reads) give null values with a
+note and mark the stage `partial`; nothing is invented. Compare `genome_size_est` with the
+assembly length in Stage 05: a large gap points at contamination, a collapsed diploid, or a
+partial assembly. `--kmer_profile false` disables the stage.
+
 ## 9.3 Stage 02 — Assembly (long-read) / Stage 02b — Assembly (short-read)
 
 **Long-read isolates (`assembly_mode == longread`)** are assembled with the chosen `--assembler`:
@@ -780,7 +801,8 @@ novelty, n_bgc, n_mycovirus, te_percent,
 polish_mode,
 sample_verdict, contam_removed_pct, top_taxon,
 stages_failed,
-gate
+gate,
+read_verdict, genome_size_est, heterozygosity_pct, ploidy_hint, coverage
 ```
 
 ### Stage status contract

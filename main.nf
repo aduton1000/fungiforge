@@ -46,7 +46,9 @@ def help() {
     --busco_lineage auto|<odb10 lineage>  (default auto)
     --run_interproscan  true|false        (default false; heavy — enable on a cluster)
     --skip_bgc / --skip_mge / --skip_novelty / --skip_extras
-    --force_all    run the fungal stages even for isolates the gate would stop (non-fungal / failed QC)
+    --force_all    run every stage even for isolates a gate would stop (non-fungal / failed QC)
+    --read_triage true|false   Kraken2 read triage before assembly (default true; needs the kraken2 DB)
+    --kmer_profile true|false  KMC + GenomeScope2 genome-size / heterozygosity / coverage profile (default true)
   """.stripIndent()
 }
 
