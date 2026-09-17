@@ -841,7 +841,7 @@ Every run ends with a run-level `PROVENANCE` task that writes `pipeline_info/pro
 | `nextflow`, `run` | Nextflow version/build, session id, run name, start time, full command line, launch/work dirs, profile, container engine, stub/resume flags, user, host | Nextflow `workflow` metadata |
 | `params` | every effective parameter | Nextflow |
 | `containers` | process label → container reference that was configured | Nextflow |
-| `images` | for each reference, what actually ran: a site `.sif` or cached `.img` with size and **sha256**, or a Docker image id + repo digest | `workflow.onComplete` on the head node (`make_provenance.py images`) |
+| `images` | for each reference, what actually ran: a site `.sif` or cached `.img` with size and **sha256**, or a Docker image id + repo digest; `used` says whether any task ran with it (the trace records each task's container, so a base entry overridden by the site config is listed but not counted) | `workflow.onComplete` on the head node (`make_provenance.py images`) |
 | `databases` | the `DB_CHECK` manifest: each database's key files, `.done` timestamp and `MANIFEST.tsv` source | `bin/check_databases.py` |
 | `samples` | per isolate, per stage: `status`, `tools` (exit, seconds, version), `skipped_tools`, `versions`, `note` | every stage JSON |
 | `tool_versions`, `version_conflicts`, `stage_summary` | one consolidated version per tool across the run (a tool reporting two different versions is listed under `version_conflicts` — it should be empty), and ok/partial/failed/skipped counts per stage | aggregated |

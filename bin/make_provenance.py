@@ -161,6 +161,19 @@ def resolve_image(ref, engine, cache_dirs, do_hash):
     return rec
 
 
+def containers_used(trace_path):
+    """Set of container references that executed tasks actually used (trace.txt `container`
+    column), or None when the trace has no such column."""
+    if not trace_path or not os.path.exists(trace_path):
+        return None
+    with open(trace_path) as fh:
+        header = fh.readline().rstrip("\n").split("\t")
+        if "container" not in header:
+            return None
+        i = header.index("container")
+        return {f[i] for f in (line.rstrip("\n").split("\t") for line in fh) if len(f) > i and f[i] and f[i] != "-"}
+
+
 def images(a):
     prov = load_json(a.provenance, "provenance")
     if "_error" in prov:
@@ -170,16 +183,26 @@ def images(a):
     if a.work_dir:
         cache_dirs += [os.path.join(a.work_dir, "singularity"), os.path.join(a.work_dir, "apptainer")]
     refs = sorted({v for v in prov.get("containers", {}).values() if isinstance(v, str) and v})
+    used = containers_used(a.trace or os.path.join(os.path.dirname(a.provenance), "trace.txt"))
+    if used:
+        refs = sorted(set(refs) | used)         # a site config may point a label at a file the config map never saw
     out = {}
     for ref in refs:
-        out[ref] = resolve_image(ref, a.engine, cache_dirs, not a.no_hash)
+        rec = resolve_image(ref, a.engine, cache_dirs, not a.no_hash)
+        if used is not None:
+            rec["used"] = ref in used
+            if not rec["used"] and not rec["resolved"]:
+                rec["note"] = "listed by a config selector but no task ran with it (overridden by the site config)"
+        out[ref] = rec
     prov["images"] = out
     prov["images_hashed"] = not a.no_hash
     with open(a.out or a.provenance, "w") as fh:
         json.dump(prov, fh, indent=2)
-    n_ok = sum(1 for r in out.values() if r.get("resolved"))
-    print(f"[provenance] images: {n_ok}/{len(out)} resolved ({'sha256' if not a.no_hash else 'size only'}) -> {a.out or a.provenance}")
-    for ref, r in out.items():
+    counted = {k: r for k, r in out.items() if r.get("used", True)}
+    n_ok = sum(1 for r in counted.values() if r.get("resolved"))
+    print(f"[provenance] images: {n_ok}/{len(counted)} used images resolved ({'sha256' if not a.no_hash else 'size only'})"
+          + (f", {len(out) - len(counted)} listed but unused" if len(out) != len(counted) else "") + f" -> {a.out or a.provenance}")
+    for ref, r in counted.items():
         if not r.get("resolved") and r.get("kind") != "none":
             print(f"[provenance]   unresolved {ref}: {r.get('error')}", file=sys.stderr)
 
@@ -241,6 +264,7 @@ def main():
     g.add_argument("--jsons", nargs="*", default=[]); g.add_argument("--out", default="provenance.json"); g.set_defaults(fn=aggregate)
     i = sub.add_parser("images"); i.add_argument("--provenance", required=True); i.add_argument("--engine", default="none")
     i.add_argument("--cache-dir", default=""); i.add_argument("--work-dir", default=""); i.add_argument("--no-hash", action="store_true")
+    i.add_argument("--trace", default=None, help="Nextflow trace.txt with a `container` column (default: next to the provenance file)")
     i.add_argument("--out"); i.set_defaults(fn=images)
     v = sub.add_parser("validate"); v.add_argument("provenance"); v.add_argument("--schema", default=DEFAULT_SCHEMA); v.set_defaults(fn=validate)
     a = ap.parse_args(); a.fn(a)
