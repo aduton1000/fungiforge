@@ -682,7 +682,7 @@ Stage 05 scores completeness against `fungi_odb10` before the species is known (
 stage 08b re-scores the nuclear assembly with the lineage stage 08 chose (e.g. `eurotiales_odb10`
 for *Aspergillus*, `saccharomycetes_odb10` for *Candida*). It records `skipped` with the reason when
 the lineage is the one stage 05 used, when it is not staged under `--data_dir/busco`
-(`fetch_references.sh busco` stages the common lineages; `BUSCO_LINEAGES` overrides the set), or
+(`fetch_references.sh busco` downloads the common lineages straight from the BUSCO data server into `--data_dir/busco/lineages/`; `BUSCO_LINEAGES` overrides the set), or
 when `--busco_lineage` is fixed. Emits `busco_lineage.json` (`lineage`, `busco_complete`, S/D/F/M);
 the master row carries `busco_lineage_specific` and `busco_complete_specific` next to the
 stage-05 values.
