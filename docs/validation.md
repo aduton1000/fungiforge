@@ -105,6 +105,14 @@ mitogenome separated and annotated. In-image check on the local CEA10 assembly: 
 cox1 intron 2,011 bp (Af293 2,020 bp), rRNAs 100 %, redundant Flye fragments recognised (size
 estimate 29.4 kb), copy ratio 32 (details in UPGRADE_PLAN W2.7).
 
+### 1.6 Mobile elements (W2.8)
+
+Pending on the dev deployment after `fetch_references.sh genomad`: `te_percent` populated for CEA10
+(about 4.7 % from the earlier RepeatMasker table) and DF-005, geNomad status `ok`, RVDB screen
+categories on both isolates. In-image RVDB screen on the local CEA10 assembly: 30 loci, one
+partitivirus coat-protein EVE candidate (81 % identity), te_percent 4.67 from the RepeatMasker table
+(details in UPGRADE_PLAN W2.8).
+
 ## 2. Reference-genome benchmarks
 
 | Isolate | Reference | Status |
