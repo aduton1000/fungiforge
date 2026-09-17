@@ -11,10 +11,11 @@ def row(S):
 
 def test_columns_are_append_only_and_end_with_status_columns():
     assert m.MASTER_COLS[:4] == ["sample", "compartment", "facility", "season"]
-    assert m.MASTER_COLS[-17:] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
+    assert m.MASTER_COLS[-23:] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
                                    "read_verdict", "genome_size_est", "heterozygosity_pct", "ploidy_hint", "coverage",
                                    "id_loci_agree", "id_flags", "mlst_st", "busco_lineage_specific", "busco_complete_specific",
-                                   "resistance_read_support", "copy_number_flags"]
+                                   "resistance_read_support", "copy_number_flags",
+                                   "n_proteins", "pct_pfam", "pct_go", "pct_eggnog", "pct_interpro", "annotation_training"]
     assert len(m.MASTER_COLS) == len(set(m.MASTER_COLS))
 
 
@@ -134,3 +135,11 @@ def test_resistance_read_support_columns_w24():
     assert r["resistance_read_support"] == "confirmed:2;discordant:0;reads_only:1;insufficient:3" and r["copy_number_flags"] == "ERG11:2.1"
     assert row({"resistance": {"summary": {"read_support": {"mode": "assembly_only"}}}})["resistance_read_support"] == "assembly_only"
     assert row({})["resistance_read_support"] == "NA" and row({})["copy_number_flags"] == "none"
+
+
+def test_annotation_columns_w25():
+    S = {"annotate": {"n_proteins": 9607, "pct_pfam": 61.2, "pct_go": 40.0, "pct_eggnog": 70.5, "pct_interpro": 66.1},
+         "predict": {"augustus_species": "aspergillus_fumigatus", "busco_db": "eurotiomycetes", "genemark": "yes"}}
+    r = row(S)
+    assert (r["n_proteins"], r["pct_pfam"], r["pct_eggnog"]) == (9607, 61.2, 70.5) and r["annotation_training"] == "aspergillus_fumigatus/eurotiomycetes/genemark:yes"
+    assert row({})["annotation_training"] == "NA" and row({})["n_proteins"] == "NA"

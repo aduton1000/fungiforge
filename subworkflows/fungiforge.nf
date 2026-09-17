@@ -13,6 +13,9 @@ include { DECONTAM }    from '../modules/stage04_decontam.nf'
 include { ASSEMBLY_QC } from '../modules/stage05_assembly_qc.nf'
 include { GATE as GATE_READS; GATE as GATE_ASSEMBLY } from '../modules/stage05b_gate.nf'
 include { REPEATMASK }  from '../modules/stage06_repeatmask.nf'
+include { PREDICT }     from '../modules/stage07_predict.nf'
+include { EGGNOG }      from '../modules/stage07b_eggnog.nf'
+include { INTERPROSCAN } from '../modules/stage07c_interproscan.nf'
 include { ANNOTATE }    from '../modules/stage07_annotate.nf'
 include { IDENTIFY }    from '../modules/stage08_identify.nf'
 include { BUSCO_LINEAGE } from '../modules/stage08b_busco_lineage.nf'
@@ -118,11 +121,22 @@ workflow FUNGIFORGE {
     // 6. repeat modeling + soft-masking (RepeatModeler2 / RepeatMasker)
     REPEATMASK(nuclear_ok)
 
-    // 7. eukaryotic gene prediction + functional annotation (Funannotate)
-    ANNOTATE(REPEATMASK.out.masked)
-
-    // 8. identification (ITS + CaM/BenA/TEF1/RPB2/LSU concordance, MLST, optional genome ANI)
+    // 8. identification (ITS + CaM/BenA/TEF1/RPB2/LSU concordance, MLST, optional genome ANI).
+    //    Runs before prediction so the species call can seed the annotation training (W2.5).
     IDENTIFY(nuclear_ok)
+
+    // 7a. gene prediction (Funannotate predict; GeneMark-ES when licensed; species-aware training)
+    PREDICT(REPEATMASK.out.masked.join(IDENTIFY.out.species))
+
+    // 7b/7c. eggNOG-mapper and InterProScan on the predicted proteins (separate images);
+    //        off switches hand ANNOTATE an empty placeholder so funannotate runs without them.
+    if (!params.skip_eggnog) { EGGNOG(PREDICT.out.proteins); eggnog_ch = EGGNOG.out.annotations; eggnog_json = EGGNOG.out.json }
+    else { eggnog_ch = PREDICT.out.proteins.map { m, _p -> tuple(m, file("${projectDir}/assets/NO_FILE")) }; eggnog_json = channel.empty() }
+    if (params.run_interproscan) { INTERPROSCAN(PREDICT.out.proteins); ips_ch = INTERPROSCAN.out.xml; ips_json = INTERPROSCAN.out.json }
+    else { ips_ch = PREDICT.out.proteins.map { m, _p -> tuple(m, file("${projectDir}/assets/NO_FILE")) }; ips_json = channel.empty() }
+
+    // 7. functional annotation (Funannotate annotate + eggNOG/InterProScan results)
+    ANNOTATE(PREDICT.out.results.join(eggnog_ch).join(ips_ch))
 
     // 8b. species-aware BUSCO with the lineage chosen from the species call (W2.3)
     BUSCO_LINEAGE(nuclear_ok.join(IDENTIFY.out.lineage))
@@ -154,7 +168,7 @@ workflow FUNGIFORGE {
     all_json = READ_QC.out.json
       .mix(basecall_json, triage_json, gate_reads_json, kmer_json, ASSEMBLE.out.json, SR_ASSEMBLE.out.json, MEDAKA.out.json,
            SRPOLISH.out.json, DECONTAM.out.json, ASSEMBLY_QC.out.json, GATE_ASSEMBLY.out.json, REPEATMASK.out.json,
-           ANNOTATE.out.json, IDENTIFY.out.json, BUSCO_LINEAGE.out.json, RESISTANCE.out.json,
+           PREDICT.out.json, eggnog_json, ips_json, ANNOTATE.out.json, IDENTIFY.out.json, BUSCO_LINEAGE.out.json, RESISTANCE.out.json,
            mobile_ch, bgc_ch, novelty_ch, extras_ch)
       .map { meta, j -> tuple(meta.id, meta, j) }
       .groupTuple(by: 0)

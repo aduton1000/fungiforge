@@ -13,7 +13,7 @@
 #   bin/fetch_references.sh images antismash funannotate   # selected steps
 #
 # Steps: images antismash funannotate eggnog busco unite kraken2 refseq_fungi
-#        fungamr rvdb benchmarks markers mlst
+#        fungamr rvdb benchmarks markers mlst interproscan
 #
 # NB several DBs are downloaded THROUGH their tool container (funannotate setup,
 # eggnog, antismash) so the relevant image is pulled first. Version/URL-sensitive
@@ -23,7 +23,7 @@
 set -uo pipefail
 
 DB="${FUNGIFORGE_DB:?set FUNGIFORGE_DB to the target data dir, e.g. /data/fungiforge_db}"
-mkdir -p "$DB"/{containers,funannotate,eggnog,antismash,busco,unite,kraken2,refseq_fungi,fungamr,rvdb,markers,mlst,logs}
+mkdir -p "$DB"/{containers,funannotate,eggnog,antismash,busco,unite,kraken2,refseq_fungi,fungamr,rvdb,markers,mlst,interproscan,logs}
 LOGDIR="$DB/logs"; MANIFEST="$DB/MANIFEST.tsv"
 [ -f "$MANIFEST" ] || echo -e "database\tdetail\tstatus\ttimestamp" > "$MANIFEST"
 
@@ -112,11 +112,35 @@ step_funannotate(){
 # eggnog-mapper ships download_eggnog_data.py; run it from the funannotate image
 # (bundles eggnog-mapper) or the eggnog-mapper image. -y = accept all downloads.
 step_eggnog(){
+  # eggNOG 5 data for eggNOG-mapper 2.1 (stage 07b): direct download, no container needed
+  # (the funannotate image ships no emapper; stage 07b runs the eggnog-mapper image).
   is_done eggnog && { log "eggnog db present — skip"; return; }
-  log "downloading eggNOG data -> $DB/eggnog (large)"
-  docker run --rm --platform linux/amd64 -v "$DB/eggnog":/eggnog \
-      nextgenusfs/funannotate:latest download_eggnog_data.py -y --data_dir /eggnog >>"$LOGDIR/eggnog.log" 2>&1 \
-    && mark eggnog "eggnog data" || fail eggnog "download_eggnog_data.py"
+  local base="${EGGNOG_URL:-http://eggnog5.embl.de/download/emapperdb-5.0.2}"
+  local ok=1 f
+  log "downloading eggNOG 5.0.2 data (eggnog.db ~6.8 GB + eggnog_proteins.dmnd ~5.2 GB, compressed) -> $DB/eggnog"
+  for f in eggnog.db.gz eggnog_proteins.dmnd.gz eggnog.taxa.tar.gz; do
+    [ -s "$DB/eggnog/${f%.gz}" ] || [ -s "$DB/eggnog/${f%.tar.gz}" ] && { log "have ${f%.gz} — skip"; continue; }
+    ( cd "$DB/eggnog" && dl "$base/$f" "$f" \
+      && { case "$f" in *.tar.gz) tar xzf "$f" && rm -f "$f";; *.gz) gunzip -f "$f";; esac; } ) >>"$LOGDIR/eggnog.log" 2>&1 \
+      || { fail eggnog "$f"; ok=0; }
+  done
+  [ "$ok" = 1 ] && [ -s "$DB/eggnog/eggnog.db" ] && [ -s "$DB/eggnog/eggnog_proteins.dmnd" ] && mark eggnog "emapperdb-5.0.2 (eggnog.db, eggnog_proteins.dmnd, taxa)"
+}
+
+# ---- InterProScan data release (W2.5, stage 07c) ------------------------------
+# The image (interpro/interproscan:<ver>, conf/base.config) carries the software only; the member
+# databases come from the matching data tarball (~6.9 GB), extracted to
+# $DB/interproscan/interproscan-<ver>/data and bound at /opt/interproscan/data by the profile
+# (--interproscan_data). IPS_VERSION must match the image tag.
+step_interproscan(){
+  is_done interproscan && { log "interproscan data present — skip"; return; }
+  local ver="${IPS_VERSION:-5.78-109.0}"
+  local url="${IPS_DATA_URL:-https://ftp.ebi.ac.uk/pub/software/unix/iprscan/5/$ver/alt/interproscan-data-$ver.tar.gz}"
+  mkdir -p "$DB/interproscan"
+  log "downloading InterProScan data $ver -> $DB/interproscan"
+  ( cd "$DB/interproscan" && dl "$url" "interproscan-data-$ver.tar.gz" && dl "$url.md5" "interproscan-data-$ver.tar.gz.md5" \
+    && md5sum -c "interproscan-data-$ver.tar.gz.md5" && tar xzf "interproscan-data-$ver.tar.gz" && rm -f "interproscan-data-$ver.tar.gz" ) >>"$LOGDIR/interproscan.log" 2>&1 \
+    && [ -d "$DB/interproscan/interproscan-$ver/data" ] && mark interproscan "$ver -> interproscan-$ver/data" || fail interproscan "$url"
 }
 
 # ---- BUSCO / compleasm fungal lineages --------------------------------------
@@ -271,7 +295,7 @@ step_mlst(){
 }
 
 # ---- driver -----------------------------------------------------------------
-STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggnog busco unite kraken2 refseq_fungi fungamr rvdb benchmarks markers mlst)
+STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggnog busco unite kraken2 refseq_fungi fungamr rvdb benchmarks markers mlst)   # interproscan: on request (6.9 GB + hours per genome)
 log "==== fungiforge fetch_references start · DB=$DB · steps: ${STEPS[*]} ===="
 for s in "${STEPS[@]}"; do "step_$s"; done
 log "==== fetch_references finished ===="
