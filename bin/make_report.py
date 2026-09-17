@@ -26,9 +26,11 @@ MASTER_COLS = [
     "sample_verdict", "contam_removed_pct", "top_taxon",
     # appended 0.2.0: stage status contract — any stage not "ok" as stage:status (or "none")
     "stages_failed",
-    # appended 0.2.0 (W2.1): "pass", or "skipped(<reason>)" when the gate stopped the isolate after
-    # assembly QC (verdict non_fungal/human or qc_pass false) and stages 06-13 were not run
+    # appended 0.2.0 (W2.1): "pass", or "skipped(<reason>)" when a gate stopped the isolate (read
+    # triage: verdict non_fungal/human before assembly; assembly QC: verdict or qc_pass false)
     "gate",
+    # appended 0.2.0 (W2.2): read-level triage verdict and the k-mer profile
+    "read_verdict", "genome_size_est", "heterozygosity_pct", "ploidy_hint", "coverage",
 ]
 
 
@@ -64,6 +66,8 @@ def build_row(sample, compartment, facility, season, S):
     mob = S.get("mobile", {})
     pol = S.get("polish", {})
     dc  = S.get("decontam", {})
+    tri = S.get("triage", {})
+    km  = S.get("kmer", {})
     tops = g(dc, "top_species", default=[])
     top_taxon = (f"{tops[0].get('name', '?')} ({tops[0].get('pct', 'NA')}%)"
                  if isinstance(tops, list) and tops and isinstance(tops[0], dict) else "NA")
@@ -91,6 +95,11 @@ def build_row(sample, compartment, facility, season, S):
         "stages_failed": ";".join(f"{st}:{d.get('status')}" for st, d in sorted(S.items())
                                   if d.get("status") not in (None, "ok")) or "none",
         "gate": f"skipped({S['gate'].get('reason', '?')})" if isinstance(S.get("gate"), dict) else "pass",
+        "read_verdict": g(tri, "verdict", default="NA"),
+        "genome_size_est": g(km, "genome_size_est", default="NA"),
+        "heterozygosity_pct": g(km, "heterozygosity_pct", default="NA"),
+        "ploidy_hint": g(km, "ploidy_hint", default="NA"),
+        "coverage": g(km, "coverage_from_kmers", default=g(km, "coverage_from_read_bases", default="NA")),
     }
     return row
 

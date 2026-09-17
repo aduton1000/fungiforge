@@ -34,7 +34,9 @@ dependencies:
   - genomad==1.12.0
   - kraken2==2.1.3      # Stage 04 contig decontamination + bin/triage_reads.sh (was only in decontam.yml)
   - seqkit==2.13.0
-  # read filtering (light)
+  # read filtering (light) + k-mer profile (W2.2)
+  - kmc==3.2.4         # k-mer counting for the genome-size / heterozygosity / coverage profile
+  - genomescope2==2.0.1  # k-mer spectrum model (R); reports genome size, heterozygosity, k-mer coverage
   - chopper==0.9.0
   - nanoplot==1.47.1
   # report / glue
