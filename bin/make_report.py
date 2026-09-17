@@ -8,10 +8,12 @@ bacterial `master_results` table. Missing stages -> NA (never a hard failure).
 """
 from __future__ import annotations
 import argparse
+import datetime
 import glob
 import html
 import json
 import os
+import sys
 
 # Fixed master-table columns (the Layer-2 contract). Keep additions append-only.
 MASTER_COLS = [
@@ -162,32 +164,60 @@ def build_row(sample, compartment, facility, season, S):
     return row
 
 
-def render_html(sample, meta, S, row):
+TEMPLATE_DIRS = [os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fungiforge", "report_templates")]
+
+
+def _pill(value, good):
+    """<span> with a colour class: green when the value equals `good`, grey for NA, amber otherwise."""
+    v = "" if value is None else str(value)
+    cls = "na" if v in ("NA", "", "None") else ("ok" if v == good else "warn")
+    return f'<span class="pill {cls}">{html.escape(v or "NA")}</span>'
+
+
+def render_html(sample, meta, S, row, version="0.2.0"):
+    """Render the isolate report from the Jinja2 template; falls back to a plain table when
+    Jinja2 or the template is unavailable (the report must never be the reason a run fails)."""
+    res = S.get("resistance", {}) or {}
+    ident = S.get("identify", {}) or {}
+    bgc = S.get("bgc", {}) or {}
+    ctx = {"sample": sample, "meta": meta, "row": row, "S": S, "version": version,
+           "generated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+           "calls": [c for c in (res.get("calls") or []) if isinstance(c, dict)],
+           "loci": {k: v for k, v in (ident.get("loci") or {}).items() if isinstance(v, dict)},
+           "bgc_types": sorted((bgc.get("by_type") or {}).items(), key=lambda kv: -kv[1]),
+           "stages": sorted(S.keys()), "pill": _pill}
+    try:
+        import jinja2
+        for d in TEMPLATE_DIRS:
+            if os.path.exists(os.path.join(d, "isolate_report.html.j2")):
+                env = jinja2.Environment(loader=jinja2.FileSystemLoader(d), autoescape=True)
+                from markupsafe import Markup
+                env.globals["pill"] = lambda v, g: Markup(_pill(v, g))
+                return env.get_template("isolate_report.html.j2").render(**ctx)
+    except Exception as e:  # noqa: BLE001
+        sys.stderr.write(f"[make_report] template rendering unavailable ({e}); using the plain layout\n")
+    return render_html_plain(sample, meta, S, row)
+
+
+def render_html_plain(sample, meta, S, row):
     def esc(x): return html.escape(str(x))
     rows = "".join(f"<tr><th>{esc(k)}</th><td>{esc(v)}</td></tr>" for k, v in row.items())
-    # resistance calls table
-    calls = S.get("resistance", {}).get("calls", [])
+    calls = (S.get("resistance", {}) or {}).get("calls", [])
     call_rows = "".join(
         f"<tr><td>{esc(c.get('gene'))}</td><td>{esc(c.get('drug_class'))}</td>"
         f"<td>{esc(c.get('change', c.get('status')))}</td><td>{esc(c.get('known'))}</td>"
         f"<td>{esc(c.get('confidence'))}</td></tr>" for c in calls) or "<tr><td colspan=5>none</td></tr>"
     stages = ", ".join(sorted(S.keys()))
-    try:
-        import jinja2  # noqa: F401 — richer templating available if desired
-    except Exception:
-        pass
     return f"""<!doctype html><meta charset=utf-8><title>FungiForge · {esc(sample)}</title>
 <style>body{{font:14px/1.5 system-ui,sans-serif;max-width:900px;margin:2rem auto;padding:0 1rem;color:#1a2a44}}
 h1{{color:#17233d}}table{{border-collapse:collapse;width:100%;margin:1rem 0}}
-th,td{{border:1px solid #dcdfe6;padding:6px 10px;text-align:left}}th{{background:#f4f6fa;width:34%}}
-.k{{color:#8a6d1f}}caption{{text-align:left;font-weight:bold;margin:.5rem 0}}</style>
+th,td{{border:1px solid #dcdfe6;padding:6px 10px;text-align:left}}th{{background:#f4f6fa;width:34%}}</style>
 <h1>FungiForge — {esc(sample)}</h1>
-<p><b>{esc(row['species'])}</b> · {esc(meta['compartment'])} / {esc(meta['facility'])} / {esc(meta['season'])}
-· stages: {esc(stages)}</p>
+<p><b>{esc(row['species'])}</b> · {esc(meta['compartment'])} / {esc(meta['facility'])} / {esc(meta['season'])} · stages: {esc(stages)}</p>
 <table><caption>Summary (master row)</caption>{rows}</table>
 <table><caption>Antifungal-resistance calls</caption>
 <tr><th>gene</th><th>class</th><th>change/status</th><th>known</th><th>confidence</th></tr>{call_rows}</table>
-<p style="color:#777">Resistance calls on ONT-only assemblies are <b>provisional</b> until hybrid-polished; hybrid and Illumina-only assemblies are high-confidence (no homopolymer-indel risk).</p>
+<p style="color:#777">Resistance calls on ONT-only assemblies are <b>provisional</b> until hybrid-polished.</p>
 """
 
 
@@ -197,6 +227,7 @@ def main():
     ap.add_argument("--compartment", default="NA"); ap.add_argument("--facility", default="NA"); ap.add_argument("--season", default="NA")
     ap.add_argument("--jsons", nargs="+", required=True)
     ap.add_argument("--html", required=True); ap.add_argument("--master", required=True)
+    ap.add_argument("--version", default="0.2.0", help="pipeline version, shown in the report footer")
     a = ap.parse_args()
     # expand any globs / dirs
     paths = []
@@ -208,7 +239,7 @@ def main():
     with open(a.master, "w") as fh:
         fh.write("\t".join(MASTER_COLS) + "\n")
         fh.write("\t".join(str(row.get(c, "NA")) for c in MASTER_COLS) + "\n")
-    open(a.html, "w").write(render_html(a.sample, meta, S, row))
+    open(a.html, "w").write(render_html(a.sample, meta, S, row, a.version))
     print(f"[make_report] {a.sample}: {row['species']} · {len(S)} stages · report+master written")
 
 

@@ -28,6 +28,7 @@ include { EXTRAS }      from '../modules/stage13_extras.nf'
 include { REPORT }      from '../modules/stage14_report.nf'
 include { PROVENANCE }  from '../modules/stage15_provenance.nf'
 include { COHORT }      from '../modules/stage16_cohort.nf'
+include { SUMMARY }     from '../modules/stage17_summary.nf'
 
 workflow FUNGIFORGE {
   take:
@@ -200,8 +201,15 @@ workflow FUNGIFORGE {
                all_json.map { _meta, jsons -> jsons }.flatten().collect(),
                REPORT.out.master.collect())
 
+    // 17. run-level cohort summary: merged master table (schema-validated), cohort report,
+    //     MultiQC custom content (W3.3). Waits for every isolate's master row.
+    SUMMARY(REPORT.out.master.collect(),
+            cohort_json.ifEmpty { file("${projectDir}/assets/NO_COHORT") },
+            PROVENANCE.out.provenance.ifEmpty { file("${projectDir}/assets/NO_PROVENANCE") })
+
   emit:
     cohort     = cohort_json
+    summary    = SUMMARY.out.summary
     master     = REPORT.out.master
     reports    = REPORT.out.report
     provenance = PROVENANCE.out.provenance

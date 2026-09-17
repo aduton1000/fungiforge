@@ -828,9 +828,22 @@ all of it for Layer 2's transmission objective.
 ## 9.16 Stage 14 — Report + master table
 
 `make_report.py` merges every per-stage `result.json` into a **self-contained per-isolate HTML
-report** and appends the isolate's **master row** to `results/04_summary/<sample>.master.tsv`
-(published to both the sample's `14_report/` dir and the shared `04_summary/`). Missing stages
-become `NA` — never a hard failure. The master schema is the Layer-2 contract (§11).
+report** (Jinja2 template `fungiforge/report_templates/isolate_report.html.j2`: headline call,
+resistance table with read support and evidence tiers, reads and assembly, identification with the
+per-locus evidence, annotation and biology, secondary metabolism, mobile elements and organelle,
+run status) and writes the isolate's **master row** to `results/04_summary/<sample>.master.tsv`.
+Missing stages become `NA` — never a hard failure.
+
+## 9.17 Stage 17 — Cohort summary (run-level)
+
+`cohort_report.py` runs once after every isolate: it merges the per-isolate rows into
+**`results/04_summary/master_fungi.tsv`** in schema order, **validates** it against
+`fungiforge/resources/master_schema.json` (§11.2) and writes **`cohort_report.html`** (composition
+by species / compartment / facility, gates and QC, resistance and mycotoxin tallies, metric ranges,
+and the stage-16 clusters, tree, clonal groups and BGC families), **`cohort_summary.json`** (the
+same numbers, machine-readable) and **MultiQC custom content** under `04_summary/multiqc/`, running
+MultiQC itself when it is in the image. A schema violation fails this stage loudly at the end of
+the run without touching the per-isolate results.
 
 # 10. The antifungal-resistance module in depth
 
@@ -921,7 +934,12 @@ Under `results/<sample>/`:
 
 ## 11.2 The master table schema (the Layer-2 contract)
 
-`make_report.py` writes a fixed, append-only column set to `results/04_summary/<sample>.master.tsv`:
+The schema lives in `fungiforge/resources/master_schema.json` (name, type, allowed values,
+description and group for every column) and is enforced by `bin/validate_master.py`, which Stage 17
+runs over the merged table. Columns are **append-only**: a newer pipeline adds columns at the end,
+never renames or reorders them, so an older consumer keeps working and a newer table still
+validates (extra columns are a warning, not an error). `make_report.py` writes the same column set
+to `results/04_summary/<sample>.master.tsv`:
 
 ```text
 sample, compartment, facility, season,

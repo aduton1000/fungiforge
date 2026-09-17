@@ -1,0 +1,419 @@
+{
+  "schema_version": "1.0",
+  "title": "fungiforge master table (master_fungi.tsv)",
+  "description": "One row per isolate: the Layer-1 -> Layer-2 handoff contract. Columns are append-only: new fungiforge versions add columns at the end, never rename or reorder existing ones. Every field may be the literal 'NA' (not measured / stage skipped); numeric fields are otherwise plain numbers, booleans are 'True'/'False'.",
+  "na_value": "NA",
+  "primary_key": "sample",
+  "delimiter": "\t",
+  "columns": [
+    {
+      "name": "sample",
+      "group": "identity",
+      "description": "isolate identifier from the samplesheet (primary key)",
+      "type": "string"
+    },
+    {
+      "name": "compartment",
+      "group": "identity",
+      "description": "sampling compartment from the samplesheet (e.g. AIR, HUMAN, SURFACE)",
+      "type": "string"
+    },
+    {
+      "name": "facility",
+      "group": "identity",
+      "description": "facility / site from the samplesheet",
+      "type": "string"
+    },
+    {
+      "name": "season",
+      "group": "identity",
+      "description": "season or sampling round from the samplesheet",
+      "type": "string"
+    },
+    {
+      "name": "species",
+      "group": "identification",
+      "description": "species call of stage 08 ('Genus sp.' when only the genus is resolved, 'unknown' when nothing matched)",
+      "type": "string"
+    },
+    {
+      "name": "species_confidence",
+      "group": "identification",
+      "description": "confidence of the species call (high needs ITS plus an agreeing secondary locus)",
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low",
+        "none"
+      ]
+    },
+    {
+      "name": "id_method",
+      "group": "identification",
+      "description": "evidence behind the call, e.g. ITS+CaM(concordant)",
+      "type": "string"
+    },
+    {
+      "name": "qc_pass",
+      "group": "assembly",
+      "description": "assembly-QC gate result (MIMAG-style: assembly present and BUSCO >= 80 %)",
+      "type": "boolean"
+    },
+    {
+      "name": "busco_complete",
+      "group": "assembly",
+      "description": "BUSCO/compleasm completeness (%) against the stage-05 lineage",
+      "type": "number"
+    },
+    {
+      "name": "busco_lineage",
+      "group": "assembly",
+      "description": "BUSCO lineage used in stage 05 (fungi_odb10 unless --busco_lineage)",
+      "type": "string"
+    },
+    {
+      "name": "assembly_len",
+      "group": "assembly",
+      "description": "nuclear assembly length (bp)",
+      "type": "integer"
+    },
+    {
+      "name": "n_contigs",
+      "group": "assembly",
+      "description": "nuclear contig count",
+      "type": "integer"
+    },
+    {
+      "name": "ploidy",
+      "group": "biology",
+      "description": "ploidy call from nQuire on the read BAM (1 = haploid-like), NA without reads",
+      "type": "string"
+    },
+    {
+      "name": "mating_type",
+      "group": "biology",
+      "description": "mating-type idiomorph from the Pfam MAT locus scan",
+      "type": "string",
+      "enum": [
+        "MAT1-1",
+        "MAT1-2",
+        "MAT1-1/MAT1-2",
+        "undetermined"
+      ]
+    },
+    {
+      "name": "resistant_classes",
+      "group": "resistance",
+      "description": "antifungal classes with a known resistance mutation, ';'-separated, 'none' when clean",
+      "type": "string"
+    },
+    {
+      "name": "n_known_af_mutations",
+      "group": "resistance",
+      "description": "count of known resistance mutations called",
+      "type": "integer"
+    },
+    {
+      "name": "cyp51A_TR",
+      "group": "resistance",
+      "description": "A. fumigatus cyp51A promoter tandem repeat (TR34 / TR46 / TR46_3 / none / NA)",
+      "type": "string"
+    },
+    {
+      "name": "novelty",
+      "group": "identification",
+      "description": "novelty verdict of stage 12",
+      "type": "string",
+      "enum": [
+        "known_species",
+        "candidate_novel_species",
+        "candidate_novel_or_unrepresented",
+        "undetermined",
+        "NA"
+      ]
+    },
+    {
+      "name": "n_bgc",
+      "group": "bgc",
+      "description": "biosynthetic gene clusters detected by antiSMASH",
+      "type": "integer"
+    },
+    {
+      "name": "n_mycovirus",
+      "group": "mobile",
+      "description": "mycovirus-family loci in the RVDB screen (endogenous viral element candidates; DNA-only)",
+      "type": "integer"
+    },
+    {
+      "name": "te_percent",
+      "group": "mobile",
+      "description": "genome fraction masked as repeats by RepeatMasker (%)",
+      "type": "number"
+    },
+    {
+      "name": "polish_mode",
+      "group": "assembly",
+      "description": "polishing route, which sets the resistance-call confidence",
+      "type": "string",
+      "enum": [
+        "hybrid",
+        "illumina_only",
+        "ont_only",
+        "unknown"
+      ]
+    },
+    {
+      "name": "sample_verdict",
+      "group": "qc",
+      "description": "contig-level Kraken2 verdict of stage 04",
+      "type": "string",
+      "enum": [
+        "fungal",
+        "likely_fungal",
+        "mixed",
+        "non_fungal",
+        "human",
+        "not_run",
+        "NA"
+      ]
+    },
+    {
+      "name": "contam_removed_pct",
+      "group": "qc",
+      "description": "percentage of assembled bases dropped as contamination",
+      "type": "number"
+    },
+    {
+      "name": "top_taxon",
+      "group": "qc",
+      "description": "most abundant taxon with its percentage (contig level, or read level for gated isolates)",
+      "type": "string"
+    },
+    {
+      "name": "stages_failed",
+      "group": "qc",
+      "description": "every stage whose status is not ok, as stage:status, or 'none'",
+      "type": "string"
+    },
+    {
+      "name": "gate",
+      "group": "qc",
+      "description": "'pass', or skipped(<reason>) when a gate stopped the isolate",
+      "type": "string"
+    },
+    {
+      "name": "read_verdict",
+      "group": "qc",
+      "description": "read-level Kraken2 triage verdict (stage 00b)",
+      "type": "string",
+      "enum": [
+        "fungal",
+        "likely_fungal",
+        "mixed",
+        "non_fungal",
+        "human",
+        "not_run",
+        "NA"
+      ]
+    },
+    {
+      "name": "genome_size_est",
+      "group": "reads",
+      "description": "genome size estimated by GenomeScope2 from the k-mer spectrum (bp)",
+      "type": "integer"
+    },
+    {
+      "name": "heterozygosity_pct",
+      "group": "reads",
+      "description": "heterozygosity estimated by GenomeScope2 (%)",
+      "type": "number"
+    },
+    {
+      "name": "ploidy_hint",
+      "group": "reads",
+      "description": "haploid/diploid hint from the k-mer spectrum",
+      "type": "string"
+    },
+    {
+      "name": "coverage",
+      "group": "reads",
+      "description": "read coverage (k-mer based, else read bases / genome size)",
+      "type": "number"
+    },
+    {
+      "name": "id_loci_agree",
+      "group": "identification",
+      "description": "secondary loci agreeing with the ITS species, ';'-separated, 'none'",
+      "type": "string"
+    },
+    {
+      "name": "id_flags",
+      "group": "identification",
+      "description": "identification flags (ties, discordance, unavailable loci), ';'-separated, 'none'",
+      "type": "string"
+    },
+    {
+      "name": "mlst_st",
+      "group": "identification",
+      "description": "PubMLST scheme and sequence type, e.g. afumigatus:ST5",
+      "type": "string"
+    },
+    {
+      "name": "busco_lineage_specific",
+      "group": "assembly",
+      "description": "species-aware BUSCO lineage of stage 08b (NA when it did not run)",
+      "type": "string"
+    },
+    {
+      "name": "busco_complete_specific",
+      "group": "assembly",
+      "description": "BUSCO completeness against that lineage (%)",
+      "type": "number"
+    },
+    {
+      "name": "resistance_read_support",
+      "group": "resistance",
+      "description": "read-level support summary: confirmed:N;discordant:M;reads_only:K;insufficient:J, or assembly_only",
+      "type": "string"
+    },
+    {
+      "name": "copy_number_flags",
+      "group": "resistance",
+      "description": "target/efflux genes with a locus/genome depth ratio >= 1.8, ';'-separated, 'none'",
+      "type": "string"
+    },
+    {
+      "name": "n_proteins",
+      "group": "annotation",
+      "description": "proteins predicted by Funannotate",
+      "type": "integer"
+    },
+    {
+      "name": "pct_pfam",
+      "group": "annotation",
+      "description": "percentage of proteins with a PFAM domain",
+      "type": "number"
+    },
+    {
+      "name": "pct_go",
+      "group": "annotation",
+      "description": "percentage of proteins with GO terms",
+      "type": "number"
+    },
+    {
+      "name": "pct_eggnog",
+      "group": "annotation",
+      "description": "percentage of proteins with an eggNOG orthologue",
+      "type": "number"
+    },
+    {
+      "name": "pct_interpro",
+      "group": "annotation",
+      "description": "percentage of proteins with an InterPro entry (0 unless stage 07c ran)",
+      "type": "number"
+    },
+    {
+      "name": "annotation_training",
+      "group": "annotation",
+      "description": "how prediction was trained: <augustus species>/<busco set>/genemark:<yes|no>",
+      "type": "string"
+    },
+    {
+      "name": "n_secreted",
+      "group": "biology",
+      "description": "proteins with a signal peptide (SignalP 6)",
+      "type": "integer"
+    },
+    {
+      "name": "n_effectors",
+      "group": "biology",
+      "description": "predicted effectors among the secretome (EffectorP 3)",
+      "type": "integer"
+    },
+    {
+      "name": "n_cazymes",
+      "group": "biology",
+      "description": "proteins with a dbCAN CAZyme family assignment",
+      "type": "integer"
+    },
+    {
+      "name": "n_phibase_hits",
+      "group": "biology",
+      "description": "proteins with a PHI-base best hit (virulence-associated)",
+      "type": "integer"
+    },
+    {
+      "name": "mito_size_kb",
+      "group": "organelle",
+      "description": "mitochondrial genome size (kb; longest contig when the assembler left redundant fragments)",
+      "type": "number"
+    },
+    {
+      "name": "mito_core_genes",
+      "group": "organelle",
+      "description": "core mitochondrial genes found, as n/15",
+      "type": "string"
+    },
+    {
+      "name": "mito_circular",
+      "group": "organelle",
+      "description": "true when a single mitochondrial contig closes on itself",
+      "type": "string"
+    },
+    {
+      "name": "mito_copy_ratio",
+      "group": "organelle",
+      "description": "mitochondrial read depth divided by nuclear depth",
+      "type": "number"
+    },
+    {
+      "name": "mito_heteroplasmic_sites",
+      "group": "organelle",
+      "description": "mitochondrial positions with a minor substitution allele above the platform floor",
+      "type": "integer"
+    },
+    {
+      "name": "te_ltr_pct",
+      "group": "mobile",
+      "description": "genome fraction masked as LTR elements (%)",
+      "type": "number"
+    },
+    {
+      "name": "n_genomad_virus",
+      "group": "mobile",
+      "description": "viral contigs called by geNomad",
+      "type": "integer"
+    },
+    {
+      "name": "n_genomad_plasmid",
+      "group": "mobile",
+      "description": "plasmid contigs called by geNomad",
+      "type": "integer"
+    },
+    {
+      "name": "n_mito_heg",
+      "group": "mobile",
+      "description": "mitochondrial ORFs with a homing-endonuclease / maturase domain",
+      "type": "integer"
+    },
+    {
+      "name": "mycotoxin_clusters",
+      "group": "bgc",
+      "description": "known mycotoxin clusters from KnownClusterBlast, ';'-separated, 'none'",
+      "type": "string"
+    },
+    {
+      "name": "bioactive_clusters",
+      "group": "bgc",
+      "description": "known antibiotic / other bioactive clusters, ';'-separated, 'none'",
+      "type": "string"
+    },
+    {
+      "name": "n_bgc_mibig_hits",
+      "group": "bgc",
+      "description": "BGC regions with a MIBiG best hit",
+      "type": "integer"
+    }
+  ]
+}
