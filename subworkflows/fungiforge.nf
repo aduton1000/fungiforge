@@ -157,7 +157,7 @@ workflow FUNGIFORGE {
     // 10-13: skippable stages — a skip flag truly skips the process (empty channel),
     // rather than running it emptily (which would also drag in its container).
     mobile_ch = channel.empty()
-    if (!params.skip_mge)     { MOBILE(REPEATMASK.out.telib.join(DECONTAM.out.mito)); mobile_ch = MOBILE.out.json }
+    if (!params.skip_mge)     { MOBILE(REPEATMASK.out.telib.join(REPEATMASK.out.tbl).join(DECONTAM.out.nuclear).join(DECONTAM.out.mito)); mobile_ch = MOBILE.out.json }   // W2.8
 
     bgc_ch = channel.empty()
     if (!params.skip_bgc)     { BGC(ANNOTATE.out.gbk); bgc_ch = BGC.out.json }

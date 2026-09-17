@@ -13,7 +13,7 @@
 #   bin/fetch_references.sh images antismash funannotate   # selected steps
 #
 # Steps: images antismash funannotate eggnog busco unite kraken2 refseq_fungi
-#        fungamr rvdb benchmarks markers mlst dbcan phibase effectorp interproscan
+#        fungamr rvdb benchmarks markers mlst dbcan phibase effectorp genomad interproscan
 #
 # NB several DBs are downloaded THROUGH their tool container (funannotate setup,
 # eggnog, antismash) so the relevant image is pulled first. Version/URL-sensitive
@@ -326,8 +326,19 @@ step_effectorp(){
     && mark effectorp "$repo ($(git -C "$DB/effectorp/EffectorP-3.0" rev-parse --short HEAD))" || fail effectorp "$repo"
 }
 
+# ---- geNomad database (W2.8, stage 10) ---------------------------------------
+# Zenodo release matching the pinned genomad (1.12 uses database v1.9); extracted to $DB/genomad_db.
+step_genomad(){
+  is_done genomad_db && { log "genomad_db present — skip"; return; }
+  local url="${GENOMAD_DB_URL:-https://zenodo.org/api/records/14886553/files/genomad_db_v1.9.tar.gz/content}"
+  mkdir -p "$DB/genomad_db"
+  log "downloading geNomad database v1.9 (~0.8 GB) -> $DB/genomad_db"
+  ( cd "$DB" && dl "$url" genomad_db.tar.gz && tar xzf genomad_db.tar.gz && rm -f genomad_db.tar.gz ) >>"$LOGDIR/genomad.log" 2>&1 \
+    && [ -s "$DB/genomad_db/genomad_db" ] || [ -s "$DB/genomad_db/version.txt" ] && mark genomad_db "$url" || fail genomad_db "$url"
+}
+
 # ---- driver -----------------------------------------------------------------
-STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggnog busco unite kraken2 refseq_fungi fungamr rvdb benchmarks markers mlst dbcan phibase effectorp)   # interproscan: on request (6.9 GB + hours per genome)
+STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggnog busco unite kraken2 refseq_fungi fungamr rvdb benchmarks markers mlst dbcan phibase effectorp genomad)   # interproscan: on request (6.9 GB + hours per genome)
 log "==== fungiforge fetch_references start · DB=$DB · steps: ${STEPS[*]} ===="
 for s in "${STEPS[@]}"; do "step_$s"; done
 log "==== fetch_references finished ===="
