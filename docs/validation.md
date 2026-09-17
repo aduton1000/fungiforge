@@ -90,6 +90,13 @@ Pending on the dev deployment: CEA10 and DF-005 rerun with `--genemark_dir` / `-
 Augustus seeds) and eggNOG-mapper; record gene counts and the new coverage columns (`pct_pfam`,
 `pct_go`, `pct_eggnog`) against the v0.1.0 numbers (9,630 and 12,473 proteins).
 
+### 1.4 Extras (W2.6)
+
+Pending on the dev deployment with the rebuilt image, the dbCAN/PHI-base/EffectorP data and the
+site-built SignalP 6 image: CEA10 expected MAT1-1 (published for CEA10) and `haploid_like`;
+DF-005 haploid; secretome, CAZyme and effector counts within the ranges published for the two
+species.
+
 ## 2. Reference-genome benchmarks
 
 | Isolate | Reference | Status |

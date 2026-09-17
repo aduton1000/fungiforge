@@ -3,9 +3,19 @@
 # images (staphb/flye, ontresearch|staphb/medaka, dfam/tetools, nextgenusfs/funannotate,
 # antismash/standalone, ezlabgva/busco). Built for linux/amd64:
 #   docker build -f env/Dockerfile -t aduton1000/fungiforge:<version> .
+# nQuire (ploidy from read allele frequencies; W2.6) is not packaged: built here from source with its
+# bundled htslib (static, zlib only) and copied into the runtime image as a single binary.
+FROM debian:bookworm-slim AS nquire
+RUN apt-get update -q && apt-get install -y -q --no-install-recommends build-essential zlib1g-dev git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+ARG NQUIRE_COMMIT=master
+RUN git clone --recursive -q https://github.com/clwgg/nQuire /opt/nQuire && cd /opt/nQuire && git checkout -q ${NQUIRE_COMMIT} \
+    && make submodules && make && ./nQuire 2>&1 | head -1
+
 FROM mambaorg/micromamba:1.5.8
 LABEL org.opencontainers.image.source="https://github.com/aduton1000/fungiforge"
 USER root
+COPY --from=nquire /opt/nQuire/nQuire /usr/local/bin/nQuire
 ENV LC_ALL=C.UTF-8 LANG=C.UTF-8 MPLCONFIGDIR=/tmp/matplotlib
 # Install from the explicit lock (exact package URLs + md5) so rebuilds reproduce the validated
 # environment byte for byte; env/base.yml is the human-readable source of the same pins.

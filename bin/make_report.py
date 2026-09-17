@@ -38,6 +38,8 @@ MASTER_COLS = [
     "resistance_read_support", "copy_number_flags",
     # appended 0.2.0 (W2.5): annotation size/quality and how the prediction was trained
     "n_proteins", "pct_pfam", "pct_go", "pct_eggnog", "pct_interpro", "annotation_training",
+    # appended 0.2.0 (W2.6): extras counts (ploidy and mating_type above are now nQuire / Pfam-based)
+    "n_secreted", "n_effectors", "n_cazymes", "n_phibase_hits",
 ]
 
 
@@ -137,6 +139,8 @@ def build_row(sample, compartment, facility, season, S):
         "pct_eggnog": g(ann, "pct_eggnog"), "pct_interpro": g(ann, "pct_interpro"),
         "annotation_training": (f"{g(prd, 'augustus_species')}/{g(prd, 'busco_db')}/genemark:{g(prd, 'genemark')}"
                                 if isinstance(prd, dict) and prd else "NA"),
+        "n_secreted": g(ext, "n_secreted"), "n_effectors": g(ext, "n_effectors"),
+        "n_cazymes": g(ext, "n_cazymes"), "n_phibase_hits": g(ext, "n_phibase_hits"),
     }
     return row
 

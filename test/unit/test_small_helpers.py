@@ -1,4 +1,4 @@
-"""Unit tests for the small stage helpers: bin/te_summary.py, bin/mobile_merge.py, bin/extras.py."""
+"""Unit tests for the small stage helpers: bin/te_summary.py, bin/mobile_merge.py."""
 import json, os, subprocess, sys
 
 
@@ -38,23 +38,4 @@ def test_mobile_merge_degrades_without_inputs(tmp_path, helpers):
     d = json.load(open(tmp_path / "m.json"))
     assert d["n_te_families"] == "NA" and d["te_by_class"] == {} and d["n_mycovirus"] == 0
 
-
-# ---------------------------------------------------------------- extras
-def test_extras_mating_type_and_keyword_tallies(tmp_path, helpers):
-    prots = helpers["write_fasta"](tmp_path / "p.faa", {
-        "FUN_1 MAT1-1-1 alpha-box mating-type protein": "M", "FUN_2 glycoside hydrolase family 18": "M",
-        "FUN_3 GH16 protein": "M", "FUN_4 secreted effector candidate": "M", "FUN_5 siderophore biosynthesis": "M",
-        "FUN_6 hypothetical protein": "M"})
-    out = run(helpers, "extras.py", "--sample", "S1", "--proteins", prots, "--out", str(tmp_path / "e.json"))
-    d = json.load(open(tmp_path / "e.json"))
-    assert d["mating_type"] == "MAT1-1" and d["n_cazyme_like"] == 2 and d["n_secreted_like"] == 1 and d["n_virulence_like"] == 1
-    assert d["ploidy"] == "NA" and "mating=MAT1-1" in out
-
-
-def test_extras_mat1_2_and_undetermined(tmp_path, helpers):
-    p = helpers["write_fasta"](tmp_path / "p.faa", {"FUN_1 MAT1-2-1 HMG-box mating type": "M"})
-    run(helpers, "extras.py", "--sample", "S1", "--proteins", p, "--out", str(tmp_path / "e.json"))
-    assert json.load(open(tmp_path / "e.json"))["mating_type"] == "MAT1-2"
-    run(helpers, "extras.py", "--sample", "S1", "--proteins", str(tmp_path / "absent.faa"), "--out", str(tmp_path / "e2.json"))
-    d = json.load(open(tmp_path / "e2.json"))
-    assert d["mating_type"] == "undetermined" and d["n_cazyme_like"] == 0
+# extras (stage 13) is tested in test_extras.py since W2.6 (tool-backed, no keyword tallies)

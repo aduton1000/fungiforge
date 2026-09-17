@@ -162,7 +162,7 @@ workflow FUNGIFORGE {
     if (!params.skip_novelty) { NOVELTY(DECONTAM.out.nuclear.join(IDENTIFY.out.markers).join(IDENTIFY.out.json)); novelty_ch = NOVELTY.out.json }
 
     extras_ch = channel.empty()
-    if (!params.skip_extras)  { EXTRAS(ANNOTATE.out.proteins.join(reads_ok)); extras_ch = EXTRAS.out.json }
+    if (!params.skip_extras)  { EXTRAS(ANNOTATE.out.proteins.join(ANNOTATE.out.gbk).join(RESISTANCE.out.bam)); extras_ch = EXTRAS.out.json }   // W2.6: GenBank for MAT synteny, stage-09 BAM for ploidy
 
     // 14. aggregate every per-stage result.json per isolate -> report + master row
     all_json = READ_QC.out.json

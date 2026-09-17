@@ -27,6 +27,8 @@
 #   --bind PATHS      extra container bind roots           (default /hpc)
 #   --skip-images     don't build the two .sif images / pre-pull public images
 #   --rebuild-images  rebuild the .sif files even if present
+#   --signalp <tgz>   build the site-only SignalP 6 image from the licensed package (env/signalp6.Dockerfile)
+#                     and write the `extras` label override into site.config (W2.6)
 #   --skip-cli        don't create the conda cli-env
 #   --profile-d       write /etc/profile.d/fungiforge.sh via sudo (else prints the snippet)
 #   --smoke           after install, run the stub-run DAG test through SLURM (~2-5 min)
@@ -35,11 +37,12 @@
 set -euo pipefail
 
 PREFIX=/hpc/opt/fungiforge; DB=/hpc/data/fungiforge; GROUP=""; REPO=https://github.com/aduton1000/fungiforge.git
-REF=main; PARTITION=""; BIND=/hpc; SKIP_IMAGES=0; REBUILD_IMAGES=0; SKIP_CLI=0; PROFILE_D=0; SMOKE=0; DRY=0
+REF=main; PARTITION=""; BIND=/hpc; SKIP_IMAGES=0; REBUILD_IMAGES=0; SKIP_CLI=0; PROFILE_D=0; SMOKE=0; DRY=0; SIGNALP_TGZ=""
 while [ $# -gt 0 ]; do case "$1" in
   --prefix) PREFIX="$2"; shift;;   --db) DB="$2"; shift;;   --group) GROUP="$2"; shift;;
   --repo) REPO="$2"; shift;;       --ref) REF="$2"; shift;; --partition) PARTITION="$2"; shift;;
   --bind) BIND="$2"; shift;;       --skip-images) SKIP_IMAGES=1;; --rebuild-images) REBUILD_IMAGES=1;;
+  --signalp) SIGNALP_TGZ="$2"; shift;;
   --skip-cli) SKIP_CLI=1;;         --profile-d) PROFILE_D=1;; --smoke) SMOKE=1;; --dry-run) DRY=1;;
   -h|--help) sed -n '2,36p' "$0"; exit 0;;
   *) echo "unknown option $1" >&2; exit 2;;
@@ -114,6 +117,20 @@ if [ "$SKIP_IMAGES" = 0 ]; then
   }
   build_sif "$FF_TAG" "$REPO_DIR/env/Dockerfile"              "$REPO_DIR"     "$FF_SIF"
   build_sif "$AS_TAG" "$REPO_DIR/env/antismash-ff.Dockerfile" "$REPO_DIR/env" "$AS_SIF"
+  # W2.6: site-only SignalP 6 image from the licensed package (never pushed); the `extras` label is
+  # pointed at it in site.config below. Rebuilt whenever the base image is rebuilt (--rebuild-images).
+  if [ -n "$SIGNALP_TGZ" ]; then
+    [ -s "$SIGNALP_TGZ" ] || die "--signalp: $SIGNALP_TGZ not found"
+    SP_SIF="$PREFIX/images/fungiforge-signalp6-$VERSION.sif"; SP_TAG="aduton1000/fungiforge-signalp6:$VERSION"
+    if [ -s "$SP_SIF" ] && [ "$REBUILD_IMAGES" = 0 ]; then echo "  have $SP_SIF — skip (use --rebuild-images)"; else
+      SP_CTX="$(mktemp -d)"; run cp "$SIGNALP_TGZ" "$SP_CTX/signalp6.tar.gz"
+      log "docker build $SP_TAG from $(basename "$SIGNALP_TGZ")"
+      run docker build --platform linux/amd64 --build-arg "BASE=$FF_TAG" --build-arg SIGNALP_TGZ=signalp6.tar.gz \
+          -t "$SP_TAG" -f "$REPO_DIR/env/signalp6.Dockerfile" "$SP_CTX"
+      run rm -f "$SP_SIF" "$SP_SIF.part"; run "$RT" build "$SP_SIF.part" "docker-daemon://$SP_TAG"; run mv "$SP_SIF.part" "$SP_SIF"; rm -rf "$SP_CTX"
+      run "$RT" exec "$SP_SIF" bash -c 'signalp6 --help >/dev/null && echo "  signalp6 OK"'
+    fi
+  fi
   log "sanity: tools inside the images"
   run "$RT" exec "$FF_SIF" bash -c 'ps --version | head -1; fungiforge version; ITSx -h 2>&1 | head -1; sourmash --version'
   run "$RT" exec "$AS_SIF" bash -c 'ps --version | head -1; antismash --version'
@@ -152,6 +169,10 @@ if [ "$DRY" = 0 ]; then
       sed "s#// slurm_partition = 'global'.*#slurm_partition = '$PARTITION'#" "$PREFIX/site.config" > "$PREFIX/site.config.tmp" && mv "$PREFIX/site.config.tmp" "$PREFIX/site.config"
     fi
   else echo "  keeping existing $PREFIX/site.config"; fi
+  if [ -n "${SP_SIF:-}" ] && [ -s "${SP_SIF:-}" ] && ! grep -q "fungiforge-signalp6" "$PREFIX/site.config"; then
+    printf '\n// W2.6: the site-built SignalP 6 image (licensed package) runs the extras stage\nprocess { withLabel: extras { container = %s } }\n' "'$SP_SIF'" >> "$PREFIX/site.config"
+    echo "  site.config: extras label -> $SP_SIF"
+  fi
   if [ ! -f "$PREFIX/fungiforge-env.sh" ]; then
     sed -e "s#^export FUNGIFORGE_ROOT=.*#export FUNGIFORGE_ROOT=\"$PREFIX\"#" \
         -e "s#^export FUNGIFORGE_DB=.*#export FUNGIFORGE_DB=\"$DB\"#" \

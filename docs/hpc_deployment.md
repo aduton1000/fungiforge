@@ -112,7 +112,7 @@ job: `sbatch --wrap 'fungiforge-run --samplesheet samples.csv' --time=7-0 --cpus
 bash /hpc/opt/fungiforge/repo/bin/hpc_install.sh --prefix /hpc/opt/fungiforge --db /hpc/data/fungiforge --group <group> --ref v0.1.1
 ```
 Existing `site.config` / `fungiforge-env.sh` are kept; images are rebuilt only with
-`--rebuild-images` (or when the version in `nextflow.config` changes).
+`--rebuild-images` (or when the version in `nextflow.config` changes). Add `--signalp /path/to/signalp-6.0i.fast.tar.gz` to build the site-only SignalP 6 image for the extras stage (W2.6); it is written next to the other `.sif` files and wired into `site.config`.
 
 ## Notes
 - Launch from a **writable** dir (Nextflow writes `.nextflow/`, `work/`, the log to CWD).
