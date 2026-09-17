@@ -24,17 +24,20 @@ The fungal sibling of the *forge* family (captureforge / callforge / methylforge
 flowchart LR
   ONT([ONT reads]) --> ASM
   ILMN([Illumina reads]) --> ASM
-  ASM[assembly + polish<br/>ONT: Flye+Medaka ± hybrid<br/>Illumina-only: SPAdes] --> QC[decontam · QC · BUSCO]
-  QC --> ANN[annotation<br/>Funannotate]
-  ANN --> ID[identify<br/>ITS/LSU · ANI · GCPSR]
-  ANN --> AMR[antifungal resistance<br/>FungAMR · cyp51A TR34/46]
-  ANN --> MGE[mobile / TE / mycovirus]
-  ANN --> BGC[BGCs · fungiSMASH]
-  ID --> REP[per-isolate report<br/>master_fungi.tsv]
+  ASM[assembly + polish<br/>ONT: Flye+purge_dups+Medaka ± hybrid<br/>Illumina-only: SPAdes] --> QC[decontam · organelle · QC · BUSCO]
+  QC --> ID[identify<br/>ITS + CaM/BenA/TEF1/RPB2/LSU · MLST · ANI]
+  ID --> ANN[annotation<br/>Funannotate + eggNOG ± InterProScan]
+  ANN --> AMR[antifungal resistance<br/>FungAMR tiers · read-level genotyping · cyp51A TR]
+  ANN --> MGE[TE landscape · geNomad · mycovirus EVEs]
+  ANN --> BGC[BGCs · fungiSMASH · mycotoxin flags]
+  ANN --> EXT[secretome · CAZymes · MAT · ploidy]
+  ID --> REP[per-isolate report<br/>master row]
   AMR --> REP
   MGE --> REP
   BGC --> REP
-  REP --> OH[One Health<br/>comparative analysis]
+  EXT --> REP
+  REP --> COH[cohort<br/>ANI clusters · tree · clonal groups · GCFs<br/>master_fungi.tsv · cohort report]
+  COH --> OH[One Health<br/>comparative analysis]
 ```
 
 ## Two layers
