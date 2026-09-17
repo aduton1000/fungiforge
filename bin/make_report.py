@@ -44,6 +44,8 @@ MASTER_COLS = [
     "mito_size_kb", "mito_core_genes", "mito_circular", "mito_copy_ratio", "mito_heteroplasmic_sites",
     # appended 0.2.0 (W2.8): mobile elements (te_percent and n_mycovirus above are now populated by stage 10)
     "te_ltr_pct", "n_genomad_virus", "n_genomad_plasmid", "n_mito_heg",
+    # appended 0.2.0 (W3.2): known mycotoxin / bioactive clusters (KnownClusterBlast vs MIBiG)
+    "mycotoxin_clusters", "bioactive_clusters", "n_bgc_mibig_hits",
 ]
 
 
@@ -153,6 +155,9 @@ def build_row(sample, compartment, facility, season, S):
         "mito_heteroplasmic_sites": g(org, "heteroplasmy", "n_heteroplasmic_sites"),
         "te_ltr_pct": g(mob, "te_landscape", "ltr_pct"), "n_genomad_virus": g(mob, "n_genomad_virus"),
         "n_genomad_plasmid": g(mob, "n_genomad_plasmid"), "n_mito_heg": g(mob, "n_mito_heg"),
+        "mycotoxin_clusters": ";".join(g(bgc, "mycotoxin_compounds", default=[]) or []) or ("none" if g(bgc, "status", default="ok") == "ok" and g(bgc, "knownclusterblast", "ran", default=False) else "NA"),
+        "bioactive_clusters": ";".join(g(bgc, "bioactive_compounds", default=[]) or []) or ("none" if g(bgc, "status", default="ok") == "ok" and g(bgc, "knownclusterblast", "ran", default=False) else "NA"),
+        "n_bgc_mibig_hits": g(bgc, "knownclusterblast", "n_regions_with_mibig_hit"),
     }
     return row
 
