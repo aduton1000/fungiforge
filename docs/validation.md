@@ -57,7 +57,8 @@ removed, so `stages_failed` is `none` only for runs of the current code.
 
 DF-003 (Illumina-only; the plate's read triage had flagged it bacterial) on the dev deployment with
 the W2.2 code (`8b0571e`), 2026-09-17: read QC → read triage → gate → report → provenance, 6 tasks,
-7 min 10 s, 0.4 CPU-h; master row present with `stages_failed = gate:skipped`,
+7 min 10 s, 0.4 CPU-h; triage on 200,000 of 11.2 M read pairs: 93.5 % bacterial, 3.8 % unclassified,
+top taxon *Staphylococcus aureus* (17.3 %); master row present with `stages_failed = gate:skipped`,
 `gate = skipped(read_triage:non_fungal)`; no assembly, annotation or downstream task ran. On the
 production code the same isolate went through assembly and hours of annotation.
 
