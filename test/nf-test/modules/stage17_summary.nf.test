@@ -1,0 +1,26 @@
+// Stub test for modules/stage17_summary.nf — the run-level cohort summary (W3.3).
+nextflow_process {
+
+    name "SUMMARY stub"
+    script "modules/stage17_summary.nf"
+    process "SUMMARY"
+    options "-stub-run"
+
+    test("emits the merged master, cohort report and summary JSON") {
+        when {
+            process {
+                """
+                input[0] = [file("$baseDir/test/samplesheet.test.csv")]
+                input[1] = file("$baseDir/assets/NO_COHORT")
+                input[2] = file("$baseDir/assets/NO_PROVENANCE")
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert process.out.master[0].endsWith('master_fungi.tsv')
+            assert process.out.report[0].endsWith('cohort_report.html')
+            assert path(process.out.summary[0]).json.n_isolates == 0
+        }
+    }
+}

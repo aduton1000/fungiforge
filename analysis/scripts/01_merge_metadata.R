@@ -9,8 +9,9 @@ args <- commandArgs(trailingOnly = TRUE)
 results_dir <- if (length(args) >= 1) args[[1]] else file.path(D$root, "..", "results")
 meta_csv    <- if (length(args) >= 2) args[[2]] else NULL   # optional external sample metadata
 
-# gather every per-isolate master row (Stage 14 publishes *.master.tsv to 04_summary)
-master_files <- Sys.glob(file.path(results_dir, "04_summary", "*.master.tsv"))
+# Stage 17 writes the merged, schema-validated table; fall back to the per-isolate rows
+merged <- file.path(results_dir, "04_summary", "master_fungi.tsv")
+master_files <- if (file.exists(merged)) merged else Sys.glob(file.path(results_dir, "04_summary", "*.master.tsv"))
 if (length(master_files) == 0)
   master_files <- Sys.glob(file.path(results_dir, "*", "14_report", "*.master.tsv"))
 if (length(master_files) == 0) stop("no *.master.tsv found under ", results_dir,
@@ -18,7 +19,16 @@ if (length(master_files) == 0) stop("no *.master.tsv found under ", results_dir,
 
 master <- master_files |> lapply(function(f) suppressMessages(read_tsv(f, show_col_types = FALSE))) |>
   bind_rows() |> distinct(sample, .keep_all = TRUE)
-message(sprintf("[01] %d isolates from %d master files", nrow(master), length(master_files)))
+message(sprintf("[01] %d isolates from %s", nrow(master),
+                if (identical(master_files, merged)) "04_summary/master_fungi.tsv (merged by stage 17)"
+                else sprintf("%d per-isolate master files", length(master_files))))
+# carry the cohort outputs (stage 16) next to the table so the objectives can use them
+cohort_dir <- file.path(results_dir, "cohort")
+if (dir.exists(cohort_dir)) {
+  for (f in c("clonal_groups.tsv", "species_clusters.tsv", "bgc_families.tsv", "cohort.json"))
+    if (file.exists(file.path(cohort_dir, f))) file.copy(file.path(cohort_dir, f), file.path(D$output, f), overwrite = TRUE)
+  message("[01] cohort tables copied from results/cohort/")
+}
 
 if (!is.null(meta_csv) && file.exists(meta_csv)) {
   meta <- suppressMessages(read_csv(meta_csv, show_col_types = FALSE))

@@ -4,11 +4,18 @@ Objective scripts that turn the per-isolate `master_fungi` rows from Layer 1 int
 air/human/surface **One Health** comparative story, mirroring the bacterial `r-analysis/`.
 
 ```bash
-# after the Nextflow pipeline has produced results/*/14_report/*.master.tsv:
+# after the Nextflow pipeline has produced results/04_summary/master_fungi.tsv:
 analysis/run_downstream.sh results/ [sample_metadata.csv]
 ```
 
-Flow: `01_merge_metadata.R` (gather per-isolate master rows) → `02_recover_metadata.R`
+Inputs from Layer 1: the merged, schema-validated **`04_summary/master_fungi.tsv`** (stage 17;
+per-isolate `*.master.tsv` rows are the fallback for older runs) and, when the run-level cohort
+stage produced them, **`cohort/clonal_groups.tsv`**, `species_clusters.tsv` and
+`bgc_families.tsv`, which `01_merge_metadata.R` copies next to the analysis table so
+objective 4 reports genome-level clonal groups and objective 7 the cross-compartment gene-cluster
+families instead of candidate pairs.
+
+Flow: `01_merge_metadata.R` (gather the master table + cohort tables) → `02_recover_metadata.R`
 (→ `output/analysis_dataset.csv`, the table every objective reads) → objectives:
 
 | Script | Objective |
