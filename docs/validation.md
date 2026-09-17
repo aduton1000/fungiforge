@@ -119,10 +119,18 @@ genotypes from the paper's Table 3):
 
 The three poultry-farm isolates share the same cyp51A background substitutions, so the TR34 and
 L98H calls are tested against a matched wild-type rather than an unrelated strain. Expected
-pipeline outcome for the positives: `cyp51A_TR = TR34`, `L98H` known mutation, azole in
-`resistant_classes`, confidence `provisional_ont_only` (no Illumina); for 157DB3: no TR, no L98H,
-the five background substitutions reported as novel hotspot variants only where they sit on a
-panel hotspot (none do), so `resistant_classes = none`.
+pipeline outcome for the positives (W2.4 code): `cyp51A_TR = TR34` with the read check
+`agrees_with_assembly`, `L98H` known mutation with `read_support.agrees = true`, azole in
+`resistant_classes`, confidence `high` (read-confirmed even without Illumina); for 157DB3: no TR
+(reads `agrees_with_assembly` at the wild-type site), no L98H, the five background substitutions
+reported only where they sit on a panel position (F46Y, M172V, N248T, D255E, E427K are all FungAMR
+positions and will appear as `associated_unvalidated` or wild-type-agreeing calls), so
+`resistant_classes = none`; `resistance_read_support` lists the confirmed positions.
+
+In-image check of the read-level code (2026-09-17, simulated 250-bp reads on the real cyp51A
+locus): C87 published assembly → L98H confirmed by 25 reads (96 %), TR34 agrees; wild-type
+assembly with reads carrying L98H and an extra TR34 unit → L98H reported as reads-only (97 %) and
+TR34 as `reads_have_extra_copy` (12/12 spanning reads), i.e. the C87 lesson is now detectable.
 
 *Candida* controls (*C. auris* FKS1 S639F, *C. albicans* ERG11) are deferred to the resistance
 upgrade (W2.4), where the caller gains read-level genotyping for those genes; candidate sources:

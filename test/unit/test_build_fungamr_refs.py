@@ -64,4 +64,4 @@ def test_main_builds_reference_fasta_and_mutation_table(tmp_path, monkeypatch):
     muts = [l.rstrip("\n").split("\t") for l in open(fdir / "fungamr_mutations.tsv")][1:]
     assert [m[3] for m in muts] == ["L98H", "G54W", "Y132F"]          # confidence 1..8 kept; 9 and -1 dropped
     info = json.load(open(fdir / "reference_build.json"))
-    assert info == {"accessions_requested": 3, "sequences_written": 3, "mutations": 3}
+    assert info == {"accessions_requested": 3, "sequences_written": 3, "mutations": 3, "panel_rows": 2}

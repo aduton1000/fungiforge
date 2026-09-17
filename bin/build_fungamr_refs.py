@@ -135,8 +135,17 @@ def main():
         for row in muts:
             out.write("\t".join(row) + "\n")
 
+    # W2.4: the panel rows af_resistance.py merges with the curated overlay (also derivable on the fly)
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import fungamr_panel
+        panel, evidence = fungamr_panel.derive_panel(rows, fungamr_panel.drug_classes(os.path.join(fdir, "drugs_class.csv")))
+        fungamr_panel.write_panel(panel, os.path.join(fdir, "fungamr_panel.tsv"))
+        n_panel = len(panel)
+    except Exception as e:  # noqa: BLE001
+        sys.stderr.write(f"[build] fungamr_panel.tsv not written: {e}\n"); n_panel = 0
     json.dump({"accessions_requested": len(accessions), "sequences_written": n,
-               "mutations": len(muts)}, open(os.path.join(fdir, "reference_build.json"), "w"), indent=2)
+               "mutations": len(muts), "panel_rows": n_panel}, open(os.path.join(fdir, "reference_build.json"), "w"), indent=2)
     print(f"[build_fungamr_refs] {n} reference proteins -> {faa}")
     print(f"[build_fungamr_refs] {len(muts)} mutations -> {mtsv}")
 

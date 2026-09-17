@@ -34,6 +34,8 @@ MASTER_COLS = [
     # appended 0.2.0 (W2.3): identification evidence — secondary loci that agree with ITS, flags
     # (tie/discordant/unavailable), MLST scheme:ST, species-aware BUSCO lineage and completeness
     "id_loci_agree", "id_flags", "mlst_st", "busco_lineage_specific", "busco_complete_specific",
+    # appended 0.2.0 (W2.4): read-level support of the resistance calls and copy-number flags
+    "resistance_read_support", "copy_number_flags",
 ]
 
 
@@ -57,6 +59,16 @@ def g(d, *keys, default="NA"):
         else:
             return default
     return cur if cur not in (None, "", []) else default
+
+
+def read_support_summary(res):
+    """confirmed:N;discordant:M;reads_only:K;insufficient:J, or assembly_only / NA."""
+    rs = g(res, "summary", "read_support", default=None)
+    if not isinstance(rs, dict):
+        return "NA"
+    if rs.get("mode") != "reads":
+        return "assembly_only"
+    return ";".join(f"{k}:{rs.get(k, 0)}" for k in ("confirmed", "discordant", "reads_only", "insufficient"))
 
 
 def build_row(sample, compartment, facility, season, S):
@@ -115,6 +127,8 @@ def build_row(sample, compartment, facility, season, S):
                     else f"{ml.get('scheme')}:ST-" if isinstance(ml, dict) and ml.get("scheme") else "NA"),
         "busco_lineage_specific": g(bl, "lineage", default="NA") if g(bl, "busco_complete", default=None) not in (None, "NA") else "NA",
         "busco_complete_specific": g(bl, "busco_complete", default="NA"),
+        "resistance_read_support": read_support_summary(res),
+        "copy_number_flags": ";".join(g(res, "summary", "copy_number_flags", default=[]) or []) or "none",
     }
     return row
 

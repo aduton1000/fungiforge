@@ -11,9 +11,10 @@ def row(S):
 
 def test_columns_are_append_only_and_end_with_status_columns():
     assert m.MASTER_COLS[:4] == ["sample", "compartment", "facility", "season"]
-    assert m.MASTER_COLS[-15:] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
+    assert m.MASTER_COLS[-17:] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
                                    "read_verdict", "genome_size_est", "heterozygosity_pct", "ploidy_hint", "coverage",
-                                   "id_loci_agree", "id_flags", "mlst_st", "busco_lineage_specific", "busco_complete_specific"]
+                                   "id_loci_agree", "id_flags", "mlst_st", "busco_lineage_specific", "busco_complete_specific",
+                                   "resistance_read_support", "copy_number_flags"]
     assert len(m.MASTER_COLS) == len(set(m.MASTER_COLS))
 
 
@@ -124,3 +125,12 @@ def test_identification_columns_w23():
     assert r2["mlst_st"] == "calbicans:ST-" and r2["busco_lineage_specific"] == "NA" and r2["busco_complete_specific"] == "NA"
     r3 = row({})
     assert r3["id_loci_agree"] == "none" and r3["id_flags"] == "none" and r3["mlst_st"] == "NA"
+
+
+def test_resistance_read_support_columns_w24():
+    S = {"resistance": {"summary": {"read_support": {"mode": "reads", "confirmed": 2, "discordant": 0, "reads_only": 1, "insufficient": 3},
+                                    "copy_number_flags": ["ERG11:2.1"]}}}
+    r = row(S)
+    assert r["resistance_read_support"] == "confirmed:2;discordant:0;reads_only:1;insufficient:3" and r["copy_number_flags"] == "ERG11:2.1"
+    assert row({"resistance": {"summary": {"read_support": {"mode": "assembly_only"}}}})["resistance_read_support"] == "assembly_only"
+    assert row({})["resistance_read_support"] == "NA" and row({})["copy_number_flags"] == "none"
