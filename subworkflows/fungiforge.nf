@@ -9,6 +9,7 @@ include { MEDAKA }      from '../modules/stage03_polish.nf'
 include { SRPOLISH }    from '../modules/stage03b_srpolish.nf'
 include { DECONTAM }    from '../modules/stage04_decontam.nf'
 include { ASSEMBLY_QC } from '../modules/stage05_assembly_qc.nf'
+include { GATE }        from '../modules/stage05b_gate.nf'
 include { REPEATMASK }  from '../modules/stage06_repeatmask.nf'
 include { ANNOTATE }    from '../modules/stage07_annotate.nf'
 include { IDENTIFY }    from '../modules/stage08_identify.nf'
@@ -66,17 +67,36 @@ workflow FUNGIFORGE {
     // 4. decontamination + organelle split -> nuclear / mito
     DECONTAM(SRPOLISH.out.assembly)
 
-    // 5. assembly QC + completeness (QUAST + compleasm/BUSCO)
+    // 5. assembly QC + completeness (compleasm/BUSCO + contiguity)
     ASSEMBLY_QC(DECONTAM.out.nuclear)
 
+    // 5b. the gate (W2.1): an isolate that is not a fungus (Kraken2 verdict non_fungal or human)
+    //     or whose assembly failed QC does not go through the fungal stages 06-13. It gets a
+    //     `gate` JSON (status skipped + reason) and still reaches REPORT, so its master row
+    //     exists with the reason. --force_all sends every isolate through regardless.
+    gate = DECONTAM.out.json.join(ASSEMBLY_QC.out.json).map { meta, dj, qj ->
+      def d = new groovy.json.JsonSlurper().parseText(dj.text)
+      def q = new groovy.json.JsonSlurper().parseText(qj.text)
+      def verdict = d?.verdict ?: 'not_run'
+      def reason = null
+      if (!params.force_all) {
+        if (verdict in ['non_fungal', 'human']) reason = "verdict:${verdict}"
+        else if (q?.qc_pass == false)          reason = "qc_pass:false"
+      }
+      tuple(meta, reason)
+    }
+    pass_meta = gate.filter { _meta, reason -> reason == null }.map { meta, _reason -> tuple(meta) }
+    GATE(gate.filter { _meta, reason -> reason != null })
+    nuclear_ok = DECONTAM.out.nuclear.join(pass_meta)     // (meta, nuclear) for isolates that passed the gate
+
     // 6. repeat modeling + soft-masking (RepeatModeler2 / RepeatMasker)
-    REPEATMASK(DECONTAM.out.nuclear)
+    REPEATMASK(nuclear_ok)
 
     // 7. eukaryotic gene prediction + functional annotation (Funannotate)
     ANNOTATE(REPEATMASK.out.masked)
 
     // 8. identification (ITS/LSU + genome ANI + MLST, GCPSR multi-locus)
-    IDENTIFY(DECONTAM.out.nuclear)
+    IDENTIFY(nuclear_ok)
 
     // 9. antifungal resistance (bespoke panel + cyp51A TR34/TR46 module).
     //    needs proteins (substitutions) + species + nuclear & GBK (promoter TR locus)
@@ -103,7 +123,7 @@ workflow FUNGIFORGE {
     // 14. aggregate every per-stage result.json per isolate -> report + master row
     all_json = READ_QC.out.json
       .mix(basecall_json, ASSEMBLE.out.json, SR_ASSEMBLE.out.json, MEDAKA.out.json,
-           SRPOLISH.out.json, DECONTAM.out.json, ASSEMBLY_QC.out.json, REPEATMASK.out.json,
+           SRPOLISH.out.json, DECONTAM.out.json, ASSEMBLY_QC.out.json, GATE.out.json, REPEATMASK.out.json,
            ANNOTATE.out.json, IDENTIFY.out.json, RESISTANCE.out.json,
            mobile_ch, bgc_ch, novelty_ch, extras_ch)
       .map { meta, j -> tuple(meta.id, meta, j) }
