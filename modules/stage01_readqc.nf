@@ -37,9 +37,11 @@ process READ_QC {
     ff_version chopper -- chopper --version
     ff_version nanoplot -- NanoPlot --version
     ff_version fastp -- fastp --version
-    ff_run nanoplot_raw --optional -- NanoPlot --fastq ${ont} -o nanoplot_raw --prefix raw --N50
+    # --plots dot --no_static: NanoPlot 1.47's 2-D density plot needs a plotly API removed in plotly 6, and
+    # static PNG export needs a Chrome-based Kaleido; neither is in the image, and only NanoStats.txt is consumed.
+    ff_run nanoplot_raw --optional -- NanoPlot --fastq ${ont} -o nanoplot_raw --prefix raw --N50 --plots dot --no_static
     ff_run chopper -- bash -o pipefail -c "chopper -q ${params.ont_min_qual} -l ${params.ont_min_len} -i ${ont} 2> chopper.log | gzip > ${meta.id}.ont.filt.fastq.gz"
-    ff_run nanoplot_filt --optional -- NanoPlot --fastq ${meta.id}.ont.filt.fastq.gz -o nanoplot_filt --prefix filt --N50
+    ff_run nanoplot_filt --optional -- NanoPlot --fastq ${meta.id}.ont.filt.fastq.gz -o nanoplot_filt --prefix filt --N50 --plots dot --no_static
     ${ has_illumina ? fastp : "ff_skip fastp 'no Illumina reads for this isolate'" }
     printf '{"sample":"%s","stage":"readqc","platform":"%s","ont_filtered":"%s","illumina":%s}\\n' \\
       "${meta.id}" "${platform}" "${meta.id}.ont.filt.fastq.gz" "${has_illumina.toString()}" > ${meta.id}.readqc.json
