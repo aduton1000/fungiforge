@@ -11,7 +11,8 @@ def row(S):
 
 def test_columns_are_append_only_and_end_with_status_columns():
     assert m.MASTER_COLS[:4] == ["sample", "compartment", "facility", "season"]
-    assert m.MASTER_COLS[-23:] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
+    assert m.MASTER_COLS[-4:] == ["n_secreted", "n_effectors", "n_cazymes", "n_phibase_hits"]
+    assert m.MASTER_COLS[-27:-4] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
                                    "read_verdict", "genome_size_est", "heterozygosity_pct", "ploidy_hint", "coverage",
                                    "id_loci_agree", "id_flags", "mlst_st", "busco_lineage_specific", "busco_complete_specific",
                                    "resistance_read_support", "copy_number_flags",

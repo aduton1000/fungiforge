@@ -13,7 +13,7 @@
 #   bin/fetch_references.sh images antismash funannotate   # selected steps
 #
 # Steps: images antismash funannotate eggnog busco unite kraken2 refseq_fungi
-#        fungamr rvdb benchmarks markers mlst interproscan
+#        fungamr rvdb benchmarks markers mlst dbcan phibase effectorp interproscan
 #
 # NB several DBs are downloaded THROUGH their tool container (funannotate setup,
 # eggnog, antismash) so the relevant image is pulled first. Version/URL-sensitive
@@ -23,7 +23,7 @@
 set -uo pipefail
 
 DB="${FUNGIFORGE_DB:?set FUNGIFORGE_DB to the target data dir, e.g. /data/fungiforge_db}"
-mkdir -p "$DB"/{containers,funannotate,eggnog,antismash,busco,unite,kraken2,refseq_fungi,fungamr,rvdb,markers,mlst,interproscan,logs}
+mkdir -p "$DB"/{containers,funannotate,eggnog,antismash,busco,unite,kraken2,refseq_fungi,fungamr,rvdb,markers,mlst,interproscan,dbcan,phibase,effectorp,logs}
 LOGDIR="$DB/logs"; MANIFEST="$DB/MANIFEST.tsv"
 [ -f "$MANIFEST" ] || echo -e "database\tdetail\tstatus\ttimestamp" > "$MANIFEST"
 
@@ -294,8 +294,40 @@ step_mlst(){
     && mark mlst "PubMLST afumigatus calbicans cglabrata ctropicalis ckrusei $(date +%F)" || fail mlst "fetch_mlst_schemes.py (see logs/mlst.log)"
 }
 
+# ---- W2.6 extras: dbCAN HMMs, PHI-base, EffectorP 3 --------------------------------
+# dbCAN CAZyme family HMMs (the HMMER module of run_dbcan; searched with hmmsearch in the base image).
+step_dbcan(){
+  is_done dbcan && { log "dbcan HMMs present — skip"; return; }
+  # the dbCAN site serves its files through a download script (plain paths return an HTML page)
+  local ver="${DBCAN_VERSION:-V14}"
+  local url="${DBCAN_URL:-https://pro.unl.edu/dbCAN2/download_file.php?file=dbCAN-HMMdb-$ver.txt}"
+  log "downloading dbCAN HMM database $ver -> $DB/dbcan"
+  ( cd "$DB/dbcan" && dl "$url" "dbCAN-HMMdb.txt" && grep -q '^HMMER3' dbCAN-HMMdb.txt && hmmpress -f dbCAN-HMMdb.txt >/dev/null 2>&1 || true ) >>"$LOGDIR/dbcan.log" 2>&1 \
+    && [ -s "$DB/dbcan/dbCAN-HMMdb.txt" ] && grep -q '^HMMER3' "$DB/dbcan/dbCAN-HMMdb.txt" && mark dbcan "dbCAN-HMMdb-$ver ($url)" || fail dbcan "$url"
+}
+
+# PHI-base pathogen–host interaction proteins (CC BY; FASTA with phenotype in the header).
+step_phibase(){
+  is_done phibase && { log "phibase present — skip"; return; }
+  local url="${PHIBASE_URL:-https://raw.githubusercontent.com/PHI-base/data/master/releases/phi-base_current.fas}"
+  log "downloading PHI-base -> $DB/phibase"
+  ( cd "$DB/phibase" && dl "$url" "phi-base_current.fas" ) >>"$LOGDIR/phibase.log" 2>&1 \
+    && [ -s "$DB/phibase/phi-base_current.fas" ] && mark phibase "$url" || fail phibase "$url"
+}
+
+# EffectorP 3.0 (GPL; Python + bundled WEKA, run with the Java of the base image).
+step_effectorp(){
+  is_done effectorp && { log "effectorp present — skip"; return; }
+  local repo="${EFFECTORP_REPO:-https://github.com/JanaSperschneider/EffectorP-3.0}"
+  log "cloning EffectorP 3.0 -> $DB/effectorp"
+  ( rm -rf "$DB/effectorp/EffectorP-3.0" && git clone -q --depth 1 "$repo" "$DB/effectorp/EffectorP-3.0" \
+    && cd "$DB/effectorp/EffectorP-3.0" && unzip -o -q weka-3-8-4.zip ) >>"$LOGDIR/effectorp.log" 2>&1 \
+    && [ -f "$DB/effectorp/EffectorP-3.0/EffectorP.py" ] && [ -d "$DB/effectorp/EffectorP-3.0/weka-3-8-4" ] \
+    && mark effectorp "$repo ($(git -C "$DB/effectorp/EffectorP-3.0" rev-parse --short HEAD))" || fail effectorp "$repo"
+}
+
 # ---- driver -----------------------------------------------------------------
-STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggnog busco unite kraken2 refseq_fungi fungamr rvdb benchmarks markers mlst)   # interproscan: on request (6.9 GB + hours per genome)
+STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggnog busco unite kraken2 refseq_fungi fungamr rvdb benchmarks markers mlst dbcan phibase effectorp)   # interproscan: on request (6.9 GB + hours per genome)
 log "==== fungiforge fetch_references start · DB=$DB · steps: ${STEPS[*]} ===="
 for s in "${STEPS[@]}"; do "step_$s"; done
 log "==== fetch_references finished ===="

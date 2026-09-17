@@ -12,6 +12,7 @@ process RESISTANCE {
   publishDir { "${params.outdir}/${meta.id}/09_resistance" }, mode: 'copy', pattern: "*.{json,bam,bai}"
   input:  tuple val(meta), path(proteins), path(species), path(nuclear), path(gbk), path(polish_json), path(ont), path(r1), path(r2)
   output: tuple val(meta), path("${meta.id}.resistance.json"), emit: json
+          tuple val(meta), path("${meta.id}.reads.bam"), path("${meta.id}.reads.bam.bai"), emit: bam   // W2.6: reused by stage 13 (nQuire)
   script:
   def has_illumina = r1.name != 'NO_R1'
   def n_ilmn = params.genotype_reads
@@ -42,6 +43,8 @@ process RESISTANCE {
   else
     ff_skip map_reads "read-level genotyping disabled (--read_genotype false)"
   fi
+  # stage 13 joins on the BAM: an empty placeholder pair keeps the contract when mapping did not run
+  [ -s ${meta.id}.reads.bam ] || { : > ${meta.id}.reads.bam; : > ${meta.id}.reads.bam.bai; }
   ff_run af_resistance -- af_resistance.py \\
       --sample "${meta.id}" --proteins ${proteins} --species ${species} \\
       --assembly ${nuclear} --gbk ${gbk} --polish-mode "\$PM" \$BAM_ARG \\
@@ -51,5 +54,5 @@ process RESISTANCE {
   ff_finalize
   """
   stub:
-  "echo '{\"sample\":\"${meta.id}\",\"stage\":\"resistance\"}' > ${meta.id}.resistance.json"
+  ": > ${meta.id}.reads.bam; : > ${meta.id}.reads.bam.bai; echo '{\"sample\":\"${meta.id}\",\"stage\":\"resistance\"}' > ${meta.id}.resistance.json"
 }
