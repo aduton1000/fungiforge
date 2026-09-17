@@ -11,8 +11,9 @@ def row(S):
 
 def test_columns_are_append_only_and_end_with_status_columns():
     assert m.MASTER_COLS[:4] == ["sample", "compartment", "facility", "season"]
-    assert m.MASTER_COLS[-10:] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
-                                   "read_verdict", "genome_size_est", "heterozygosity_pct", "ploidy_hint", "coverage"]
+    assert m.MASTER_COLS[-15:] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
+                                   "read_verdict", "genome_size_est", "heterozygosity_pct", "ploidy_hint", "coverage",
+                                   "id_loci_agree", "id_flags", "mlst_st", "busco_lineage_specific", "busco_complete_specific"]
     assert len(m.MASTER_COLS) == len(set(m.MASTER_COLS))
 
 
@@ -109,3 +110,17 @@ def test_top_taxon_falls_back_to_the_read_triage_when_decontam_never_ran():
          "gate": {"stage": "gate", "status": "skipped", "reason": "read_triage:non_fungal"}}
     r = row(S)
     assert r["top_taxon"] == "Klebsiella pneumoniae (71.2%)" and r["sample_verdict"] == "NA" and r["read_verdict"] == "non_fungal"
+
+
+def test_identification_columns_w23():
+    S = {"identify": {"species": "Aspergillus fumigatus", "confidence": "high", "method": "ITS+CaM(concordant)",
+                      "flags": ["tie:BenA=Aspergillus fumigatus/Aspergillus lentulus"],
+                      "concordance": {"secondary_agree": ["CaM", "TEF1"]}, "mlst": {"scheme": "afumigatus", "st": "26"}},
+         "busco_lineage": {"lineage": "eurotiales_odb10", "busco_complete": 99.4}}
+    r = row(S)
+    assert r["id_loci_agree"] == "CaM;TEF1" and r["id_flags"] == "tie:BenA=Aspergillus fumigatus/Aspergillus lentulus"
+    assert r["mlst_st"] == "afumigatus:ST26" and r["busco_lineage_specific"] == "eurotiales_odb10" and r["busco_complete_specific"] == 99.4
+    r2 = row({"identify": {"species": "x", "mlst": {"scheme": "calbicans", "st": None}}, "busco_lineage": {"lineage": "fungi_odb10", "busco_complete": None, "skipped": "same_as_qc"}})
+    assert r2["mlst_st"] == "calbicans:ST-" and r2["busco_lineage_specific"] == "NA" and r2["busco_complete_specific"] == "NA"
+    r3 = row({})
+    assert r3["id_loci_agree"] == "none" and r3["id_flags"] == "none" and r3["mlst_st"] == "NA"

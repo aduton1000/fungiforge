@@ -169,7 +169,7 @@ results/
 │   ├── 05_assembly_qc/  # assemblyqc.json (QUAST contiguity, BUSCO/compleasm, qc_pass)
 │   ├── 06_repeatmask/   # <sample>.masked.fasta, <sample>.telib.fasta, repeat.json
 │   ├── 07_annotate/     # <sample>.proteins.faa, <sample>.gbk, annotate.json
-│   ├── 08_identify/     # <sample>.species.txt, <sample>.markers.fasta, identify.json
+│   ├── 08_identify/     # <sample>.species.txt, <sample>.markers.fasta, identify.json, busco_lineage.json
 │   ├── 09_resistance/   # resistance.json (calls + confidence + cyp51A TR)
 │   ├── 10_mobile/  11_bgc/  12_novelty/  13_extras/   # *.json
 │   └── 14_report/       # <sample>.report.html  ← self-contained per-isolate report
@@ -190,7 +190,7 @@ Compose one from each group:
 
 - **Input-mode–aware resistance confidence:** ONT homopolymer indels create false frameshifts exactly where antifungal-resistance point-mutations live, so **ONT-only** calls are flagged **provisional until hybrid-polished** (Medaka is applied; Polypolish adds Illumina when present). **Hybrid** and **Illumina-only** assemblies carry **high-confidence** calls — short-read base accuracy has no homopolymer-indel problem.
 - **Antifungal resistance** uses a curated **FungAMR/MARDy** allele+mutation panel plus a dedicated *A. fumigatus* **cyp51A TR34/TR46** promoter-repeat detector (structural, not SNP).
-- **Identification** uses ITS/LSU (UNITE) + genome ANI (sourmash/skani) with multi-locus **GCPSR** concordance — there is no GTDB for fungi.
+- **Identification** is multi-locus: ITS against UNITE plus CaM, BenA, TEF1, RPB2 and LSU D1/D2 extracted from the assembly and searched against NCBI type-material reference sets; a species call needs ITS and one agreeing secondary locus (ties such as *A. flavus*/*A. oryzae* and discordances are flagged, never hidden); fungal PubMLST schemes give an ST where one exists, and BUSCO is re-scored with the lineage chosen from the call — there is no GTDB for fungi.
 - **Non-fungal isolates are stopped early:** a Kraken2 read triage before assembly, and the contig verdict plus assembly QC after it, stop bacterial/human/failed isolates with the reason on their master row; `--force_all` overrides.
 - **Reads tell you the genome before assembly:** a KMC + GenomeScope2 k-mer profile reports genome size, heterozygosity, a ploidy hint and coverage per isolate.
 - **No silent failure:** every stage JSON carries `status` (`ok | partial | failed | skipped`) and per-tool exit codes and versions; the master table's `stages_failed` column names anything that was not `ok`.

@@ -17,9 +17,10 @@ nextflow_pipeline {
             assert workflow.success
             def names = workflow.trace.tasks().collect { it.name }
             // 1 DB_CHECK + 3 x (READ_QC, READ_TRIAGE, KMER_PROFILE, SRPOLISH, DECONTAM, ASSEMBLY_QC,
-            // REPEATMASK, ANNOTATE, IDENTIFY, RESISTANCE, MOBILE, BGC, NOVELTY, EXTRAS, REPORT)
-            // + 2 ASSEMBLE + 2 MEDAKA + 1 SR_ASSEMBLE + 1 PROVENANCE = 52
-            assert workflow.trace.succeeded().size() == 52
+            // REPEATMASK, ANNOTATE, IDENTIFY, BUSCO_LINEAGE, RESISTANCE, MOBILE, BGC, NOVELTY, EXTRAS, REPORT)
+            // + 2 ASSEMBLE + 2 MEDAKA + 1 SR_ASSEMBLE + 1 PROVENANCE = 55
+            assert workflow.trace.succeeded().size() == 55
+            assert names.count { it.startsWith("FUNGIFORGE:BUSCO_LINEAGE") } == 3
             assert names.count { it.startsWith("FUNGIFORGE:READ_TRIAGE") } == 3
             assert names.count { it.startsWith("FUNGIFORGE:KMER_PROFILE") } == 3
             assert workflow.trace.failed().size() == 0
@@ -57,7 +58,7 @@ nextflow_pipeline {
             assert workflow.success
             def names = workflow.trace.tasks().collect { it.name }
             assert !names.any { it.contains("BGC") || it.contains("MOBILE") || it.contains("NOVELTY") || it.contains("EXTRAS") }
-            assert workflow.trace.succeeded().size() == 52 - 4 * 3
+            assert workflow.trace.succeeded().size() == 55 - 4 * 3
             assert path("$outputDir/pipeline_info/provenance.json").json.n_samples == 3
         }
     }
@@ -75,9 +76,9 @@ nextflow_pipeline {
             def names = workflow.trace.tasks().collect { it.name }
             assert names.count { it.startsWith("FUNGIFORGE:GATE_ASSEMBLY") } == 2
             assert names.any { it == "FUNGIFORGE:GATE_ASSEMBLY (TESTFUN03)" } && names.any { it == "FUNGIFORGE:GATE_ASSEMBLY (TESTFUN01)" }
-            // the two gated isolates skip 8 stages each; TESTFUN02 runs everything
-            assert workflow.trace.succeeded().size() == 52 - 2 * 8 + 2
-            ["REPEATMASK", "ANNOTATE", "IDENTIFY", "RESISTANCE", "MOBILE", "BGC", "NOVELTY", "EXTRAS"].each { st ->
+            // the two gated isolates skip 9 stages each; TESTFUN02 runs everything
+            assert workflow.trace.succeeded().size() == 55 - 2 * 9 + 2
+            ["REPEATMASK", "ANNOTATE", "IDENTIFY", "BUSCO_LINEAGE", "RESISTANCE", "MOBILE", "BGC", "NOVELTY", "EXTRAS"].each { st ->
                 assert !names.any { it == "FUNGIFORGE:${st} (TESTFUN03)" || it == "FUNGIFORGE:${st} (TESTFUN01)" }
                 assert names.any { it == "FUNGIFORGE:${st} (TESTFUN02)" }
             }
@@ -101,7 +102,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            assert workflow.trace.succeeded().size() == 52
+            assert workflow.trace.succeeded().size() == 55
             assert !workflow.trace.tasks().any { it.name.startsWith("FUNGIFORGE:GATE") }
         }
     }
@@ -117,15 +118,15 @@ nextflow_pipeline {
             assert workflow.success
             def names = workflow.trace.tasks().collect { it.name }
             assert names.count { it.startsWith("FUNGIFORGE:GATE_READS") } == 1 && names.any { it == "FUNGIFORGE:GATE_READS (TESTFUN02)" }
-            // TESTFUN02 (hybrid) runs READ_QC, READ_TRIAGE, GATE_READS, REPORT only: 17 tasks -> 4
-            assert workflow.trace.succeeded().size() == 52 - 17 + 4
-            ["KMER_PROFILE", "ASSEMBLE", "MEDAKA", "SRPOLISH", "DECONTAM", "ASSEMBLY_QC", "ANNOTATE", "IDENTIFY", "RESISTANCE"].each { st ->
+            // TESTFUN02 (hybrid) runs READ_QC, READ_TRIAGE, GATE_READS, REPORT only: 18 tasks -> 4
+            assert workflow.trace.succeeded().size() == 55 - 18 + 4
+            ["KMER_PROFILE", "ASSEMBLE", "MEDAKA", "SRPOLISH", "DECONTAM", "ASSEMBLY_QC", "ANNOTATE", "IDENTIFY", "BUSCO_LINEAGE", "RESISTANCE"].each { st ->
                 assert !names.any { it == "FUNGIFORGE:${st} (TESTFUN02)" }
             }
             assert names.any { it == "FUNGIFORGE:ASSEMBLE (TESTFUN01)" } && names.any { it == "FUNGIFORGE:SR_ASSEMBLE (TESTFUN03)" }
             assert path("$outputDir/04_summary/TESTFUN02.master.tsv").exists()
             def g = path("$outputDir/TESTFUN02/05_assembly_qc/TESTFUN02.gate.json").json
-            assert g.reason == "read_triage:human" && g.skipped_stages.contains("assemble") && g.skipped_stages.size() == 14
+            assert g.reason == "read_triage:human" && g.skipped_stages.contains("assemble") && g.skipped_stages.size() == 15
             assert path("$outputDir/pipeline_info/provenance.json").json.samples.TESTFUN02.triage.status == "ok" || true
         }
     }
@@ -140,7 +141,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            assert workflow.trace.succeeded().size() == 46
+            assert workflow.trace.succeeded().size() == 49
             assert !workflow.trace.tasks().any { it.name.contains("READ_TRIAGE") || it.name.contains("KMER_PROFILE") }
         }
     }

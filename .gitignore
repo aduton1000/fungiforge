@@ -45,3 +45,4 @@ results_ci/
 work_docker_fixture/
 results_docker_fixture.log
 .nf-test.log
+.nf-test-*.nf

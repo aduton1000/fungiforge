@@ -62,6 +62,27 @@ top taxon *Staphylococcus aureus* (17.3 %); master row present with `stages_fail
 `gate = skipped(read_triage:non_fungal)`; no assembly, annotation or downstream task ran. On the
 production code the same isolate went through assembly and hours of annotation.
 
+### 1.2 Multi-locus identification (W2.3)
+
+Pending on the dev deployment (needs `fetch_references.sh markers mlst busco` on the data root):
+CEA10 expected *A. fumigatus* at high confidence with at least one agreeing secondary locus, an
+afumigatus MLST ST and eurotiales_odb10 completeness; DF-005 expected ITS *A. flavus* with CaM and
+BenA reported as ties (*A. flavus*/*A. oryzae*) and TEF1/RPB2 deciding.
+
+Real-tool check, 2026-09-17, base image on a workstation, CEA10 nuclear assembly from the v0.1.0
+run, reference sets fetched the same day (CaM 3,829, BenA 8,031, LSU 55,721 type-material records;
+PubMLST afumigatus and calbicans):
+
+| Locus | Extracted | Best type-material hit |
+|---|---|---|
+| CaM | contig_45, 2 HSPs (intron), 1,021 bp | *A. fumigatus* KACC 41143 / NRRL 163, 100 % over 505 bp |
+| BenA | contig_20, 3 HSPs, 1,843 bp | *A. fumigatus* CBS 133.61 / NRRL 163, 100 % over 390–444 bp |
+| TEF1 / RPB2 | found (TEF1 1 HSP; RPB2 minus strand, 3.6 kb) | sets not fetched in this check |
+| LSU D1/D2 | contig_8, 900 of 3,363 bp | 99.9 % to eight section *Fumigati* type strains: genus-level only |
+| MLST | — | afumigatus ST5, 7/7 exact alleles |
+
+Call without ITS: *A. fumigatus*, medium, `CaM+BenA(secondary-only)`, lineage eurotiales_odb10.
+
 ## 2. Reference-genome benchmarks
 
 | Isolate | Reference | Status |

@@ -149,7 +149,8 @@ staged under `--data_dir`.
 | 05 | Assembly QC + completeness | QUAST, compleasm/BUSCO / `ezlabgva/busco` | nuclear → `assemblyqc.json` (contiguity, BUSCO, `qc_pass`) |
 | 06 | Repeat model + soft-mask | RepeatModeler2, RepeatMasker / `dfam/tetools` | nuclear → `*.masked.fasta`, `*.telib.fasta`, `repeat.json` |
 | 07 | Eukaryotic annotation | Funannotate / `nextgenusfs/funannotate` | masked → `*.proteins.faa`, `*.gbk`, `annotate.json` |
-| 08 | Identification (GCPSR) | ITSx, barrnap, vsearch/UNITE, sourmash/skani, MLST / base image | nuclear → `*.species.txt`, `*.markers.fasta`, `identify.json` |
+| 08 | Identification (multi-locus concordance) | ITSx, barrnap, vsearch/UNITE, tblastn/blastn vs type-material sets, mlst, sourmash / base image | nuclear → `*.species.txt`, `*.markers.fasta`, `*.busco_lineage.txt`, `identify.json` |
+| 08b | Species-aware BUSCO | compleasm/BUSCO with the lineage from stage 08 / BUSCO image | nuclear + lineage → `busco_lineage.json` |
 | 09 | **Antifungal resistance ★** | `af_resistance.py` + `cyp51a_TR.py` / base image | proteins + species + nuclear + GBK → `resistance.json` |
 | 10 | Mobile & repeat elements | `te_summary.py`, geNomad/RVDB / base image | TE library + mito → `mobile.json` |
 | 11 | Biosynthetic gene clusters | fungiSMASH (antiSMASH 8) / `antismash/standalone:8.0.0` | GBK → `bgc.json`, `*.regions.gbk` |
@@ -371,12 +372,14 @@ external/scratch drive.
 | **antiSMASH** databases (~9 GB) | fungiSMASH BGC detection | 11 | `antismash` (via the antiSMASH 8 image) |
 | **Funannotate** DB (~30–50 GB: Pfam, dbCAN, MEROPS, InterPro, BUSCO) | eukaryotic annotation | 07 | `funannotate` (`funannotate setup -i all`) |
 | **eggNOG** (~50 GB) | functional annotation | 07 | `eggnog` (`download_eggnog_data.py`) |
-| **BUSCO / compleasm** `fungi_odb10` (+ order lineages) | assembly completeness | 05 | `busco` |
+| **BUSCO / compleasm** `fungi_odb10` + the order/class lineages of `busco_lineages.tsv` | assembly completeness (gate, then species-aware) | 05, 08b | `busco` (`BUSCO_LINEAGES` overrides the set) |
 | **UNITE** general FASTA (Fungi v10.0, 2025) | ITS species identification | 08 | `unite` |
 | **Kraken2** (PlusPF-8 GB) | decontamination | 04 | `kraken2` |
 | **sourmash/RefSeq-fungi** (GenBank fungi k=31) | genome-ANI ID & novelty | 08, 12 | `refseq_fungi` |
 | **FungAMR** tables + built reference proteins | antifungal-resistance calling | 09 | `fungamr` (+ `build_fungamr_refs.py`) |
 | **RVDB-prot** (v31.0 RdRp) | mycovirus / EVE screen (staged now; consumed from the W2.8 mobile/mycovirus upgrade) | 10 | `rvdb` |
+| **Type-material marker sets** (NCBI "sequence from type": CaM, BenA, TEF1, RPB2, LSU; optional) | secondary-locus identification | 08 | `markers` (`fetch_marker_refs.py`; `NCBI_API_KEY` speeds it up) |
+| **PubMLST fungal schemes** (optional) | MLST | 08 | `mlst` (`fetch_mlst_schemes.py`) |
 
 **Checked before every run.** The first task of a run, `DB_CHECK`, verifies that every database the
 enabled stages need is present and complete (the `.done` marker `fetch_references.sh` writes plus the
@@ -645,16 +648,44 @@ GeneMark key can be supplied via `--genemark_key`. Emits the **proteins FASTA** 
 **GenBank (`.gbk`)** that Stages 09 and 11 consume, plus `annotate.json`. This is the slowest
 stage under emulation.
 
-## 9.10 Stage 08 — Identification (GCPSR)
+## 9.10 Stage 08 — Identification (multi-locus concordance)
 
 `barrnap` finds the rRNA operon; `extract_rrna_region.py` extracts a padded window around it so
 **ITSx** stays under the HMMER 100 kb limit (it aborts on whole chromosomes); ITSx carves
-ITS1/5.8S/ITS2; **vsearch** classifies ITS against **UNITE** (`--id 0.90`, top hits). Optionally
-(`--genome_id true`, slow emulated) **sourmash gather** does genome-level ANI. `id_classify.py`
-resolves a species call with confidence and method under the GCPSR logic (§2): ITS ≥98.5% →
-high/species; 94–98.5% → medium; genus-only → low; genome-ANI concordance with ITS → high
-(`GCPSR`). Emits `*.species.txt`, `*.markers.fasta`, `identify.json` (including the top ITS
-identity, reused by novelty).
+ITS1/5.8S/ITS2; **vsearch** classifies ITS against **UNITE** (`--id 0.90`, top hits). The
+**secondary loci** are extracted from the assembly by `extract_markers.py`: calmodulin (CaM),
+β-tubulin (BenA), TEF1-α and RPB2 are located by `tblastn` with bundled reference proteins
+(`fungiforge/resources/markers/`), HSPs on the best contig/strand are chained across introns and
+the locus is written with flanks in coding orientation; the LSU D1/D2 region is the first 900 bp
+of barrnap's 28S. Each locus is searched (`blastn`, megablast) against a reference set of NCBI
+records from **type material** (`--data_dir/markers/<locus>.fasta`, `fetch_references.sh markers`).
+**MLST** runs against the fungal PubMLST schemes (`--data_dir/mlst`, `fetch_references.sh mlst`;
+*A. fumigatus*, *C. albicans*, *C. glabrata*, *C. tropicalis*, *C. krusei*) through
+`mlst_fungal.sh`. Optionally (`--genome_id true`, slow emulated) **sourmash gather** does
+genome-level ANI.
+
+`id_classify.py` resolves the call: **high** needs the ITS species *and* at least one agreeing
+secondary line (locus or genome match) with none contradicting; **medium** is ITS alone
+(flag `secondary_loci_unavailable` when no reference set is staged), secondary-only, ITS at
+94–98.5 %, or ties that include the ITS species; **low** is genus-only or a discordance (the call
+becomes *Genus* sp. with `discordant:<locus>=<species>` in `flags`). A locus is a *tie* when
+reference species within 0.3 % identity of the best hit differ (e.g. *A. flavus* vs *A. oryzae* on
+CaM and BenA): it is reported with its candidates and never confirms a species by itself. The
+species-aware BUSCO lineage is chosen from `fungiforge/resources/busco_lineages.tsv` (species row,
+then genus, else `fungi_odb10`) and written to `*.busco_lineage.txt`. Emits `*.species.txt`,
+`*.markers.fasta` (ITS, rRNA window and every extracted locus), `identify.json` (`loci` with
+per-locus level/identity/candidates, `concordance`, `flags`, `mlst`, `busco_lineage`).
+
+## 9.10b Stage 08b — Species-aware BUSCO
+
+Stage 05 scores completeness against `fungi_odb10` before the species is known (the QC gate);
+stage 08b re-scores the nuclear assembly with the lineage stage 08 chose (e.g. `eurotiales_odb10`
+for *Aspergillus*, `saccharomycetes_odb10` for *Candida*). It records `skipped` with the reason when
+the lineage is the one stage 05 used, when it is not staged under `--data_dir/busco`
+(`fetch_references.sh busco` stages the common lineages; `BUSCO_LINEAGES` overrides the set), or
+when `--busco_lineage` is fixed. Emits `busco_lineage.json` (`lineage`, `busco_complete`, S/D/F/M);
+the master row carries `busco_lineage_specific` and `busco_complete_specific` next to the
+stage-05 values.
 
 ## 9.11 Stage 09 — Antifungal resistance (the centerpiece)
 
@@ -781,7 +812,7 @@ Under `results/<sample>/`:
 | Nuclear / mito | `04_decontam/` | `*.nuclear.fasta`, `*.mito.fasta` |
 | Assembly QC | `05_assembly_qc/` | `assemblyqc.json` (N50, BUSCO, `qc_pass`) |
 | Annotation | `07_annotate/` | `*.proteins.faa`, `*.gbk` |
-| Identification | `08_identify/` | `*.species.txt`, `identify.json` |
+| Identification | `08_identify/` | `*.species.txt`, `identify.json` (loci, concordance, MLST), `busco_lineage.json` |
 | Resistance | `09_resistance/` | `resistance.json` (calls + confidence + TR) |
 | Mobile / BGC / novelty / extras | `10_…`–`13_…` | per-feature `result.json` |
 | **Per-isolate report** | `14_report/` | `*.report.html` (self-contained) |
@@ -802,7 +833,8 @@ polish_mode,
 sample_verdict, contam_removed_pct, top_taxon,
 stages_failed,
 gate,
-read_verdict, genome_size_est, heterozygosity_pct, ploidy_hint, coverage
+read_verdict, genome_size_est, heterozygosity_pct, ploidy_hint, coverage,
+id_loci_agree, id_flags, mlst_st, busco_lineage_specific, busco_complete_specific
 ```
 
 ### Stage status contract
