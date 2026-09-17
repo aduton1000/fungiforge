@@ -40,14 +40,17 @@ process ORGANELLE {
           samtools coverage reads.bam > coverage.tsv
           MITO_DEPTH=\$(awk -v ids="\$(grep '>' ${mito} | sed 's/>//; s/ .*//' | tr '\\n' ' ')" 'BEGIN{n=split(ids,a," "); for(i=1;i<=n;i++) m[a[i]]=1} !/^#/ && (\$1 in m) {bp+=\$3-\$2+1; d+=(\$3-\$2+1)*\$7} END{if(bp>0) printf "%.1f", d/bp}' coverage.tsv)
           NUC_DEPTH=\$(awk -v ids="\$(grep '>' ${mito} | sed 's/>//; s/ .*//' | tr '\\n' ' ')" 'BEGIN{n=split(ids,a," "); for(i=1;i<=n;i++) m[a[i]]=1} !/^#/ && !(\$1 in m) {bp+=\$3-\$2+1; d+=(\$3-\$2+1)*\$7} END{if(bp>0) printf "%.1f", d/bp}' coverage.tsv)
-          # pileup on the mitochondrial contigs from a BAM downsampled to ~300x; -B (no BAQ realignment:
-          # on kilobase ONT reads BAQ exhausts memory and yields nothing); MAPQ 0 is kept because
-          # overlapping fragments of the circle make every mitochondrial read a multi-mapper
+          # pileup on the mitochondrial contigs from a BAM downsampled to ~--organelle_pileup_depth x
+          # (0 = every read); -B (no BAQ realignment: on kilobase ONT reads BAQ exhausts memory and
+          # yields nothing); MAPQ 0 is kept because overlapping fragments of the circle make every
+          # mitochondrial read a multi-mapper
           samtools faidx ${mito}
-          FRAC=\$(python3 -c "d=float('\${MITO_DEPTH:-0}' or 0); print(min(1.0, 300.0/d) if d > 0 else 1.0)")
+          TARGET=${params.organelle_pileup_depth}
+          FRAC=\$(python3 -c "d=float('\${MITO_DEPTH:-0}' or 0); t=float('\$TARGET'); print(min(1.0, t/d) if (d > 0 and t > 0) else 1.0)")
+          MAXD=\$(python3 -c "t=int('\$TARGET'); print(max(500, 2*t) if t > 0 else 100000)")
           samtools view -b -s "\$FRAC" -o mito_sub.bam reads.bam \$(cut -f1 ${mito}.fai | tr '\\n' ' ') && samtools index mito_sub.bam
           : > mito.pileup
-          for c in \$(cut -f1 ${mito}.fai); do samtools mpileup -B -f ${mito} -q 0 -Q 15 -d 500 -r "\$c" mito_sub.bam 2>/dev/null >> mito.pileup || true; done
+          for c in \$(cut -f1 ${mito}.fai); do samtools mpileup -B -f ${mito} -q 0 -Q 15 -d "\$MAXD" -r "\$c" mito_sub.bam 2>/dev/null >> mito.pileup || true; done
           PILEUP="--mpileup mito.pileup --het-min-frac ${het_frac}"
         fi
       fi
