@@ -376,7 +376,7 @@ external/scratch drive.
 | **UNITE** general FASTA (Fungi v10.0, 2025) | ITS species identification | 08 | `unite` |
 | **Kraken2** (PlusPF-8 GB) | decontamination | 04 | `kraken2` |
 | **sourmash/RefSeq-fungi** (GenBank fungi k=31) | genome-ANI ID & novelty | 08, 12 | `refseq_fungi` |
-| **FungAMR** tables + built reference proteins | antifungal-resistance calling | 09 | `fungamr` (+ `build_fungamr_refs.py`) |
+| **FungAMR** tables + built reference proteins + derived panel | antifungal-resistance calling (panel rows with evidence tiers are derived from the table at run time when `fungamr_panel.tsv` is absent) | 09 | `fungamr` (+ `build_fungamr_refs.py`) |
 | **RVDB-prot** (v31.0 RdRp) | mycovirus / EVE screen (staged now; consumed from the W2.8 mobile/mycovirus upgrade) | 10 | `rvdb` |
 | **Type-material marker sets** (NCBI "sequence from type": CaM, BenA, TEF1, RPB2, LSU; optional) | secondary-locus identification | 08 | `markers` (`fetch_marker_refs.py`; `NCBI_API_KEY` speeds it up) |
 | **PubMLST fungal schemes** (optional) | MLST | 08 | `mlst` (`fetch_mlst_schemes.py`) |
@@ -690,11 +690,31 @@ stage-05 values.
 ## 9.11 Stage 09 — Antifungal resistance (the centerpiece)
 
 The bespoke core; see §10 for full depth. `af_resistance.py` takes the Funannotate proteins, the
-species call, the nuclear assembly and the GBK; selects species-relevant panel rows; finds the
-isolate ortholog of each target gene; reads residues at the panel hotspots; classifies each as a
-known resistance mutation, novel hotspot variant, wild-type, loss-of-function, gain-of-function,
-or over-expression target; and runs the `cyp51a_TR.py` promoter-TR detector for *A. fumigatus*.
-Every call carries a confidence flag tied to the polish mode. Emits `resistance.json`.
+species call, the nuclear assembly and the GBK; selects species-relevant panel rows from the
+curated overlay **merged with rows derived from the FungAMR catalogue** (`fungamr_panel.py`:
+every published substitution with its evidence tier, 1 = engineered and measured in the same
+species … 8 = seen in a resistant isolate without validation); finds the isolate ortholog of each
+target gene; reads residues at the panel positions; classifies each as a known resistance
+mutation, an `associated_unvalidated` tier-8 change, a novel hotspot variant, wild-type,
+loss-of-function, gain-of-function, or over-expression target; and runs the `cyp51a_TR.py`
+promoter-TR detector for *A. fumigatus*.
+
+**Read-level genotyping.** A subsample of the QC'd reads (`--genotype_reads` Illumina pairs,
+`--genotype_reads_ont` ONT reads) is mapped with minimap2 to the GenBank records
+(`gbk_to_fasta.py`, the annotation's coordinates) and `read_genotype.py` translates every read
+at each hotspot codon: allele frequency, zygosity (`homozygous` / `heterozygous` / `mixed` /
+`insufficient` below `--genotype_min_reads`), agreement with the assembly, known alleles the
+assembly lacks (reported as *reads only*), the cyp51A TR site as an insertion or deletion in the
+spanning reads (an extra copy the assembly missed becomes a TR call flagged `discordant`), and
+locus/genome depth as a copy-number ratio for target and efflux genes. `--read_genotype false`
+keeps the assembly-only path.
+
+**Confidence** combines the polish mode, the read support and the evidence tier: `high`
+(read-confirmed, or hybrid/Illumina assembly), `provisional_ont_only`, `discordant` (reads
+contradict the assembly), `low_evidence` (tier 8), `provisional_minor_allele` (reads-only below
+80 %). Emits `resistance.json` (`calls[].read_support`, `calls[].copy_number`, `panel`,
+`summary.read_support`, `summary.copy_number_flags`) and the mapped subsample as
+`<sample>.reads.bam`.
 
 ## 9.12 Stage 10 — Mobile & repeat elements
 
@@ -834,7 +854,8 @@ sample_verdict, contam_removed_pct, top_taxon,
 stages_failed,
 gate,
 read_verdict, genome_size_est, heterozygosity_pct, ploidy_hint, coverage,
-id_loci_agree, id_flags, mlst_st, busco_lineage_specific, busco_complete_specific
+id_loci_agree, id_flags, mlst_st, busco_lineage_specific, busco_complete_specific,
+resistance_read_support, copy_number_flags
 ```
 
 ### Stage status contract

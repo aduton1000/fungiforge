@@ -107,6 +107,11 @@ def detect_tr(assembly_path, gbk_path=None, promoter_bp=600):
         return out
     out["cyp51A_located"] = True
     contig, start, end, strand, gbk_seq = loc
+    # GenBank-record coordinates (1-based, inclusive) of the gene and the promoter window, so the
+    # read-level check (read_genotype.py) can look at the same place in a BAM mapped to the records
+    out.update(contig=contig, gene_start=start + 1, gene_end=end, strand=strand,
+               promoter_start=(max(0, start - promoter_bp) + 1) if strand == 1 else end + 1,
+               promoter_end=start if strand == 1 else min(len(gbk_seq or ""), end + promoter_bp) or end + promoter_bp)
     # Coordinates are in GBK space -> use the GBK record's sequence; the assembly FASTA is
     # only a fallback (its contig names are Flye's, funannotate's are size-sorted).
     seq = gbk_seq or contigs.get(contig, "")
@@ -127,9 +132,38 @@ def detect_tr(assembly_path, gbk_path=None, promoter_bp=600):
             tr_type = "TR46_3"
         out.update(tr_detected=True, tr_type=tr_type, unit_len=L, copies=copies,
                    note=f"tandem array of {copies}×{L} bp in cyp51A promoter (~{tr_type})")
+        site = pos                                   # 0-based offset of the array in the promoter (5'->3' of the gene)
     else:
         out["note"] = "no tandem repeat detected in cyp51A promoter (wild-type promoter)"
+        site = _wt_tr_site(promoter.upper())
+    if site is not None:
+        # record-coordinate window of the TR site: the array when present, else the single
+        # wild-type copy of the 34-bp unit (where a duplication would be inserted)
+        span = (hit[0] * hit[1]) if hit else len(TR34_UNIT)
+        if strand == 1:
+            s0 = max(0, start - promoter_bp) + site + 1
+            out.update(tr_site_start=s0, tr_site_end=s0 + span - 1)
+        else:
+            e0 = end + len(promoter) - site          # promoter is the reverse complement of seq[end:end+promoter_bp]
+            out.update(tr_site_start=e0 - span + 1, tr_site_end=e0)
     return out
+
+
+TR34_UNIT = "GAATCACGCGGTCCGGATGTGTGCTGAGCCGAAT"
+
+
+def _wt_tr_site(promoter):
+    """Offset of the single wild-type TR34 unit in a promoter (exact, then 90 % match), or None."""
+    i = promoter.find(TR34_UNIT)
+    if i >= 0:
+        return i
+    L = len(TR34_UNIT)
+    best = None
+    for j in range(0, len(promoter) - L + 1):
+        m = sum(1 for a, b in zip(promoter[j:j + L], TR34_UNIT) if a == b)
+        if m >= 0.9 * L and (best is None or m > best[0]):
+            best = (m, j)
+    return best[1] if best else None
 
 
 def main():
