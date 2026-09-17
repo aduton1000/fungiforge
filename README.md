@@ -141,7 +141,8 @@ CA_SUR_009,,reads/CA_SUR_009_R1.fastq.gz,reads/CA_SUR_009_R2.fastq.gz,SURFACE,Cl
 | `--busco_lineage` | `auto` | `auto` (order-specific after ID) \| e.g. `fungi_odb10` |
 | `--basecall` | `false` | run Dorado on a pod5 dir (`ont_fastq` = pod5 dir); needs `--dorado_model` |
 | `--ont_min_qual` / `--ont_min_len` | `10` / `1000` | chopper Q / length filters (Stage 01) |
-| `--run_interproscan` | `false` | heavy under emulation; on for HPC |
+| `--run_interproscan` | `false` | Stage 07c InterProScan in its own image (needs `--interproscan_data`) |
+| `--genemark_dir` / `--genemark_key` | `null` | licensed GeneMark-ES directory + key for Stage 07a |
 | `--skip_decontam` / `--skip_mge` / `--skip_bgc` / `--skip_novelty` / `--skip_extras` | `false` | skip optional stages |
 | `--max_cpus` / `--max_memory` / `--max_time` | `16` / `120.GB` / `96.h` | resource caps |
 
@@ -168,7 +169,7 @@ results/
 │   ├── 04_decontam/     # <sample>.nuclear.fasta, <sample>.mito.fasta, decontam.json
 │   ├── 05_assembly_qc/  # assemblyqc.json (QUAST contiguity, BUSCO/compleasm, qc_pass)
 │   ├── 06_repeatmask/   # <sample>.masked.fasta, <sample>.telib.fasta, repeat.json
-│   ├── 07_annotate/     # <sample>.proteins.faa, <sample>.gbk, annotate.json
+│   ├── 07_annotate/     # <sample>.proteins.faa, <sample>.gbk, annotate.json, predict.json, eggnog.json (+ emapper table, InterProScan XML)
 │   ├── 08_identify/     # <sample>.species.txt, <sample>.markers.fasta, identify.json, busco_lineage.json
 │   ├── 09_resistance/   # resistance.json (calls + confidence + cyp51A TR)
 │   ├── 10_mobile/  11_bgc/  12_novelty/  13_extras/   # *.json

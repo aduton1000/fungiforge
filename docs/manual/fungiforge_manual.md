@@ -371,7 +371,8 @@ external/scratch drive.
 | **Container images** | all stage images (Flye, Medaka, antiSMASH 8, Funannotate, dfam/tetools, BUSCO) | all | `images` |
 | **antiSMASH** databases (~9 GB) | fungiSMASH BGC detection | 11 | `antismash` (via the antiSMASH 8 image) |
 | **Funannotate** DB (~30–50 GB: Pfam, dbCAN, MEROPS, InterPro, BUSCO) | eukaryotic annotation | 07 | `funannotate` (`funannotate setup -i all`) |
-| **eggNOG** (~50 GB) | functional annotation | 07 | `eggnog` (`download_eggnog_data.py`) |
+| **eggNOG** 5.0.2 (~12 GB compressed: `eggnog.db`, `eggnog_proteins.dmnd`, taxa) | eggNOG-mapper orthology annotation | 07b | `eggnog` (direct download) |
+| **InterProScan** data release 5.78-109.0 (6.9 GB; matches the image tag) | InterProScan domains / GO | 07c | `interproscan` (on request) |
 | **BUSCO / compleasm** `fungi_odb10` + the order/class lineages of `busco_lineages.tsv` | assembly completeness (gate, then species-aware) | 05, 08b | `busco` (`BUSCO_LINEAGES` overrides the set) |
 | **UNITE** general FASTA (Fungi v10.0, 2025) | ITS species identification | 08 | `unite` |
 | **Kraken2** (PlusPF-8 GB) | decontamination | 04 | `kraken2` |
@@ -490,9 +491,12 @@ the knobs you will touch most.
 | `--dorado_duplex` | `false` | Dorado duplex basecalling |
 | `--busco_lineage` | `auto` | `auto` (order-specific after ID) \| `fungi_odb10` \| `<lineage>` |
 | `--genome_id` | `false` | Stage 08 genome-level sourmash gather (slow emulated; ITS is primary) |
-| `--run_interproscan` | `false` | Stage 07 InterProScan (heavy; default off, enable on a cluster) |
+| `--run_interproscan` | `false` | Stage 07c InterProScan in its own image (heavy; needs `--interproscan_data`) |
+| `--interproscan_data` | `null` | InterProScan data directory (`<data_dir>/interproscan/interproscan-<ver>/data`) |
+| `--skip_eggnog` | `false` | remove Stage 07b eggNOG-mapper |
+| `--genemark_dir` | `null` | unpacked GeneMark-ES directory (licensed; bound into the container) |
 | `--ploidy` | `auto` | ploidy handling |
-| `--genemark_key` | `null` | path to a free-academic GeneMark license `.gm_key` |
+| `--genemark_key` | `null` | path to the free-academic GeneMark licence key (with `--genemark_dir`) |
 | `--af_panel` | bundled `af_resistance_panel.tsv` | curated resistance panel (Stage 09) |
 | `--skip_decontam` | `false` | skip Stage 04 decontamination |
 | `--skip_mge` | `false` | skip Stage 10 mobile elements |
@@ -639,14 +643,30 @@ Isolates whose decontamination did not run (`verdict = not_run`) pass the gate.
 nuclear genome (`-xsmall`) — both from the `dfam/tetools` image. Emits the soft-masked genome
 (for annotation), the **TE library** (for Stage 10), and `repeat.json`.
 
-## 9.9 Stage 07 — Eukaryotic annotation (Funannotate)
+## 9.9 Stage 07 — Eukaryotic annotation (Funannotate, four processes)
 
-**Funannotate** `predict` (GeneMark / Augustus / SNAP / GlimmerHMM combined by EVM) then
-`annotate` (eggNOG, Pfam, dbCAN, MEROPS; InterProScan only with `--run_interproscan true`), from
-the `nextgenusfs/funannotate` image with `FUNANNOTATE_DB=--data_dir/funannotate`. A free-academic
-GeneMark key can be supplied via `--genemark_key`. Emits the **proteins FASTA** and the
-**GenBank (`.gbk`)** that Stages 09 and 11 consume, plus `annotate.json`. This is the slowest
-stage under emulation.
+**07a Predict.** `funannotate predict` (GeneMark-ES / Augustus / SNAP / GlimmerHMM combined by
+EVM) from the `nextgenusfs/funannotate` image with `FUNANNOTATE_DB=--data_dir/funannotate`.
+GeneMark is licensed and not in the image: give `--genemark_dir` (the unpacked GeneMark-ES
+directory; the profiles bind it into the container) and `--genemark_key`; without them
+prediction runs without GeneMark and `predict.json` says so. Training is **species-aware**: the
+stage-08 species call selects the Augustus pre-trained seed species and the funannotate BUSCO set
+from `fungiforge/resources/annotation_training.tsv` (`annotation_training.py` uses a mapped
+choice only when it is staged, else `anidulans` / `dikarya`). Emits `predict_results/` and the
+predicted proteins.
+
+**07b eggNOG-mapper** (`eggnog-mapper` image, eggNOG 5.0.2 data from `fetch_references.sh
+eggnog`, fungal taxonomic scope) and **07c InterProScan** (`interpro/interproscan` image with the
+data release from `fetch_references.sh interproscan`, `--interproscan_data`; `--run_interproscan
+true`, off by default because it takes hours per genome) annotate the predicted proteins in
+parallel; each is skipped with an empty table when its data are not staged, and `--skip_eggnog`
+removes 07b.
+
+**07 Annotate.** `funannotate annotate` (Pfam, dbCAN, MEROPS, UniProt, BUSCO, plus `--eggnog` /
+`--iprscan` when the tables exist) on a private copy of the prediction. Emits the **proteins
+FASTA** and the **GenBank (`.gbk`)** that Stages 09–13 consume, plus `annotate.json` with the
+annotation coverage (`annotate_stats.py`: proteins, % with PFAM / InterPro / GO / eggNOG / a named
+product, secreted, CAZyme, protease, BUSCO, EC counts). This is the slowest stage under emulation.
 
 ## 9.10 Stage 08 — Identification (multi-locus concordance)
 
@@ -855,7 +875,8 @@ stages_failed,
 gate,
 read_verdict, genome_size_est, heterozygosity_pct, ploidy_hint, coverage,
 id_loci_agree, id_flags, mlst_st, busco_lineage_specific, busco_complete_specific,
-resistance_read_support, copy_number_flags
+resistance_read_support, copy_number_flags,
+n_proteins, pct_pfam, pct_go, pct_eggnog, pct_interpro, annotation_training
 ```
 
 ### Stage status contract

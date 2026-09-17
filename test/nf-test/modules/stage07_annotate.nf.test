@@ -1,5 +1,6 @@
 // Stub test for modules/stage07_annotate.nf — the process must run under -stub-run and emit every
 // declared output once, named after the sample (the contract the subworkflow joins on).
+// Inputs (W2.5): predict_results directory, eggNOG table (placeholder here), InterProScan XML (placeholder).
 nextflow_process {
 
     name "ANNOTATE stub"
@@ -11,7 +12,7 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = [[id:'S1', assembly_mode:'longread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/test/samplesheet.test.csv")]
+                input[0] = [[id:'S1', assembly_mode:'longread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/test/reads"), file("$baseDir/assets/NO_FILE"), file("$baseDir/nf-test.config")]
                 """
             }
         }
