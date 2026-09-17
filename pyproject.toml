@@ -28,7 +28,7 @@ fungiforge = "fungiforge.cli:main"
 packages = ["fungiforge"]
 
 [tool.setuptools.package-data]
-fungiforge = ["resources/*.tsv", "resources/*.json", "resources/markers/*", "resources/mito/*", "report_templates/*.j2"]
+fungiforge = ["resources/*.tsv", "resources/*.txt", "resources/*.json", "resources/markers/*", "resources/mito/*", "report_templates/*.j2"]
 
 [tool.pytest.ini_options]
 testpaths = ["test/unit"]
