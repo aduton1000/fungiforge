@@ -128,12 +128,13 @@ workflow FUNGIFORGE {
     BUSCO_LINEAGE(nuclear_ok.join(IDENTIFY.out.lineage))
 
     // 9. antifungal resistance (bespoke panel + cyp51A TR34/TR46 module).
-    //    needs proteins (substitutions) + species + nuclear & GBK (promoter TR locus)
+    //    needs proteins (substitutions) + species + nuclear & GBK (promoter TR locus) + reads (W2.4)
     RESISTANCE(ANNOTATE.out.proteins
                  .join(IDENTIFY.out.species)
                  .join(DECONTAM.out.nuclear)
                  .join(ANNOTATE.out.gbk)
-                 .join(SRPOLISH.out.json))
+                 .join(SRPOLISH.out.json)
+                 .join(reads_ok))                      // W2.4: read-level genotyping of the hotspots
 
     // 10-13: skippable stages — a skip flag truly skips the process (empty channel),
     // rather than running it emptily (which would also drag in its container).

@@ -1,5 +1,6 @@
 // Stub test for modules/stage09_resistance.nf — the process must run under -stub-run and emit every
 // declared output once, named after the sample (the contract the subworkflow joins on).
+// Inputs: proteins, species, nuclear, gbk, polish_json, ont, r1, r2 (W2.4 added the reads).
 nextflow_process {
 
     name "RESISTANCE stub"
@@ -11,7 +12,7 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = [[id:'S1', assembly_mode:'longread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/test/samplesheet.test.csv"), file("$baseDir/assets/NO_ONT"), file("$baseDir/assets/NO_R1"), file("$baseDir/assets/NO_R2"), file("$baseDir/test/reads/TESTFUN01.ont.fastq.gz")]
+                input[0] = [[id:'S1', assembly_mode:'longread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/test/samplesheet.test.csv"), file("$baseDir/assets/NO_ONT"), file("$baseDir/assets/NO_R1"), file("$baseDir/assets/NO_R2"), file("$baseDir/test/reads/TESTFUN01.ont.fastq.gz"), file("$baseDir/test/reads/TESTFUN02.ont.fastq.gz"), file("$baseDir/README.md"), file("$baseDir/LICENSE")]
                 """
             }
         }

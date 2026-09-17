@@ -14,6 +14,16 @@ because homopolymer indels can mimic frameshifts/substitutions exactly where the
 live; hybrid- and Illumina-only assemblies are *high* confidence (short-read base accuracy has
 no homopolymer-indel problem). Degrades gracefully: without a reference sequence (FungAMR not yet staged) it reports the
 gene as searched-but-unresolved rather than guessing, and the structural TR scan still runs.
+
+W2.4 additions: (1) the panel is the curated overlay PLUS rows derived from the FungAMR
+catalogue (bin/fungamr_panel.py) so every known substitution carries an evidence tier
+(1 strongest .. 8 = seen in a resistant natural isolate only; tier-8-only changes are reported
+as `associated_unvalidated`, not as resistance); (2) with `--bam` (reads mapped to the GenBank
+records, bin/gbk_to_fasta.py) every hotspot is re-genotyped from the reads
+(bin/read_genotype.py): allele frequency, zygosity, agreement with the assembly, plus known
+alleles the assembly missed (heterozygous in a diploid), the cyp51A TR site as a read-level
+insertion, and locus/genome depth ratio as a copy-number signal for target and efflux genes;
+(3) confidence combines polish mode, read support and evidence tier.
 """
 from __future__ import annotations
 import argparse
@@ -25,6 +35,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import cyp51a_TR
+import fungamr_panel
+import read_genotype
 
 
 # ---------- IO helpers ----------
@@ -156,8 +168,8 @@ def ref_to_query_residue(aln, ref_pos1):
 
 
 # ---------- calling ----------
-def call_substitutions(gene, refseq, aln, row):
-    """Yield resistance/variant calls at hotspot + known positions."""
+def panel_positions(row):
+    """{position: [(wt, mut), ...]} of known mutations and the set of hotspot positions of a row."""
     known = {}
     for tok in (row.get("known_mutations", "") or "").split(","):
         tok = tok.strip()
@@ -169,6 +181,24 @@ def call_substitutions(gene, refseq, aln, row):
         h = h.strip()
         if h.isdigit():
             positions.add(int(h))
+    return known, positions
+
+
+def evidence_for(evidence, gene, species, change):
+    """FungAMR tier/classes for a change, trying the species, then any species of the genus."""
+    key = (gene.lower(), (species or "").lower(), change)
+    if key in evidence:
+        return evidence[key]
+    genus = (species or "").split()[0].lower() if species else ""
+    for (g, sp, ch), v in evidence.items():
+        if g == gene.lower() and ch == change and sp.split()[0] == genus:
+            return v
+    return None
+
+
+def call_substitutions(gene, refseq, aln, row, evidence=None, species=None, curated=True):
+    """Resistance/variant calls at hotspot + known positions of one panel row."""
+    known, positions = panel_positions(row)
     calls = []
     for pos in sorted(positions):
         if pos > len(refseq):
@@ -179,9 +209,118 @@ def call_substitutions(gene, refseq, aln, row):
             continue
         change = f"{wt}{pos}{obs}"
         is_known = any(mut == obs for (_, mut) in known.get(pos, []))
-        calls.append({"gene": gene, "change": change, "known": is_known,
-                      "class": "known_resistance_mutation" if is_known else "novel_hotspot_variant"})
+        ev = evidence_for(evidence or {}, gene, species, change) if is_known else None
+        curated_known = row.get("curated_known")            # set by merge_panels: the overlay's own mutations
+        in_overlay = curated and (change in curated_known if curated_known is not None else True)
+        tier = "curated" if (is_known and in_overlay) else (ev["tier"] if ev else None)
+        c = {"gene": gene, "change": change, "known": is_known,
+             "class": "known_resistance_mutation" if is_known else "novel_hotspot_variant",
+             "evidence_tier": tier, "ref_pos": pos, "wt": wt, "obs": obs}
+        if is_known and tier == 8:
+            c["class"], c["known"] = "associated_unvalidated", False
+            c["note"] = "FungAMR tier 8: seen in a resistant isolate without validation — association only"
+        if ev and ev.get("classes"):
+            c["evidence_classes"] = ev["classes"]
+        calls.append(c)
     return calls
+
+
+def merge_panels(curated_rows, fungamr_rows):
+    """Curated overlay first; FungAMR rows add positions/mutations to a matching (gene, organism)
+    row or become new substitution rows. Returns rows with a `curated` flag."""
+    out = []
+    index = {}
+    for r in curated_rows:
+        r = dict(r, curated=True, curated_known={t for t in (r.get("known_mutations") or "").split(",") if t and t != "NA"})
+        out.append(r)
+        index[(r["gene"].lower(), (r.get("organism_regex") or "").lower())] = r
+    for f in fungamr_rows:
+        names = [re.sub(r"\\", "", n).lower() for n in (f.get("organism_regex") or "").split("|") if n]
+        target = None
+        for r in out:
+            if r["gene"].lower() != f["gene"].lower() or r.get("mechanism") != "substitution":
+                continue
+            org = (r.get("organism_regex") or "").lower()
+            if any(n == org or re.search(r"\b" + re.escape(n) + r"\b", org) for n in names):
+                target = r; break
+        if target:
+            km = [t for t in (target.get("known_mutations") or "").split(",") if t and t != "NA"]
+            hs = [t for t in (target.get("hotspot_aa") or "").split(",") if t and t != "NA"]
+            for t in (f.get("known_mutations") or "").split(","):
+                if t and t not in km:
+                    km.append(t)
+            for t in (f.get("hotspot_aa") or "").split(","):
+                if t and t not in hs:
+                    hs.append(t)
+            target["known_mutations"], target["hotspot_aa"] = ",".join(km), ",".join(hs)
+            target["fungamr_merged"] = True
+        else:
+            out.append(dict(f, curated=False, source=f.get("source", "FungAMR")))
+    return out
+
+
+def combined_confidence(polish_mode, read_support=None, tier=None):
+    """high: read-confirmed, or a high-accuracy assembly (hybrid / Illumina); provisional_ont_only:
+    ONT-only assembly without read confirmation; discordant: the reads contradict the assembly;
+    low_evidence: tier-8 association only (whatever the reads say)."""
+    base = {"hybrid": "high", "illumina_only": "high", "ont_only": "provisional_ont_only", "unknown": "provisional"}[polish_mode]
+    if read_support:
+        if read_support.get("agrees") is False:
+            return "discordant"
+        if read_support.get("agrees") is True:
+            base = "high"
+    if tier == 8:
+        return "low_evidence"
+    return base
+
+
+def read_support_for(reads, cds, aln, row, refseq, min_reads):
+    """Read-level genotype of every panel position of a row, keyed by REFERENCE position.
+    The query residue index comes from the protein alignment (reference numbering != isolate
+    numbering when the ortholog has indels)."""
+    _, positions = panel_positions(row)
+    ref_to_query = {}
+    t, q = aln.aligned
+    for pos in positions:
+        p = pos - 1
+        for (ts, te), (qs, qe) in zip(t, q):
+            if ts <= p < te:
+                ref_to_query[pos] = int(qs + (p - ts) + 1)      # plain int: the alignment arrays are numpy
+                break
+    if not ref_to_query:
+        return {}
+    try:
+        geno = read_genotype.genotype_residues(reads, cds, sorted(set(ref_to_query.values())), min_reads)
+    except Exception as e:  # noqa: BLE001
+        sys.stderr.write(f"[af_resistance] read genotyping failed for {cds.get('contig')}: {e}\n")
+        return {}
+    return {pos: dict(geno[qpos], query_pos=qpos) for pos, qpos in ref_to_query.items() if qpos in geno}
+
+
+def tr_read_check(reads, tr, min_reads, min_frac):
+    """Reads spanning the cyp51A TR site, mapped to the assembly: an extra copy in the reads is an
+    insertion, a copy the reads lack is a deletion (30-140 bp). call: agrees_with_assembly |
+    reads_have_extra_copy | reads_lack_copy | mixed | insufficient."""
+    try:
+        if isinstance(reads, tuple):
+            lines = reads[1]
+        else:
+            lines = read_genotype.sam_from_bam(reads, tr["contig"], max(1, tr["tr_site_start"] - 300), tr["tr_site_end"] + 300)
+        sup = read_genotype.indel_support(lines, tr["contig"], (tr["tr_site_start"], tr["tr_site_end"]), 30, 140)
+    except Exception as e:  # noqa: BLE001
+        return {"call": "not_run", "error": str(e)[:120]}
+    n, ins, dele = sup["spanning"], sup["ins_frac"], sup["del_frac"]
+    if n < min_reads or ins is None:
+        call = "insufficient"
+    elif ins >= min_frac:
+        call = "reads_have_extra_copy"
+    elif dele >= min_frac:
+        call = "reads_lack_copy"
+    elif ins <= 1 - min_frac and dele <= 1 - min_frac:
+        call = "agrees_with_assembly"
+    else:
+        call = "mixed"
+    return dict(sup, call=call, agrees=(call == "agrees_with_assembly") if call not in ("insufficient", "not_run") else None)
 
 
 def main():
@@ -196,6 +335,12 @@ def main():
     ap.add_argument("--ref-faa", help="explicit reference protein FASTA (headers containing gene names)")
     ap.add_argument("--polish-mode", default="unknown",
                     choices=["hybrid", "illumina_only", "ont_only", "unknown"])
+    ap.add_argument("--bam", default=None, help="reads mapped to the GenBank records (bin/gbk_to_fasta.py); enables read-level genotyping")
+    ap.add_argument("--sam", default=None, help="SAM text instead of --bam (tests)")
+    ap.add_argument("--min-reads", type=int, default=10)
+    ap.add_argument("--min-frac", type=float, default=0.8)
+    ap.add_argument("--fungamr-min-tier", type=int, default=8, help="keep FungAMR mutations with tier <= this")
+    ap.add_argument("--no-fungamr-panel", action="store_true", help="curated overlay only")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
 
@@ -214,8 +359,12 @@ def main():
             pass
     if not os.path.exists(panel_path):
         sys.exit(f"[af_resistance] ERROR: resistance panel not found: {a.panel} (and no packaged copy)")
-    panel = read_panel(panel_path)
+    curated = read_panel(panel_path)
+    fa_rows, evidence, fa_src = ([], {}, None) if a.no_fungamr_panel else fungamr_panel.load_or_derive(a.data_dir, a.fungamr_min_tier)
+    panel = merge_panels(curated, fa_rows)
     proteins = read_fasta(a.proteins) if os.path.exists(a.proteins) else {}
+    reads = ("sam", read_genotype.load_sam(a.sam)) if a.sam else (a.bam if a.bam and os.path.exists(a.bam) else None)
+    genome_depth = read_genotype.genome_mean_depth(a.bam) if (a.bam and os.path.exists(a.bam)) else None
     bundled_ref = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                "fungiforge", "resources", "af_reference_proteins.faa")
     refidx = load_reference_index(a.data_dir, a.ref_faa, bundled_ref)
@@ -230,9 +379,13 @@ def main():
     genus = species.split()[0] if species and species != "unknown" else ""
     def relevant(row):
         org = (row.get("organism_regex", "") or "").strip()
-        return bool(genus) and (re.search(re.escape(species), org, re.I) is not None or
-                                re.search(r"\b" + re.escape(genus) + r"\b", org, re.I) is not None or
-                                org in ("*", "Fungi", "any"))
+        if not genus:
+            return False
+        if not row.get("curated", True):          # FungAMR-derived: exact species (or synonym) only
+            return re.search(org, species, re.I) is not None
+        return (re.search(re.escape(species), org, re.I) is not None or
+                re.search(r"\b" + re.escape(genus) + r"\b", org, re.I) is not None or
+                org in ("*", "Fungi", "any"))
 
     calls, searched = [], []
     for row in panel:
@@ -266,13 +419,51 @@ def main():
         base = {"gene": gene, "drug_class": row.get("drug_class"), "drugs": row.get("drugs"),
                 "mechanism": mech, "ortholog": name, "identity": round(pid, 3),
                 "confidence": conf, "source": row.get("source", "")}
+        cds = read_genotype.cds_codon_coords(a.gbk, name, qseq) if (reads is not None and a.gbk and os.path.exists(a.gbk)) else None
+        if cds and mech in ("substitution", "overexpression", "GOF") and a.bam and os.path.exists(a.bam):
+            lo = min(p for t in cds["codons"] for p in t); hi = max(p for t in cds["codons"] for p in t)
+            base["copy_number"] = read_genotype.copy_number(a.bam, cds["contig"], lo, hi, genome_depth)
+            if base["copy_number"].get("ratio") and base["copy_number"]["ratio"] >= 1.8:
+                base["copy_number"]["flag"] = "possible_duplication"
         if mech == "substitution":
-            subs = call_substitutions(gene, refseq, aln, row)
-            if subs:
-                for c in subs:
-                    calls.append({**base, "status": "variant", **c})
-            else:
-                calls.append({**base, "status": "wild_type"})
+            subs = call_substitutions(gene, refseq, aln, row, evidence, species, curated=row.get("curated", True))
+            rs = read_support_for(reads, cds, aln, row, refseq, a.min_reads) if cds else {}
+            for c in subs:
+                sup = rs.get(c["ref_pos"])
+                if sup:
+                    sup = dict(sup, agrees=(sup["major"] == c["obs"]) if sup["call"] != "insufficient" else None)
+                    c["read_support"] = sup
+                c["confidence"] = combined_confidence(a.polish_mode, c.get("read_support"), c.get("evidence_tier"))
+                calls.append({**base, "status": "variant", **c})
+            # known alleles present in the reads but absent from the assembly (minor / heterozygous)
+            known, _ = panel_positions(row)
+            called_pos = {c["ref_pos"] for c in subs}
+            for pos, sup in rs.items():
+                if pos in called_pos or sup["call"] == "insufficient":
+                    continue
+                wt_res = refseq[pos - 1]
+                for aa, frac in sup["alleles"].items():
+                    if aa == wt_res or aa in ("del", "X", "*"):          # reads agree with the wild-type (or are uninformative)
+                        continue
+                    if any(mut == aa for (_, mut) in known.get(pos, [])) and frac >= 0.2:
+                        change = f"{refseq[pos - 1]}{pos}{aa}"
+                        ev = evidence_for(evidence, gene, species, change)
+                        ck = row.get("curated_known")
+                        tier = "curated" if (row.get("curated", True) and (change in ck if ck is not None else True)) else (ev["tier"] if ev else None)
+                        calls.append({**base, "status": "variant", "gene": gene, "change": change, "known": tier != 8,
+                                      "class": "known_resistance_mutation" if tier != 8 else "associated_unvalidated",
+                                      "evidence_tier": tier, "ref_pos": pos, "wt": refseq[pos - 1], "obs": aa,
+                                      "read_support": dict(sup, agrees=None), "assembly_residue": refseq[pos - 1],
+                                      "confidence": "high" if frac >= a.min_frac else "provisional_minor_allele",
+                                      "note": f"detected in reads only ({sup['call']}, {frac:.0%}); assembly carries the wild-type residue"})
+            if not any(c.get("gene") == gene and c.get("status") == "variant" for c in calls):
+                wt_call = {**base, "status": "wild_type"}
+                if rs:
+                    n_ok = sum(1 for v in rs.values() if v["call"] != "insufficient")
+                    wt_call["read_support"] = {"positions_checked": len(rs), "positions_covered": n_ok,
+                                               "agrees": True if n_ok else None, "min_depth": min(v["depth"] for v in rs.values())}
+                    wt_call["confidence"] = combined_confidence(a.polish_mode, wt_call["read_support"])
+                calls.append(wt_call)
         elif mech == "loss_of_function":
             trunc = len(qseq) < 0.85 * len(refseq)
             calls.append({**base, "status": "loss_of_function" if trunc else "intact",
@@ -290,21 +481,48 @@ def main():
     tr = None
     if re.search(r"Aspergillus\s+fumigatus", species, re.I) and a.assembly:
         tr = cyp51a_TR.detect_tr(a.assembly, a.gbk)
+        if tr.get("tr_site_start") and reads is not None:
+            tr["reads"] = tr_read_check(reads, tr, a.min_reads, a.min_frac)
         if tr.get("tr_detected"):
+            conf_tr = "high" if a.polish_mode in ("hybrid", "illumina_only") else "medium"
+            rd = tr.get("reads") or {}
+            if rd.get("call") == "agrees_with_assembly":
+                conf_tr = "high"
+            elif rd.get("call") in ("reads_lack_copy", "mixed"):
+                conf_tr = "discordant"
             calls.append({"gene": "cyp51A_promoter", "drug_class": "azole", "mechanism": "promoter_TR",
-                          "status": "resistance", "change": tr["tr_type"], "known": True,
-                          "confidence": "high" if a.polish_mode in ("hybrid", "illumina_only") else "medium",
+                          "status": "resistance", "change": tr["tr_type"], "known": True, "evidence_tier": "curated",
+                          "confidence": conf_tr, "read_support": rd or None,
                           "note": tr["note"] + " — pairs with cyp51A L98H (TR34) or Y121F+T289A (TR46)"})
+        elif (tr.get("reads") or {}).get("call") == "reads_have_extra_copy":
+            rd = tr["reads"]
+            L = max(rd["insertion_lengths"], key=rd["insertion_lengths"].get) if rd["insertion_lengths"] else 0
+            calls.append({"gene": "cyp51A_promoter", "drug_class": "azole", "mechanism": "promoter_TR",
+                          "status": "resistance", "change": "TR34" if 30 <= L <= 40 else "TR46" if 42 <= L <= 52 else f"TR{L}",
+                          "known": True, "evidence_tier": "curated", "confidence": "discordant", "read_support": rd,
+                          "note": f"reads carry a {L}-bp insertion at the cyp51A TR site that the assembly lacks (tandem repeat missed by assembly)"})
 
     resistant_classes = sorted({c.get("drug_class") for c in calls
                                 if c.get("known") or c.get("status") in ("loss_of_function", "resistance")
                                 and c.get("drug_class")})
+    supports = [c["read_support"] for c in calls if isinstance(c.get("read_support"), dict)]
+    rs_summary = {"mode": "reads" if reads is not None else "assembly_only",
+                  "confirmed": sum(1 for c in calls if c.get("status") == "variant" and (c.get("read_support") or {}).get("agrees") is True),
+                  "discordant": sum(1 for c in calls if c.get("confidence") == "discordant"),
+                  "insufficient": sum(1 for s_ in supports if s_.get("call") == "insufficient"),
+                  "reads_only": sum(1 for c in calls if "reads only" in (c.get("note") or ""))}
+    cn_flags = sorted({f"{c['gene']}:{c['copy_number']['ratio']}" for c in calls
+                       if isinstance(c.get("copy_number"), dict) and c["copy_number"].get("flag")})
     out = {"sample": a.sample, "stage": "resistance", "species": species,
            "polish_mode": a.polish_mode, "genes_searched": sorted(set(searched)),
+           "panel": {"curated_rows": len(curated), "fungamr_rows": len(fa_rows), "fungamr_source": fa_src,
+                     "rows_relevant": len([r for r in panel if relevant(r)])},
            "calls": calls, "cyp51A_TR": tr,
            "summary": {"resistant_drug_classes": [c for c in resistant_classes if c],
                        "n_known_mutations": sum(1 for c in calls if c.get("known")),
-                       "reference_available": bool(refidx)}}
+                       "n_associated_unvalidated": sum(1 for c in calls if c.get("class") == "associated_unvalidated"),
+                       "reference_available": bool(refidx),
+                       "read_support": rs_summary, "copy_number_flags": cn_flags}}
     json.dump(out, open(a.out, "w"), indent=2)
     print(f"[af_resistance] {a.sample} · {species} · {len(calls)} calls · "
           f"known={out['summary']['n_known_mutations']} · ref={'yes' if refidx else 'no'}")
