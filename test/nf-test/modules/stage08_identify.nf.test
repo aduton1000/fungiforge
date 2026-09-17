@@ -28,6 +28,27 @@ nextflow_process {
             assert path(process.out.json[0][1]).exists()
             def js = path(process.out.json[0][1]).json
             assert js.sample == 'S1'
+            assert process.out.lineage.size() == 1
+            assert process.out.lineage[0][1].endsWith('S1.busco_lineage.txt')
+            assert path(process.out.lineage[0][1]).text.trim() == 'fungi_odb10'
+        }
+    }
+
+    test("--stub_busco_lineage sets the lineage the stub reports") {
+        when {
+            params {
+                stub_busco_lineage = 'eurotiales_odb10'
+            }
+            process {
+                """
+                input[0] = [[id:'S2', assembly_mode:'shortread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/test/samplesheet.test.csv")]
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert path(process.out.lineage[0][1]).text.trim() == 'eurotiales_odb10'
+            assert path(process.out.json[0][1]).json.busco_lineage == 'eurotiales_odb10'
         }
     }
 }
