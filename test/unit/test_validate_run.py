@@ -23,9 +23,10 @@ def make_results(tmp_path, sample="S1", **over):
             stages[st][key] = v
     dirs = {"assembly_qc": "05_assembly_qc", "identify": "08_identify", "resistance": "09_resistance", "bgc": "11_bgc",
             "decontam": "04_decontam", "annotate": "07_annotate", "polish": "03_polish", "novelty": "12_novelty"}
+    fnames = {"assembly_qc": "assemblyqc"}          # real file names do not always equal the stage name
     for st, doc in stages.items():
         d = tmp_path / "results" / sample / dirs[st]; d.mkdir(parents=True, exist_ok=True)
-        (d / f"{sample}.{st}.json").write_text(json.dumps(doc))
+        (d / f"{sample}.{fnames.get(st, st)}.json").write_text(json.dumps(doc))
     ms = tmp_path / "results" / "04_summary"; ms.mkdir(exist_ok=True)
     (ms / f"{sample}.master.tsv").write_text("sample\tresistant_classes\tstages_failed\n" + f"{sample}\tnone\t{over.get('master__stages_failed', 'none')}\n")
     pi = tmp_path / "results" / "pipeline_info"; pi.mkdir(exist_ok=True)
