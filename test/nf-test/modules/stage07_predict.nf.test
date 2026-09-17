@@ -1,0 +1,25 @@
+// Stub test for modules/stage07_predict.nf — the process must run under -stub-run and emit every declared output (W2.5).
+nextflow_process {
+
+    name "PREDICT stub"
+    script "modules/stage07_predict.nf"
+    process "PREDICT"
+    options "-stub-run"
+
+    test("emits every declared output for one isolate") {
+        when {
+            process {
+                """
+                input[0] = [[id:'S1', assembly_mode:'longread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/test/samplesheet.test.csv"), file("$baseDir/nf-test.config")]
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert process.out.json.size() == 1
+            assert process.out.results.size() == 1 && path(process.out.results[0][1]).exists()
+            assert process.out.proteins[0][1].endsWith('S1.predicted.proteins.faa')
+            assert path(process.out.json[0][1]).json.stage == 'predict'
+        }
+    }
+}

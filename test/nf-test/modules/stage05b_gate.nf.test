@@ -19,7 +19,7 @@ nextflow_process {
             assert process.out.json.size() == 1
             def js = path(process.out.json[0][1]).json
             assert js.sample == 'S1' && js.stage == 'gate' && js.status == 'skipped' && js.reason == 'verdict:non_fungal'
-            assert js.skipped_stages.size() == 9 && js.skipped_stages.contains('busco_lineage')
+            assert js.skipped_stages.size() == 12 && js.skipped_stages.contains('busco_lineage') && js.skipped_stages.contains('predict')
         }
     }
 }

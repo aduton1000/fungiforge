@@ -36,6 +36,8 @@ MASTER_COLS = [
     "id_loci_agree", "id_flags", "mlst_st", "busco_lineage_specific", "busco_complete_specific",
     # appended 0.2.0 (W2.4): read-level support of the resistance calls and copy-number flags
     "resistance_read_support", "copy_number_flags",
+    # appended 0.2.0 (W2.5): annotation size/quality and how the prediction was trained
+    "n_proteins", "pct_pfam", "pct_go", "pct_eggnog", "pct_interpro", "annotation_training",
 ]
 
 
@@ -78,6 +80,8 @@ def build_row(sample, compartment, facility, season, S):
     bgc = S.get("bgc", {})
     nov = S.get("novelty", {})
     ext = S.get("extras", {})
+    ann = S.get("annotate", {})
+    prd = S.get("predict", {})
     mob = S.get("mobile", {})
     pol = S.get("polish", {})
     dc  = S.get("decontam", {})
@@ -129,6 +133,10 @@ def build_row(sample, compartment, facility, season, S):
         "busco_complete_specific": g(bl, "busco_complete", default="NA"),
         "resistance_read_support": read_support_summary(res),
         "copy_number_flags": ";".join(g(res, "summary", "copy_number_flags", default=[]) or []) or "none",
+        "n_proteins": g(ann, "n_proteins"), "pct_pfam": g(ann, "pct_pfam"), "pct_go": g(ann, "pct_go"),
+        "pct_eggnog": g(ann, "pct_eggnog"), "pct_interpro": g(ann, "pct_interpro"),
+        "annotation_training": (f"{g(prd, 'augustus_species')}/{g(prd, 'busco_db')}/genemark:{g(prd, 'genemark')}"
+                                if isinstance(prd, dict) and prd else "NA"),
     }
     return row
 

@@ -83,6 +83,13 @@ PubMLST afumigatus and calbicans):
 
 Call without ITS: *A. fumigatus*, medium, `CaM+BenA(secondary-only)`, lineage eurotiales_odb10.
 
+### 1.3 Annotation (W2.5)
+
+Pending on the dev deployment: CEA10 and DF-005 rerun with `--genemark_dir` / `--genemark_key`
+(GeneMark-ES joins EVM), species-aware training (eurotiomycetes set, *A. fumigatus* / *A. oryzae*
+Augustus seeds) and eggNOG-mapper; record gene counts and the new coverage columns (`pct_pfam`,
+`pct_go`, `pct_eggnog`) against the v0.1.0 numbers (9,630 and 12,473 proteins).
+
 ## 2. Reference-genome benchmarks
 
 | Isolate | Reference | Status |
