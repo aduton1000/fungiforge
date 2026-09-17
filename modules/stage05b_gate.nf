@@ -14,8 +14,8 @@ process GATE {
   output: tuple val(meta), path("${meta.id}.gate.json"), emit: json
   script:
   def skipped = reason.startsWith('read_triage')
-    ? '["kmer", "assemble", "medaka", "polish", "decontam", "assembly_qc", "repeatmask", "annotate", "identify", "busco_lineage", "resistance", "mobile", "bgc", "novelty", "extras"]'
-    : '["repeatmask", "annotate", "identify", "busco_lineage", "resistance", "mobile", "bgc", "novelty", "extras"]'
+    ? '["kmer", "assemble", "medaka", "polish", "decontam", "assembly_qc", "repeatmask", "predict", "eggnog", "interproscan", "annotate", "identify", "busco_lineage", "resistance", "mobile", "bgc", "novelty", "extras"]'
+    : '["repeatmask", "predict", "eggnog", "interproscan", "annotate", "identify", "busco_lineage", "resistance", "mobile", "bgc", "novelty", "extras"]'
   """
   python3 - <<'PY'
   import json
@@ -28,8 +28,8 @@ process GATE {
   """
   stub:
   def skipped = reason.startsWith('read_triage')
-    ? '["kmer","assemble","medaka","polish","decontam","assembly_qc","repeatmask","annotate","identify","busco_lineage","resistance","mobile","bgc","novelty","extras"]'
-    : '["repeatmask","annotate","identify","busco_lineage","resistance","mobile","bgc","novelty","extras"]'
+    ? '["kmer","assemble","medaka","polish","decontam","assembly_qc","repeatmask","predict","eggnog","interproscan","annotate","identify","busco_lineage","resistance","mobile","bgc","novelty","extras"]'
+    : '["repeatmask","predict","eggnog","interproscan","annotate","identify","busco_lineage","resistance","mobile","bgc","novelty","extras"]'
   """
   echo '{"sample":"${meta.id}","stage":"gate","status":"skipped","reason":"${reason}","skipped_stages":${skipped},"tools":{},"skipped_tools":{},"versions":{}}' > ${meta.id}.gate.json
   """
