@@ -25,7 +25,7 @@ Legend: `todo` · `in progress` · `built` (code + tests) · `validated` (real-d
 | W0.3 | Test framework and CI | built | develop: `8b25b82`, `a0a7d7d` | 127 unit tests (93 % coverage of bin/ + fungiforge/), 28 nf-test cases, lint 0 warnings, shellcheck clean, stub DAG, Docker fixture run; CI green on develop |
 | W0.4 | Cluster development deployment (validate items on real data without touching production) | todo | | |
 | W1.1 | Validation suite, controls, benchmarks | built | develop: `ea8c06b`, `6732256` | 142 unit tests incl. minimap2 integration; expected files for CEA10/DF-005; controls chosen (PRJNA1494181) — read-level verification, benchmark runs and control pipeline runs pending on the dev deployment |
-| W2.1 | QC and verdict gating in the DAG | built | develop: W2.1 commit | stub DAG + nf-test (forced non_fungal, forced QC fail, --force_all), unit test for the master column; real case (DF-003, bacterial) pending on the dev deployment |
+| W2.1 | QC and verdict gating in the DAG | built | develop: `c98a0b4` | stub DAG + nf-test (forced non_fungal, forced QC fail, --force_all), unit test for the master column; real case (DF-003, bacterial) pending on the dev deployment |
 | W2.2 | Read QC: trimmed reads, k-mer profile, in-pipeline triage | todo | | |
 | W2.3 | Identification: secondary loci, real concordance, species-aware BUSCO | todo | | |
 | W2.4 | Resistance: FungAMR-derived panel, read-level genotyping | todo | | |
