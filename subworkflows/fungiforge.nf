@@ -27,6 +27,7 @@ include { NOVELTY }     from '../modules/stage12_novelty.nf'
 include { EXTRAS }      from '../modules/stage13_extras.nf'
 include { REPORT }      from '../modules/stage14_report.nf'
 include { PROVENANCE }  from '../modules/stage15_provenance.nf'
+include { COHORT }      from '../modules/stage16_cohort.nf'
 
 workflow FUNGIFORGE {
   take:
@@ -179,6 +180,16 @@ workflow FUNGIFORGE {
       .map { _id, metas, jsons -> tuple(metas[0], jsons) }
     REPORT(all_json)
 
+    // 16. run-level cohort phylogenomics + clonality over the isolates that passed the gates (W3.1)
+    cohort_json = channel.empty()
+    if (!params.skip_cohort) {
+      COHORT(nuclear_ok.map { _m, f -> f }.collect(),
+             ASSEMBLY_QC.out.busco_sc.join(pass_meta).map { _m, f -> f }.collect(),
+             IDENTIFY.out.species.map { _m, f -> f }.collect(),
+             ASSEMBLY_QC.out.json.join(pass_meta).map { _m, f -> f }.collect())
+      cohort_json = COHORT.out.json
+    }
+
     // 15. run-level provenance: every stage JSON of every isolate + DB manifest + run metadata.
     //     Waits for all reports (masters.collect()) so it is the last task of the run.
     PROVENANCE(run_info,
@@ -187,6 +198,7 @@ workflow FUNGIFORGE {
                REPORT.out.master.collect())
 
   emit:
+    cohort     = cohort_json
     master     = REPORT.out.master
     reports    = REPORT.out.report
     provenance = PROVENANCE.out.provenance

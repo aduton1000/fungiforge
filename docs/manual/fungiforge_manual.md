@@ -807,6 +807,19 @@ of Stage 09; a missing tool or database leaves that block `null` with the reason
 Emits `extras.json` (`mating_type`, `ploidy`, `n_secreted`, `n_effectors`, `n_cazymes`,
 `n_phibase_hits`, per-protein tables, `tools`, `skipped`).
 
+## 9.15b Stage 16 — Cohort phylogenomics and clonality (run-level)
+
+Runs once over every isolate that passed the gates (`--skip_cohort` removes it) and writes
+`<outdir>/cohort/`: **species clusters** from skani all-vs-all ANI (`ani_matrix.tsv`,
+`species_clusters.tsv`; single linkage at `--cohort_ani_cluster`); a **phylogenomic tree** from
+the single-copy BUSCO proteins Stage 05 now exports (genes single-copy in ≥ `--cohort_min_frac`
+of the isolates, MAFFT, gap-trimmed supermatrix `cohort_alignment.faa` with partitions, IQ-TREE 3
+LG+G with 1000 ultrafast bootstraps or FastTree, `cohort.treefile`; needs ≥ `--cohort_min_isolates`);
+and **clonality** within each species cluster: assembly-based core SNP distances to the most
+complete member (minimap2 asm5 + paftools.js call, SNVs only) in `snp_distances.<cluster>.tsv`
+and clonal groups at `--clonal_snp_threshold` in `clonal_groups.tsv`. `cohort.json` summarises
+all of it for Layer 2's transmission objective.
+
 ## 9.16 Stage 14 — Report + master table
 
 `make_report.py` merges every per-stage `result.json` into a **self-contained per-isolate HTML
@@ -899,6 +912,7 @@ Under `results/<sample>/`:
 | Mobile / BGC / novelty / extras | `10_…`–`13_…` | per-feature `result.json` |
 | **Per-isolate report** | `14_report/` | `*.report.html` (self-contained) |
 | **Master row** | `14_report/` and `04_summary/` | `*.master.tsv` |
+| **Cohort** | `cohort/` | `ani_matrix.tsv`, `species_clusters.tsv`, `cohort.treefile`, `snp_distances.*.tsv`, `clonal_groups.tsv`, `cohort.json` |
 
 ## 11.2 The master table schema (the Layer-2 contract)
 
