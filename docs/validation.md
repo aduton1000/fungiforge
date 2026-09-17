@@ -26,8 +26,26 @@ fungiforge validate --results ~/runs/dev/cea10/results --sample AfumCEA10
 fungiforge validate --results ~/runs/dev/df005/results --sample ASSARM-PHI-DF-005
 ```
 
-Status: expected files written 2026-09-16 from the recorded v0.1.0 values; the first runs of the
-`develop` code on the dev deployment (W0.4) are in progress and will be compared here.
+Status (2026-09-17, first runs of the `develop` code on the dev deployment, checkout `cc534dc`,
+i.e. W0.1–W0.3 + the /tmp fix, before W1.1/W2.x):
+
+| Check | CEA10 (hybrid) | DF-005 (Illumina-only) |
+|---|---|---|
+| species / confidence | *A. fumigatus* / high, ITS 100 % | *A. flavus* (ITS) |
+| assembly | 29,986,658 bp, 48 contigs, BUSCO 99.7 %, qc_pass | 37.8 Mb class (table rows re-checked with the fixed validator) |
+| proteins | 9,607 (expected 9,630 ± 5 %) | 12,464 (expected 12,473 ± 5 %) |
+| BGC regions | 52 (expected 50 ± 15 %) | 102 (expected 102 ± 15 %) |
+| resistance | none; 0 known mutations; cyp51A located, promoter wild-type | none |
+| decontamination | verdict fungal | verdict fungal, 0.04 % of bases removed |
+| novelty | known_species | — |
+| provenance | 27 tool versions, images hashed; all stage JSONs carry status/versions | same |
+| stages not `ok` | readqc:partial (NanoPlot exit 1, L31), assemble:partial (purge_dups not in the Flye image, L30), assembly_qc:partial (phantom QUAST, fixed) | assembly_qc:partial (phantom QUAST, fixed) |
+
+Every scientific check passes within tolerance on both isolates. The first pass of the validator
+reported the assembly-QC metrics as missing because it looked the stage JSON up by stage name
+(`assembly_qc`) while the file is `<sample>.assemblyqc.json`; fixed (`6f8fd55`), a real bug the
+first real run exposed. CEA10 wall time 2 h 09 m on the production run; on the dev install the
+rerun after the node fixes reused 12 cached tasks. DF-005: 9 h 09 m, 215 CPU-h (annotation).
 
 Known deviation for runs made before 2026-09-16: the assembly-QC stage reports `partial` because
 its optional QUAST call could never run (QUAST is in none of the images); the call has been
@@ -80,4 +98,5 @@ Spruijtenburg et al. 2023 (*Mycoses*, PMID 37712885) for *C. auris*.
 
 ## 4. Change log
 
+- 2026-09-17 — first dev-deployment runs of CEA10 and DF-005 compared: all scientific checks within tolerance; validator stage-lookup bug found and fixed; L30 (purge_dups never ran) and L31 (NanoPlot failures) opened.
 - 2026-09-16 — suite created: expected files for CEA10 and DF-005, validate/benchmark/control tools with unit and minimap2 integration tests, controls chosen and fetch script written; C87 lesson recorded.
