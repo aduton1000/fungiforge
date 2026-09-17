@@ -11,7 +11,7 @@ def row(S):
 
 def test_columns_are_append_only_and_end_with_status_columns():
     assert m.MASTER_COLS[:4] == ["sample", "compartment", "facility", "season"]
-    assert m.MASTER_COLS[-4:] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed"]
+    assert m.MASTER_COLS[-5:] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate"]
     assert len(m.MASTER_COLS) == len(set(m.MASTER_COLS))
 
 
@@ -78,3 +78,13 @@ def test_cli_merges_stage_jsons_into_html_and_master_row(tmp_path):
     html_text = open(tmp_path / "S1.html").read()
     assert "<title>FungiForge · S1</title>" in html_text and "L98H" in html_text and "Aspergillus fumigatus" in html_text
     assert "5 stages" in r.stdout          # the unreadable JSON was skipped, not fatal
+
+
+
+def test_gate_column_reports_skipped_reason_and_stages_failed():
+    S = {"decontam": {"status": "ok", "verdict": "non_fungal"},
+         "gate": {"stage": "gate", "status": "skipped", "reason": "verdict:non_fungal"}}
+    r = row(S)
+    assert r["gate"] == "skipped(verdict:non_fungal)" and r["stages_failed"] == "gate:skipped"
+    assert r["species"] == "NA" and r["n_bgc"] == "NA"
+    assert row({"decontam": {"status": "ok", "verdict": "fungal"}})["gate"] == "pass"

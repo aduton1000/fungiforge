@@ -26,6 +26,9 @@ MASTER_COLS = [
     "sample_verdict", "contam_removed_pct", "top_taxon",
     # appended 0.2.0: stage status contract — any stage not "ok" as stage:status (or "none")
     "stages_failed",
+    # appended 0.2.0 (W2.1): "pass", or "skipped(<reason>)" when the gate stopped the isolate after
+    # assembly QC (verdict non_fungal/human or qc_pass false) and stages 06-13 were not run
+    "gate",
 ]
 
 
@@ -87,6 +90,7 @@ def build_row(sample, compartment, facility, season, S):
         "top_taxon": top_taxon,
         "stages_failed": ";".join(f"{st}:{d.get('status')}" for st, d in sorted(S.items())
                                   if d.get("status") not in (None, "ok")) or "none",
+        "gate": f"skipped({S['gate'].get('reason', '?')})" if isinstance(S.get("gate"), dict) else "pass",
     }
     return row
 

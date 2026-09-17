@@ -46,6 +46,7 @@ def help() {
     --busco_lineage auto|<odb10 lineage>  (default auto)
     --run_interproscan  true|false        (default false; heavy — enable on a cluster)
     --skip_bgc / --skip_mge / --skip_novelty / --skip_extras
+    --force_all    run the fungal stages even for isolates the gate would stop (non-fungal / failed QC)
   """.stripIndent()
 }
 
