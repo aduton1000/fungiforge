@@ -29,7 +29,7 @@
                                                        "path": {"type": "string"}, "size": {"type": "integer"}, "sha256": {"type": "string"},
                                                        "mtime": {"type": "string"}, "image_id": {"type": ["string", "null"]},
                                                        "repo_digests": {"type": "array", "items": {"type": "string"}},
-                                                       "error": {"type": "string"}, "note": {"type": "string"},
+                                                       "error": {"type": "string"}, "note": {"type": "string"}, "used": {"type": "boolean"},
                                                        "created": {"type": ["string", "null"]}, "architecture": {"type": ["string", "null"]}}}},
     "images_hashed": {"type": "boolean"},
     "databases": {"type": "object"},
