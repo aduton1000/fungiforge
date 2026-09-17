@@ -596,6 +596,19 @@ order-specific ODB10 lineage (`fungi_odb10` fallback under `--busco_lineage auto
 % complete, and sets a **MIMAG-style `qc_pass`** flag (true when the assembly is non-empty and
 BUSCO ≥80% or unavailable). Emits `assemblyqc.json`.
 
+### Stage 05b — the gate (W2.1)
+
+After decontamination and assembly QC, each isolate is checked before the expensive fungal
+stages: an isolate whose Kraken2 verdict is `non_fungal` or `human`, or whose assembly failed
+QC (`qc_pass` false), is **stopped**. It receives a `gate` stage JSON (status `skipped`, reason
+`verdict:<verdict>` or `qc_pass:false`), still reaches Stage 14, and so still has a master row —
+with `gate = skipped(<reason>)`, `gate:skipped` in `stages_failed`, and `NA` for everything
+downstream — while repeat masking, annotation, identification, resistance, mobile elements,
+BGC, novelty and extras are not run for it. A bacterial isolate on a fungal plate therefore
+costs minutes, not the hours of annotation it used to. `--force_all` sends every isolate through
+regardless (for example to inspect a `mixed` sample by eye; `mixed` itself is not stopped).
+Isolates whose decontamination did not run (`verdict = not_run`) pass the gate.
+
 ## 9.8 Stage 06 — Repeat modelling + soft-masking
 
 **RepeatModeler2** builds a de-novo TE library (`-LTRStruct`), **RepeatMasker** soft-masks the
@@ -766,7 +779,8 @@ resistant_classes, n_known_af_mutations, cyp51A_TR,
 novelty, n_bgc, n_mycovirus, te_percent,
 polish_mode,
 sample_verdict, contam_removed_pct, top_taxon,
-stages_failed
+stages_failed,
+gate
 ```
 
 ### Stage status contract
@@ -787,7 +801,8 @@ run; `skipped_tools` records steps not run and why (a missing database, not appl
 `stages_failed` (`stage:status;…` or `none`), so a row with results is never mistaken for a clean run.
 The assembly and medaka steps, which have no scientific JSON of their own, emit small status JSONs
 (`<sample>.assemble.json`, `<sample>.medaka.json`) for the same reason. `|| true` is not used
-anywhere in the task scripts.
+anywhere in the task scripts. The `gate` column (Stage 05b) is `pass`, or `skipped(<reason>)`
+for an isolate the gate stopped after assembly QC.
 
 One row per isolate; missing values are `NA` (or `none` for `resistant_classes`). This schema is
 deliberately organism-agnostic and mirrors the bacterial study's master table so the two One

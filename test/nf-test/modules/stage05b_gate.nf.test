@@ -1,0 +1,25 @@
+// Stub test for modules/stage05b_gate.nf — records the gate decision for a stopped isolate.
+nextflow_process {
+
+    name "GATE stub"
+    script "modules/stage05b_gate.nf"
+    process "GATE"
+    options "-stub-run"
+
+    test("writes a skipped gate JSON with the reason") {
+        when {
+            process {
+                """
+                input[0] = [[id:'S1', assembly_mode:'shortread', compartment:'AIR', facility:'F1', season:'Dry'], 'verdict:non_fungal']
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert process.out.json.size() == 1
+            def js = path(process.out.json[0][1]).json
+            assert js.sample == 'S1' && js.stage == 'gate' && js.status == 'skipped' && js.reason == 'verdict:non_fungal'
+            assert js.skipped_stages.size() == 8
+        }
+    }
+}

@@ -60,6 +60,50 @@ nextflow_pipeline {
         }
     }
 
+    test("gate: a non-fungal verdict and a failed QC stop the fungal stages, rows still written") {
+        when {
+            params {
+                outdir = "$outputDir"
+                stub_verdicts = "TESTFUN03=non_fungal"
+                stub_qc_fail = "TESTFUN01"
+            }
+        }
+        then {
+            assert workflow.success
+            def names = workflow.trace.tasks().collect { it.name }
+            assert names.count { it.startsWith("FUNGIFORGE:GATE") } == 2
+            assert names.any { it == "FUNGIFORGE:GATE (TESTFUN03)" } && names.any { it == "FUNGIFORGE:GATE (TESTFUN01)" }
+            // the two gated isolates skip 8 stages each; TESTFUN02 runs everything
+            assert workflow.trace.succeeded().size() == 46 - 2 * 8 + 2
+            ["REPEATMASK", "ANNOTATE", "IDENTIFY", "RESISTANCE", "MOBILE", "BGC", "NOVELTY", "EXTRAS"].each { st ->
+                assert !names.any { it == "FUNGIFORGE:${st} (TESTFUN03)" || it == "FUNGIFORGE:${st} (TESTFUN01)" }
+                assert names.any { it == "FUNGIFORGE:${st} (TESTFUN02)" }
+            }
+            assert path("$outputDir/04_summary/TESTFUN03.master.tsv").exists()
+            assert path("$outputDir/04_summary/TESTFUN01.master.tsv").exists()
+            def g3 = path("$outputDir/TESTFUN03/05_assembly_qc/TESTFUN03.gate.json").json
+            assert g3.status == "skipped" && g3.reason == "verdict:non_fungal"
+            assert path("$outputDir/TESTFUN01/05_assembly_qc/TESTFUN01.gate.json").json.reason == "qc_pass:false"
+            def prov = path("$outputDir/pipeline_info/provenance.json").json
+            assert prov.samples.TESTFUN03.gate.status == "skipped" && !prov.samples.TESTFUN03.containsKey("annotate")
+        }
+    }
+
+    test("gate: --force_all runs every stage regardless of verdict") {
+        when {
+            params {
+                outdir = "$outputDir"
+                stub_verdicts = "TESTFUN03=non_fungal"
+                force_all = true
+            }
+        }
+        then {
+            assert workflow.success
+            assert workflow.trace.succeeded().size() == 46
+            assert !workflow.trace.tasks().any { it.name.startsWith("FUNGIFORGE:GATE") }
+        }
+    }
+
     test("--help prints usage and runs nothing") {
         when {
             params {

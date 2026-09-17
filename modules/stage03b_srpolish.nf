@@ -51,7 +51,8 @@ process SRPOLISH {
     fi
     if [ "\$OK" -eq 1 ]; then
       MODE=hybrid; CONF=high
-      CHANGES=\$(grep -oiE '[0-9,]+ bp changed|changed [0-9,]+' polypolish.log | grep -oE '[0-9,]+' | head -1 | tr -d ',' || echo NA)
+      # Polypolish reports "N positions changed (x% of total positions)" per contig: sum them
+      CHANGES=\$(grep -oE '[0-9,]+ positions changed' polypolish.log | tr -d ',' | awk '{s+=\$1} END{print s+0}')
     else
       cp ${medaka} ${meta.id}.polished.fasta
     fi

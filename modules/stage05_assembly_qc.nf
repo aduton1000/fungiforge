@@ -33,5 +33,8 @@ process ASSEMBLY_QC {
   ff_finalize
   """
   stub:
-  "echo '{\"sample\":\"${meta.id}\",\"stage\":\"assembly_qc\"}' > ${meta.id}.assemblyqc.json"
+  // --stub_qc_fail 'ID,ID2' lets the DAG tests exercise the gate
+  def failing = (params.stub_qc_fail ?: '').toString().split(',').collect { id -> id.trim() }
+  def qc = failing.contains(meta.id) ? 'false' : 'true'
+  "echo '{\"sample\":\"${meta.id}\",\"stage\":\"assembly_qc\",\"qc_pass\":${qc}}' > ${meta.id}.assemblyqc.json"
 }
