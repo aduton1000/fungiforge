@@ -4,7 +4,8 @@
 // within each species cluster, assembly-based SNP distances to the most complete member
 // (minimap2 asm5 + paftools.js call, SNVs inside the core aligned in every member) and clonal
 // groups at --clonal_snp_threshold; gene-cluster families across the isolates' antiSMASH regions
-// (W3.2, bin/bgc_families.py). Outputs go to <outdir>/cohort/. --skip_cohort removes it.
+// (W3.2, bin/bgc_families.py: BiG-SCAPE 2 with the funannotate database's Pfam when available,
+// else DIAMOND shared-protein clustering). Outputs go to <outdir>/cohort/. --skip_cohort removes it.
 process COHORT {
   tag 'run'
   label 'cohort'
@@ -30,7 +31,10 @@ process COHORT {
       --snp-threshold ${params.clonal_snp_threshold} --ani-cluster ${params.cohort_ani_cluster} --max-genes ${params.cohort_max_genes}
   # W3.2: gene-cluster families across the cohort from the antiSMASH region GenBanks
   ff_version diamond -- diamond version
+  ff_version bigscape -- bash -c "bigscape --version 2>&1 | head -1"
   ff_run bgc_families -- bgc_families.py --outdir cohort --threads ${task.cpus} --regions regions/* --bgc bgc/* \\
+      --method ${params.gcf_method} --gcf-cutoff ${params.gcf_cutoff} --data-dir "${params.data_dir ?: ''}" \\
+      ${params.funannotate_db ? "--pfam-path ${params.funannotate_db}/Pfam-A.hmm" : ''} \\
       --min-sim ${params.gcf_min_similarity} --min-pident ${params.gcf_min_pident}
   # the stage status rides inside cohort.json (run-level: no per-sample stage JSON)
   python3 - <<'PY'

@@ -1,0 +1,96 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>FungiForge cohort · {{ s.n_isolates }} isolates</title>
+<style>
+:root{--ink:#1a2a44;--head:#17233d;--line:#dcdfe6;--soft:#f4f6fa;--muted:#777;--ok:#1a7f37;--warn:#9a6700;--bad:#b3261e}
+body{font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem;color:var(--ink)}
+h1{color:var(--head);margin-bottom:.1rem}h2{color:var(--head);margin-top:2rem;border-bottom:2px solid var(--soft);padding-bottom:.2rem}
+.sub{color:var(--muted);margin-top:0}
+table{border-collapse:collapse;margin:.6rem 0;width:100%}th,td{border:1px solid var(--line);padding:5px 9px;text-align:left}
+th{background:var(--soft);font-weight:600}td.n,th.n{text-align:right}
+.cards{display:flex;flex-wrap:wrap;gap:.8rem;margin:1rem 0}
+.card{border:1px solid var(--line);border-radius:8px;padding:.6rem .9rem;min-width:150px}
+.card .big{font-size:26px;font-weight:600;color:var(--head)}.card .lbl{color:var(--muted);font-size:12px}
+.cols{display:flex;flex-wrap:wrap;gap:1.4rem}.cols>div{flex:1 1 300px}
+.bar{background:var(--soft);height:9px;border-radius:5px;overflow:hidden}.bar>span{display:block;height:100%;background:#4c6ef5}
+.note{color:var(--muted);font-size:13px}.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px;word-break:break-all}
+.bad{color:var(--bad);font-weight:600}.ok{color:var(--ok);font-weight:600}
+footer{margin-top:2.5rem;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:.6rem}
+</style></head><body>
+<h1>FungiForge cohort</h1>
+<p class="sub">{{ s.n_isolates }} isolates{% if s.provenance %} · run {{ s.provenance.run }} · fungiforge {{ s.provenance.pipeline }} ({{ s.provenance.commit }}){% endif %} · generated {{ generated }}</p>
+
+<div class="cards">
+  <div class="card"><div class="big">{{ s.n_isolates }}</div><div class="lbl">isolates</div></div>
+  <div class="card"><div class="big">{{ s.species | length }}</div><div class="lbl">species called</div></div>
+  <div class="card"><div class="big">{{ s.n_with_resistance }}</div><div class="lbl">with a resistance call</div></div>
+  <div class="card"><div class="big">{{ s.n_gated }}</div><div class="lbl">stopped by a gate</div></div>
+  <div class="card"><div class="big">{{ s.n_stage_failures }}</div><div class="lbl">with a stage not ok</div></div>
+  {% if s.cohort and s.cohort.species_clusters %}<div class="card"><div class="big">{{ s.cohort.species_clusters | length }}</div><div class="lbl">ANI clusters</div></div>{% endif %}
+</div>
+{% if not s.schema_validation.valid %}<p class="bad">Master table failed schema validation: {{ s.schema_validation.errors | join('; ') }}</p>
+{% else %}<p class="note">Master table validates against schema {{ s.schema_validation.schema_version }}{% if s.schema_validation.warnings %} ({{ s.schema_validation.warnings | join('; ') }}){% endif %}.</p>{% endif %}
+
+{% macro counts(title, pairs, total) %}
+<div><h3>{{ title }}</h3>{% if pairs %}<table><tr><th>{{ title }}</th><th class="n">n</th><th>share</th></tr>
+{% for k, v in pairs %}<tr><td>{{ k }}</td><td class="n">{{ v }}</td><td><div class="bar"><span style="width:{{ (100 * v / total) | round(1) }}%"></span></div></td></tr>{% endfor %}
+</table>{% else %}<p class="note">none</p>{% endif %}</div>
+{% endmacro %}
+
+<h2>Composition</h2>
+<div class="cols">
+{{ counts('Species', s.species, s.n_isolates) }}
+{{ counts('Compartment', s.compartments, s.n_isolates) }}
+{{ counts('Facility', s.facilities, s.n_isolates) }}
+</div>
+
+<h2>Quality and gating</h2>
+<div class="cols">
+{{ counts('Gate', s.gates, s.n_isolates) }}
+{{ counts('Read triage verdict', s.read_verdicts, s.n_isolates) }}
+{{ counts('Stages not ok', s.stages_failed, s.n_isolates) }}
+</div>
+
+<h2>Resistance and secondary metabolism</h2>
+<div class="cols">
+{{ counts('Resistant classes', s.resistant_classes, s.n_isolates) }}
+{{ counts('cyp51A promoter TR', s.cyp51A_TR, s.n_isolates) }}
+{{ counts('Mycotoxin clusters', s.mycotoxins, s.n_isolates) }}
+</div>
+
+<h2>Biology and novelty</h2>
+<div class="cols">
+{{ counts('Novelty', s.novelty, s.n_isolates) }}
+{{ counts('Mating type', s.mating_types, s.n_isolates) }}
+{{ counts('Identification flags', s.id_flags, s.n_isolates) }}
+</div>
+
+<h2>Metric ranges</h2>
+<table><tr><th>metric</th><th class="n">n</th><th class="n">min</th><th class="n">median</th><th class="n">max</th><th class="n">mean</th></tr>
+{% for name, m in s.metrics.items() %}{% if m %}<tr><td>{{ name }}</td><td class="n">{{ m.n }}</td><td class="n">{{ m.min }}</td><td class="n">{{ m.median }}</td><td class="n">{{ m.max }}</td><td class="n">{{ m.mean }}</td></tr>{% endif %}{% endfor %}
+</table>
+
+{% if s.cohort %}
+<h2>Cohort relationships</h2>
+{% if s.cohort.species_clusters %}<table><tr><th>cluster</th><th>members</th><th>species</th></tr>
+{% for c in s.cohort.species_clusters %}<tr><td>{{ c.cluster }}</td><td>{{ c.members | join(', ') }}</td><td>{{ c.species | join(', ') }}</td></tr>{% endfor %}</table>{% endif %}
+{% if s.cohort.phylogenomics %}<p class="note">Tree: {% if s.cohort.phylogenomics.tree %}{{ s.cohort.phylogenomics.n_genes }} single-copy BUSCO genes,
+alignment {{ s.cohort.phylogenomics.alignment_length }} columns → <span class="mono">cohort/{{ s.cohort.phylogenomics.tree }}</span>{% else %}{{ s.cohort.phylogenomics.note }}{% endif %}</p>{% endif %}
+{% if s.cohort.clusters_snp %}<table><tr><th>cluster</th><th>reference</th><th class="n">core (bp)</th><th>clonal groups</th></tr>
+{% for c in s.cohort.clusters_snp %}<tr><td>{{ c.cluster }}</td><td>{{ c.reference }}</td><td class="n">{{ c.core_bp }}</td>
+<td>{% if c.clonal_groups %}{% for g in c.clonal_groups %}[{{ g | join(', ') }}]{% endfor %}{% else %}none at {{ c.snp_threshold }} SNVs{% endif %}</td></tr>{% endfor %}</table>{% endif %}
+{% if s.cohort.bgc_families %}<p class="note">Gene-cluster families: {{ s.cohort.bgc_families.n_families }} from {{ s.cohort.bgc_families.n_regions }} regions,
+{{ s.cohort.bgc_families.n_families_shared }} shared by more than one isolate (<span class="mono">cohort/bgc_families.tsv</span>).</p>{% endif %}
+{% endif %}
+
+<h2>Isolates</h2>
+<table><tr><th>sample</th><th>species</th><th>compartment</th><th class="n">BUSCO</th><th class="n">contigs</th><th class="n">proteins</th><th class="n">BGC</th><th>resistance</th><th>gate</th></tr>
+{% for r in rows %}<tr><td class="mono">{{ r.sample }}</td><td>{{ r.species }}</td><td>{{ r.compartment }}</td><td class="n">{{ r.busco_complete }}</td>
+<td class="n">{{ r.n_contigs }}</td><td class="n">{{ r.n_proteins }}</td><td class="n">{{ r.n_bgc }}</td>
+<td>{% if r.resistant_classes not in ('none', 'NA') %}<span class="bad">{{ r.resistant_classes }}</span>{% else %}{{ r.resistant_classes }}{% endif %}</td>
+<td>{% if r.gate.startswith('skipped') %}<span class="bad">{{ r.gate }}</span>{% else %}{{ r.gate }}{% endif %}</td></tr>{% endfor %}
+</table>
+
+<footer>FungiForge {{ version }} · merged table: <span class="mono">04_summary/master_fungi.tsv</span> ·
+machine-readable summary: <span class="mono">04_summary/cohort_summary.json</span> ·
+MultiQC custom content: <span class="mono">04_summary/multiqc/</span></footer>
+</body></html>

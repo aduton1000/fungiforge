@@ -18,6 +18,11 @@ env_of <- function(fac) {
                    TRUE ~ "Community")
 }
 
+# v0.2 columns that an older results directory will not have
+for (col in c("mycotoxin_clusters", "bioactive_clusters", "te_percent", "n_mycovirus", "n_secreted", "n_effectors",
+              "n_cazymes", "n_phibase_hits", "mito_size_kb", "resistance_read_support", "gate", "species_confidence"))
+  if (!col %in% names(m)) m[[col]] <- NA
+
 d <- m |>
   mutate(compartment = norm_comp(compartment),
          env_class = env_of(facility),
@@ -35,9 +40,26 @@ d <- m |>
          is_novel = str_detect(tolower(coalesce(novelty, "")), "novel"),
          n_bgc = suppressWarnings(as.integer(n_bgc)),
          n_known_af_mutations = suppressWarnings(as.integer(n_known_af_mutations)),
-         priority = str_detect(species, regex("Candida auris|Aspergillus fumigatus|Cryptococcus|Candida albicans|Candida glabrata|Nakaseomyces|Fusarium", ignore_case = TRUE)))
+         priority = str_detect(species, regex("Candida auris|Aspergillus fumigatus|Cryptococcus|Candida albicans|Candida glabrata|Nakaseomyces|Fusarium", ignore_case = TRUE)),
+         # W3.3: columns the pipeline populates from v0.2 onwards (absent in older tables -> NA)
+         gate_passed = !str_detect(coalesce(gate, "pass"), "^skipped"),
+         id_high_conf = coalesce(species_confidence, "") == "high",
+         mycotoxin_clusters = ifelse(is.na(mycotoxin_clusters), "NA", mycotoxin_clusters),
+         has_mycotoxin = !mycotoxin_clusters %in% c("none", "NA"),
+         n_mycotoxin_clusters = ifelse(has_mycotoxin, str_count(mycotoxin_clusters, ";") + 1L, 0L),
+         aflatoxin = str_detect(mycotoxin_clusters, "aflatoxin"),
+         gliotoxin = str_detect(mycotoxin_clusters, "gliotoxin"),
+         te_percent = suppressWarnings(as.numeric(te_percent)),
+         n_mycovirus = suppressWarnings(as.integer(n_mycovirus)),
+         n_secreted = suppressWarnings(as.integer(n_secreted)),
+         n_effectors = suppressWarnings(as.integer(n_effectors)),
+         n_cazymes = suppressWarnings(as.integer(n_cazymes)),
+         n_phibase_hits = suppressWarnings(as.integer(n_phibase_hits)),
+         mito_size_kb = suppressWarnings(as.numeric(mito_size_kb)),
+         resistance_read_confirmed = str_detect(coalesce(resistance_read_support, ""), "confirmed:[1-9]"))
 
 write_csv(d, file.path(D$output, "analysis_dataset.csv"))
-message(sprintf("[02] analysis_dataset.csv: %d isolates | %d compartment-known | %d AF-resistant | %d priority | %d novel",
+message(sprintf("[02] analysis_dataset.csv: %d isolates | %d compartment-known | %d AF-resistant | %d priority | %d novel | %d mycotoxigenic | %d gated out",
                 nrow(d), sum(!is.na(d$compartment)), sum(d$has_af_resistance, na.rm = TRUE),
-                sum(d$priority, na.rm = TRUE), sum(d$is_novel, na.rm = TRUE)))
+                sum(d$priority, na.rm = TRUE), sum(d$is_novel, na.rm = TRUE),
+                sum(d$has_mycotoxin, na.rm = TRUE), sum(!d$gate_passed, na.rm = TRUE)))
