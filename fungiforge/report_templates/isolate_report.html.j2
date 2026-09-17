@@ -1,0 +1,90 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>FungiForge · {{ sample }}</title>
+<style>
+:root{--ink:#1a2a44;--head:#17233d;--line:#dcdfe6;--soft:#f4f6fa;--muted:#777;--ok:#1a7f37;--warn:#9a6700;--bad:#b3261e}
+body{font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;max-width:980px;margin:2rem auto;padding:0 1rem;color:var(--ink)}
+h1{color:var(--head);margin-bottom:.2rem}h2{color:var(--head);margin-top:2rem;border-bottom:2px solid var(--soft);padding-bottom:.2rem}
+.sub{color:var(--muted);margin-top:0}table{border-collapse:collapse;width:100%;margin:.6rem 0}
+th,td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--soft);width:34%;font-weight:600}td.v{width:66%}
+table.grid th{width:auto}
+.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600}
+.ok{background:#e6f4ea;color:var(--ok)}.warn{background:#fff4d6;color:var(--warn)}.bad{background:#fce8e6;color:var(--bad)}.na{background:#eee;color:var(--muted)}
+.note{color:var(--muted);font-size:13px}.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+footer{margin-top:2.5rem;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:.6rem}
+</style></head><body>
+<h1>FungiForge — {{ sample }}</h1>
+<p class="sub">{{ row.species }} · {{ meta.compartment }} / {{ meta.facility }} / {{ meta.season }}
+ · {{ pill(row.gate, 'pass') }} {{ pill(row.stages_failed, 'none') }}</p>
+
+<h2>Headline</h2>
+<table>
+<tr><th>Species (confidence)</th><td class="v">{{ row.species }} <span class="note">({{ row.species_confidence }}, {{ row.id_method }})</span></td></tr>
+<tr><th>Assembly</th><td class="v">{{ row.assembly_len }} bp in {{ row.n_contigs }} contigs · BUSCO {{ row.busco_complete }} % ({{ row.busco_lineage }}) · qc_pass {{ row.qc_pass }}</td></tr>
+<tr><th>Antifungal resistance</th><td class="v">{{ pill(row.resistant_classes, 'none') }} · {{ row.n_known_af_mutations }} known mutation(s) · cyp51A TR {{ row.cyp51A_TR }}</td></tr>
+<tr><th>Novelty</th><td class="v">{{ row.novelty }}</td></tr>
+<tr><th>Mycotoxin clusters</th><td class="v">{{ pill(row.mycotoxin_clusters, 'none') }}</td></tr>
+</table>
+
+{% if calls %}
+<h2>Resistance calls</h2>
+<table class="grid"><tr><th>gene</th><th>class</th><th>change / status</th><th>known</th><th>evidence</th><th>reads</th><th>confidence</th></tr>
+{% for c in calls %}<tr><td>{{ c.gene }}</td><td>{{ c.drug_class or '' }}</td><td>{{ c.change or c.status }}</td><td>{{ c.known }}</td>
+<td>{{ c.evidence_tier if c.evidence_tier is not none else '' }}</td>
+<td class="mono">{% if c.read_support %}{{ c.read_support.call or '' }}{% if c.read_support.depth %} ({{ c.read_support.depth }}x){% endif %}{% endif %}</td>
+<td>{{ c.confidence }}</td></tr>{% endfor %}</table>
+<p class="note">Genotype calls flag <em>known</em> resistance-associated changes; MIC / AFST confirmation is always required.
+ONT-only assemblies are provisional unless the reads confirm the position.</p>
+{% endif %}
+
+<h2>Reads and assembly</h2>
+<table>
+<tr><th>Read verdict (triage)</th><td class="v">{{ row.read_verdict }}</td></tr>
+<tr><th>Genome size (k-mer)</th><td class="v">{{ row.genome_size_est }} · heterozygosity {{ row.heterozygosity_pct }} % · {{ row.ploidy_hint }} · coverage {{ row.coverage }}</td></tr>
+<tr><th>Polish mode</th><td class="v">{{ row.polish_mode }}</td></tr>
+<tr><th>Decontamination</th><td class="v">verdict {{ row.sample_verdict }} · {{ row.contam_removed_pct }} % of bases removed · top taxon {{ row.top_taxon }}</td></tr>
+<tr><th>Species-aware BUSCO</th><td class="v">{{ row.busco_complete_specific }} % ({{ row.busco_lineage_specific }})</td></tr>
+</table>
+
+<h2>Identification</h2>
+<table>
+<tr><th>Loci agreeing with ITS</th><td class="v">{{ row.id_loci_agree }}</td></tr>
+<tr><th>Flags</th><td class="v">{{ pill(row.id_flags, 'none') }}</td></tr>
+<tr><th>MLST</th><td class="v">{{ row.mlst_st }}</td></tr>
+{% if loci %}<tr><th>Per-locus</th><td class="v"><table class="grid"><tr><th>locus</th><th>level</th><th>identity</th><th>candidates</th></tr>
+{% for name, l in loci.items() %}<tr><td>{{ name }}</td><td>{{ l.level }}</td><td>{{ l.pident if l.pident is not none else '' }}</td><td>{{ (l.candidates or []) | join(', ') }}</td></tr>{% endfor %}</table></td></tr>{% endif %}
+</table>
+
+<h2>Annotation and biology</h2>
+<table>
+<tr><th>Proteins</th><td class="v">{{ row.n_proteins }} · PFAM {{ row.pct_pfam }} % · GO {{ row.pct_go }} % · eggNOG {{ row.pct_eggnog }} % · InterPro {{ row.pct_interpro }} %</td></tr>
+<tr><th>Training</th><td class="v" class="mono">{{ row.annotation_training }}</td></tr>
+<tr><th>Secretome</th><td class="v">{{ row.n_secreted }} signal-peptide proteins · {{ row.n_effectors }} effectors</td></tr>
+<tr><th>CAZymes / virulence</th><td class="v">{{ row.n_cazymes }} CAZymes · {{ row.n_phibase_hits }} PHI-base hits</td></tr>
+<tr><th>Mating type / ploidy</th><td class="v">{{ row.mating_type }} · ploidy {{ row.ploidy }}</td></tr>
+</table>
+
+<h2>Secondary metabolism</h2>
+<table>
+<tr><th>BGC regions</th><td class="v">{{ row.n_bgc }} ({{ row.n_bgc_mibig_hits }} with a MIBiG hit)</td></tr>
+<tr><th>Mycotoxin clusters</th><td class="v">{{ pill(row.mycotoxin_clusters, 'none') }}</td></tr>
+<tr><th>Other bioactive</th><td class="v">{{ row.bioactive_clusters }}</td></tr>
+{% if bgc_types %}<tr><th>By type</th><td class="v">{% for t, n in bgc_types %}{{ t }} ({{ n }}){% if not loop.last %}, {% endif %}{% endfor %}</td></tr>{% endif %}
+</table>
+
+<h2>Mobile elements and organelle</h2>
+<table>
+<tr><th>Repeats</th><td class="v">{{ row.te_percent }} % masked · LTR {{ row.te_ltr_pct }} %</td></tr>
+<tr><th>geNomad</th><td class="v">{{ row.n_genomad_virus }} viral · {{ row.n_genomad_plasmid }} plasmid contigs</td></tr>
+<tr><th>Mycovirus (EVE) candidates</th><td class="v">{{ row.n_mycovirus }} <span class="note">DNA-only: RNA mycoviruses appear only as endogenous copies</span></td></tr>
+<tr><th>Mitochondrion</th><td class="v">{{ row.mito_size_kb }} kb · {{ row.mito_core_genes }} core genes · circular {{ row.mito_circular }} · copy ratio {{ row.mito_copy_ratio }} · {{ row.mito_heteroplasmic_sites }} heteroplasmic sites · {{ row.n_mito_heg }} homing-endonuclease ORFs</td></tr>
+</table>
+
+<h2>Run status</h2>
+<table>
+<tr><th>Gate</th><td class="v">{{ row.gate }}</td></tr>
+<tr><th>Stages not ok</th><td class="v">{{ pill(row.stages_failed, 'none') }}</td></tr>
+<tr><th>Stages present</th><td class="v" class="mono">{{ stages | join(', ') }}</td></tr>
+</table>
+<footer>FungiForge {{ version }} · generated {{ generated }} · every value also lives in this isolate's master row and the stage JSONs.</footer>
+</body></html>
