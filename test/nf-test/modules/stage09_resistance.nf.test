@@ -23,6 +23,7 @@ nextflow_process {
             assert path(process.out.json[0][1]).exists()
             def js = path(process.out.json[0][1]).json
             assert js.sample == 'S1'
+            assert process.out.bam.size() == 1 && process.out.bam[0][1].endsWith('S1.reads.bam') && process.out.bam[0][2].endsWith('S1.reads.bam.bai')
         }
     }
 }
