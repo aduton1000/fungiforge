@@ -1,0 +1,34 @@
+# Compounds flagged from antiSMASH KnownClusterBlast hits to MIBiG (W3.2, stage 11). A region whose
+# best MIBiG hit's description matches `pattern` (case-insensitive) is flagged with `name`/`class`.
+# class: mycotoxin (food/feed safety), antifungal_antibiotic, other_bioactive. Add rows freely.
+name	class	pattern
+aflatoxin	mycotoxin	aflatoxin
+sterigmatocystin	mycotoxin	sterigmatocystin|dothistromin
+ochratoxin	mycotoxin	ochratoxin
+fumonisin	mycotoxin	fumonisin
+gliotoxin	mycotoxin	gliotoxin
+patulin	mycotoxin	patulin
+trichothecene	mycotoxin	trichothecene|deoxynivalenol|nivalenol|T-2 toxin|diacetoxyscirpenol|trichodermin|harzianum
+ergot_alkaloid	mycotoxin	ergot|ergotamine|ergovaline|chanoclavine|fumigaclavine|festuclavine|agroclavine
+citrinin	mycotoxin	citrinin
+zearalenone	mycotoxin	zearalenone
+fumagillin	mycotoxin	fumagillin
+fumitremorgin	mycotoxin	fumitremorgin|verruculogen|tryprostatin
+cyclopiazonic_acid	mycotoxin	cyclopiazonic
+tenuazonic_acid	mycotoxin	tenuazonic
+alternariol	mycotoxin	alternariol
+beauvericin_enniatin	mycotoxin	beauvericin|enniatin
+fusaric_acid	mycotoxin	fusaric acid
+fusarin	mycotoxin	fusarin
+aspergillic_acid	mycotoxin	aspergillic
+penitrem	mycotoxin	penitrem|paspaline|paxilline|lolitrem|aflatrem
+roquefortine	mycotoxin	roquefortine|meleagrin|oxaline
+pseurotin	other_bioactive	pseurotin
+helvolic_acid	other_bioactive	helvolic
+fumiquinazoline	other_bioactive	fumiquinazoline
+trypacidin	other_bioactive	trypacidin
+penicillin	antifungal_antibiotic	penicillin|cephalosporin|isopenicillin
+echinocandin	antifungal_antibiotic	echinocandin|pneumocandin|caspofungin
+lovastatin	other_bioactive	lovastatin|monacolin|compactin
+griseofulvin	antifungal_antibiotic	griseofulvin
+cyclosporin	other_bioactive	cyclosporin

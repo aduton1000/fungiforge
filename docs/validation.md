@@ -126,6 +126,13 @@ the supermatrix tree, and SNP distances within the *A. flavus* cluster; the publ
 C6 / E142 relationships as the topology check. In-image mini cohort (CEA10, Af293, NRRL 3357): CEA10 and
 Af293 cluster at 99.59 % ANI with 42,457 core SNVs over 27.4 Mb; NRRL 3357 separate (UPGRADE_PLAN W3.1).
 
+### 1.9 BGC families and mycotoxin flags (W3.2)
+
+Pending on the dev deployment (antiSMASH now runs KnownClusterBlast): DF-005 expected to flag the
+aflatoxin cluster, CEA10 gliotoxin plus the other known *A. fumigatus* clusters; the batch's shared
+gene-cluster families. In-image family clustering of the 40 CEA10 regions (duplicated as a second
+isolate): 40 families, each shared by both copies, none merged (UPGRADE_PLAN W3.2).
+
 ## 2. Reference-genome benchmarks
 
 | Isolate | Reference | Status |

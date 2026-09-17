@@ -768,10 +768,15 @@ the raw RVDB hits.
 
 ## 9.13 Stage 11 — Biosynthetic gene clusters
 
-**fungiSMASH (antiSMASH 8, fungal taxon)** detects NRPS/PKS/terpene/RiPP/hybrid clusters from the
-GBK; `bgc_summary.py` counts clusters by product type. MIBiG-known-vs-novel and BiG-SCAPE networks
-are resolved across isolates in Layer 2. Skippable with `--skip_bgc`. Emits `bgc.json` and the
-region GBKs.
+**antiSMASH 8** in fungal mode (`--taxon fungi`, gene finding off: the Funannotate GenBank carries
+the genes) with **KnownClusterBlast** against MIBiG (`--antismash_extra`, default
+`--cb-knownclusters`). `bgc_summary.py` counts regions by product type and records each region's
+best MIBiG cluster (accession, description, core-gene hits), flagging known **mycotoxin**,
+antifungal/antibiotic and other bioactive clusters from `fungiforge/resources/mycotoxin_compounds.tsv`
+(`mycotoxin_clusters`, `bioactive_clusters`, `n_bgc_mibig_hits` on the master row). Best-effort:
+an antiSMASH failure is recorded, not fatal. Emits `bgc.json` and the region GenBanks, which the
+cohort stage clusters into **gene-cluster families** across isolates (`cohort/bgc_families.tsv`:
+regions sharing ≥ `--gcf_min_similarity` of their proteins by DIAMOND homology).
 
 ## 9.14 Stage 12 — Novelty
 
@@ -912,7 +917,7 @@ Under `results/<sample>/`:
 | Mobile / BGC / novelty / extras | `10_…`–`13_…` | per-feature `result.json` |
 | **Per-isolate report** | `14_report/` | `*.report.html` (self-contained) |
 | **Master row** | `14_report/` and `04_summary/` | `*.master.tsv` |
-| **Cohort** | `cohort/` | `ani_matrix.tsv`, `species_clusters.tsv`, `cohort.treefile`, `snp_distances.*.tsv`, `clonal_groups.tsv`, `cohort.json` |
+| **Cohort** | `cohort/` | `ani_matrix.tsv`, `species_clusters.tsv`, `cohort.treefile`, `snp_distances.*.tsv`, `clonal_groups.tsv`, `bgc_families.tsv`, `cohort.json` |
 
 ## 11.2 The master table schema (the Layer-2 contract)
 
@@ -935,7 +940,8 @@ resistance_read_support, copy_number_flags,
 n_proteins, pct_pfam, pct_go, pct_eggnog, pct_interpro, annotation_training,
 n_secreted, n_effectors, n_cazymes, n_phibase_hits,
 mito_size_kb, mito_core_genes, mito_circular, mito_copy_ratio, mito_heteroplasmic_sites,
-te_ltr_pct, n_genomad_virus, n_genomad_plasmid, n_mito_heg
+te_ltr_pct, n_genomad_virus, n_genomad_plasmid, n_mito_heg,
+mycotoxin_clusters, bioactive_clusters, n_bgc_mibig_hits
 ```
 
 ### Stage status contract

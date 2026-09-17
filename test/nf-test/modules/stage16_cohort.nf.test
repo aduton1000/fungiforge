@@ -14,6 +14,8 @@ nextflow_process {
                 input[1] = [file("$baseDir/README.md")]
                 input[2] = [file("$baseDir/LICENSE")]
                 input[3] = [file("$baseDir/pyproject.toml")]
+                input[4] = [file("$baseDir/nf-test.config")]
+                input[5] = [file("$baseDir/README.md")]
                 """
             }
         }
@@ -21,6 +23,7 @@ nextflow_process {
             assert process.success
             assert process.out.json.size() == 1 && process.out.json[0].endsWith('cohort/cohort.json')
             assert path(process.out.json[0]).json.stage == 'cohort'
+            assert process.out.files.size() >= 1
         }
     }
 }

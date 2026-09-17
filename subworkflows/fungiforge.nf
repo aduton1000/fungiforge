@@ -183,10 +183,13 @@ workflow FUNGIFORGE {
     // 16. run-level cohort phylogenomics + clonality over the isolates that passed the gates (W3.1)
     cohort_json = channel.empty()
     if (!params.skip_cohort) {
+      regions_ch = params.skip_bgc ? channel.empty() : BGC.out.regions.map { _m, f -> f }
       COHORT(nuclear_ok.map { _m, f -> f }.collect(),
              ASSEMBLY_QC.out.busco_sc.join(pass_meta).map { _m, f -> f }.collect(),
              IDENTIFY.out.species.map { _m, f -> f }.collect(),
-             ASSEMBLY_QC.out.json.join(pass_meta).map { _m, f -> f }.collect())
+             ASSEMBLY_QC.out.json.join(pass_meta).map { _m, f -> f }.collect(),
+             regions_ch.collect().ifEmpty([]),
+             bgc_ch.map { _m, f -> f }.collect().ifEmpty([]))
       cohort_json = COHORT.out.json
     }
 
