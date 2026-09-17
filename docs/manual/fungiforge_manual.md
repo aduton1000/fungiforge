@@ -373,6 +373,7 @@ external/scratch drive.
 | **Funannotate** DB (~30–50 GB: Pfam, dbCAN, MEROPS, InterPro, BUSCO) | eukaryotic annotation | 07 | `funannotate` (`funannotate setup -i all`) |
 | **eggNOG** 5.0.2 (~12 GB compressed: `eggnog.db`, `eggnog_proteins.dmnd`, taxa) | eggNOG-mapper orthology annotation | 07b | `eggnog` (direct download) |
 | **InterProScan** data release 5.78-109.0 (6.9 GB; matches the image tag) | InterProScan domains / GO | 07c | `interproscan` (on request) |
+| **dbCAN** family HMMs (V13), **PHI-base** FASTA, **EffectorP 3** (repository with WEKA) | CAZymes, virulence, effectors | 13 | `dbcan`, `phibase`, `effectorp` |
 | **BUSCO / compleasm** `fungi_odb10` + the order/class lineages of `busco_lineages.tsv` | assembly completeness (gate, then species-aware) | 05, 08b | `busco` (`BUSCO_LINEAGES` overrides the set) |
 | **UNITE** general FASTA (Fungi v10.0, 2025) | ITS species identification | 08 | `unite` |
 | **Kraken2** (PlusPF-8 GB) | decontamination | 04 | `kraken2` |
@@ -759,11 +760,25 @@ with `--skip_novelty`. Emits `novelty.json`.
 
 ## 9.15 Stage 13 — Eukaryote extras
 
-`extras.py` derives the **mating-type idiomorph** (MAT1-1 / MAT1-2 from protein names) and tallies
-secretome/CAZyme/virulence keyword hits from the annotation; ploidy/heterozygosity (nQuire /
-Smudgeplot / GenomeScope2) and richer secretome tools (SignalP6 / DeepTMHMM / EffectorP3) are
-wired to run when reads and models are available. Skippable with `--skip_extras`. Emits
-`extras.json`.
+`extras.py` runs five optional blocks on the annotated proteins, the GenBank and the read BAM
+of Stage 09; a missing tool or database leaves that block `null` with the reason (stage
+`partial`, never failed):
+
+- **CAZymes** — `hmmsearch` against the dbCAN family HMMs (`--data_dir/dbcan`,
+  `fetch_references.sh dbcan`) with run_dbcan's filter (E ≤ 1e-15, coverage ≥ 0.35).
+- **Secretome and effectors** — SignalP 6 (licensed: build the site image with
+  `bin/hpc_install.sh --signalp <tarball>`, Appendix A) on all proteins, then EffectorP 3
+  (`fetch_references.sh effectorp`) on the signal-peptide proteins.
+- **Virulence** — diamond against PHI-base (`fetch_references.sh phibase`), best hit per protein
+  (identity ≥ 40 %, coverage ≥ 50 %), counts by PHI-base phenotype.
+- **Mating type** — Pfam profiles from the funannotate database: an alpha-box protein (PF04769)
+  = MAT1-1; an HMG-box protein (PF00505) within six genes of APN2/SLA2 in the GenBank = MAT1-2;
+  both = homothallic or a heterozygous diploid.
+- **Ploidy** — nQuire on the read BAM (diploid / triploid / tetraploid likelihoods;
+  `haploid_like` when too few biallelic sites remain), next to the k-mer hint of Stage 01b.
+
+Emits `extras.json` (`mating_type`, `ploidy`, `n_secreted`, `n_effectors`, `n_cazymes`,
+`n_phibase_hits`, per-protein tables, `tools`, `skipped`).
 
 ## 9.16 Stage 14 — Report + master table
 
@@ -876,7 +891,8 @@ gate,
 read_verdict, genome_size_est, heterozygosity_pct, ploidy_hint, coverage,
 id_loci_agree, id_flags, mlst_st, busco_lineage_specific, busco_complete_specific,
 resistance_read_support, copy_number_flags,
-n_proteins, pct_pfam, pct_go, pct_eggnog, pct_interpro, annotation_training
+n_proteins, pct_pfam, pct_go, pct_eggnog, pct_interpro, annotation_training,
+n_secreted, n_effectors, n_cazymes, n_phibase_hits
 ```
 
 ### Stage status contract
