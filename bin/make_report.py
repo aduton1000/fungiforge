@@ -69,6 +69,8 @@ def build_row(sample, compartment, facility, season, S):
     tri = S.get("triage", {})
     km  = S.get("kmer", {})
     tops = g(dc, "top_species", default=[])
+    if not (isinstance(tops, list) and tops):
+        tops = g(tri, "top_species", default=[])          # isolate stopped at read triage: use the read-level taxon
     top_taxon = (f"{tops[0].get('name', '?')} ({tops[0].get('pct', 'NA')}%)"
                  if isinstance(tops, list) and tops and isinstance(tops[0], dict) else "NA")
     rc = g(res, "summary", "resistant_drug_classes", default=[])
