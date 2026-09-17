@@ -175,6 +175,7 @@ results/
 │   ├── 10_mobile/  11_bgc/  12_novelty/  13_extras/   # *.json (mobile: TE landscape, geNomad, RVDB mycovirus screen, mito HEGs; extras: secretome, effectors, CAZymes, PHI-base, MAT type, nQuire ploidy)
 │   └── 14_report/       # <sample>.report.html  ← self-contained per-isolate report
 ├── 04_summary/          # master_fungi.tsv  ← one row per isolate (the Layer-2 handoff)
+├── cohort/              # ANI matrix, species clusters, BUSCO supermatrix tree, SNP distances, clonal groups
 └── pipeline_info/       # provenance.json, db_manifest.json, execution_report.html, timeline.html, trace.txt
 ```
 

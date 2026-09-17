@@ -19,6 +19,7 @@ nextflow_process {
             assert process.success
             assert process.out.json.size() == 1
             assert process.out.json[0][1].endsWith('S1.assemblyqc.json')
+            assert process.out.busco_sc.size() == 1 && process.out.busco_sc[0][1].endsWith('S1.busco_sc.faa')
             assert path(process.out.json[0][1]).exists()
             def js = path(process.out.json[0][1]).json
             assert js.sample == 'S1'
