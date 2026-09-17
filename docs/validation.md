@@ -53,6 +53,14 @@ Known deviation for runs made before 2026-09-16: the assembly-QC stage reports `
 its optional QUAST call could never run (QUAST is in none of the images); the call has been
 removed, so `stages_failed` is `none` only for runs of the current code.
 
+### 1.1 Gate on a bacterial study isolate (W2.1 / W2.2)
+
+DF-003 (Illumina-only; the plate's read triage had flagged it bacterial) on the dev deployment with
+the W2.2 code (`8b0571e`), 2026-09-17: read QC → read triage → gate → report → provenance, 6 tasks,
+7 min 10 s, 0.4 CPU-h; master row present with `stages_failed = gate:skipped`,
+`gate = skipped(read_triage:non_fungal)`; no assembly, annotation or downstream task ran. On the
+production code the same isolate went through assembly and hours of annotation.
+
 ## 2. Reference-genome benchmarks
 
 | Isolate | Reference | Status |
@@ -100,5 +108,6 @@ Spruijtenburg et al. 2023 (*Mycoses*, PMID 37712885) for *C. auris*.
 
 ## 4. Change log
 
+- 2026-09-17 — DF-003 (bacterial) stopped at read triage on the dev deployment in 7 minutes: the gate validated on real data.
 - 2026-09-17 — first dev-deployment runs of CEA10 and DF-005 compared: all scientific checks within tolerance; validator stage-lookup bug found and fixed; L30 (purge_dups never ran) and L31 (NanoPlot failures) opened.
 - 2026-09-16 — suite created: expected files for CEA10 and DF-005, validate/benchmark/control tools with unit and minimap2 integration tests, controls chosen and fetch script written; C87 lesson recorded.
