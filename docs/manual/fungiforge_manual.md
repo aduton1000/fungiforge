@@ -623,7 +623,9 @@ mitochondrial contigs and rejected candidates).
 reference species, identity, coverage, exons and introns from HSP gaps, extra copies), rnl/rns by
 blastn, circularity from a terminal repeat, and, from a read subsample mapped to mitogenome +
 nuclear genome, the mito/nuclear depth ratio (copy number) and heteroplasmic sites (minor allele
-≥ 10 % at ≥ 20×; `--organelle_reads_check false` skips the mapping). Emits `organelle.json` and
+≥ 10 % at ≥ 20× for Illumina, ≥ 20 % for ONT; the pileup uses reads downsampled to
+`--organelle_pileup_depth` × (default 300, `0` = every read); `--organelle_reads_check false` skips the
+mapping). Emits `organelle.json` and
 `*.mito.gff`. tRNAs are not annotated.
 
 ## 9.7 Stage 05 — Assembly QC + completeness
