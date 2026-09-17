@@ -18,8 +18,10 @@ nextflow_pipeline {
             def names = workflow.trace.tasks().collect { it.name }
             // 1 DB_CHECK + 3 x (READ_QC, READ_TRIAGE, KMER_PROFILE, SRPOLISH, DECONTAM, ORGANELLE, ASSEMBLY_QC, REPEATMASK,
             // PREDICT, EGGNOG, ANNOTATE, IDENTIFY, BUSCO_LINEAGE, RESISTANCE, MOBILE, BGC, NOVELTY, EXTRAS, REPORT)
-            // + 2 ASSEMBLE + 2 MEDAKA + 1 SR_ASSEMBLE + 1 PROVENANCE = 64 (InterProScan off by default)
-            assert workflow.trace.succeeded().size() == 64
+            // + 2 ASSEMBLE + 2 MEDAKA + 1 SR_ASSEMBLE + 1 PROVENANCE + 1 COHORT = 65 (InterProScan off by default)
+            assert workflow.trace.succeeded().size() == 65
+            assert names.count { it.startsWith("FUNGIFORGE:COHORT") } == 1
+            assert path("$outputDir/cohort/cohort.json").exists()
             assert names.count { it.startsWith("FUNGIFORGE:ORGANELLE") } == 3
             assert names.count { it.startsWith("FUNGIFORGE:PREDICT") } == 3 && names.count { it.startsWith("FUNGIFORGE:EGGNOG") } == 3
             assert !names.any { it.contains("INTERPROSCAN") }
@@ -61,7 +63,7 @@ nextflow_pipeline {
             assert workflow.success
             def names = workflow.trace.tasks().collect { it.name }
             assert !names.any { it.contains("BGC") || it.contains("MOBILE") || it.contains("NOVELTY") || it.contains("EXTRAS") }
-            assert workflow.trace.succeeded().size() == 64 - 4 * 3
+            assert workflow.trace.succeeded().size() == 65 - 4 * 3
             assert path("$outputDir/pipeline_info/provenance.json").json.n_samples == 3
         }
     }
@@ -79,8 +81,8 @@ nextflow_pipeline {
             def names = workflow.trace.tasks().collect { it.name }
             assert names.count { it.startsWith("FUNGIFORGE:GATE_ASSEMBLY") } == 2
             assert names.any { it == "FUNGIFORGE:GATE_ASSEMBLY (TESTFUN03)" } && names.any { it == "FUNGIFORGE:GATE_ASSEMBLY (TESTFUN01)" }
-            // the two gated isolates skip 11 tasks each (12 stages, InterProScan off); TESTFUN02 runs everything
-            assert workflow.trace.succeeded().size() == 64 - 2 * 11 + 2
+            // the two gated isolates skip 11 tasks each (12 stages, InterProScan off); TESTFUN02 runs everything; COHORT runs on it
+            assert workflow.trace.succeeded().size() == 65 - 2 * 11 + 2
             ["REPEATMASK", "PREDICT", "EGGNOG", "ANNOTATE", "IDENTIFY", "BUSCO_LINEAGE", "RESISTANCE", "MOBILE", "BGC", "NOVELTY", "EXTRAS"].each { st ->
                 assert !names.any { it == "FUNGIFORGE:${st} (TESTFUN03)" || it == "FUNGIFORGE:${st} (TESTFUN01)" }
                 assert names.any { it == "FUNGIFORGE:${st} (TESTFUN02)" }
@@ -105,7 +107,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            assert workflow.trace.succeeded().size() == 64
+            assert workflow.trace.succeeded().size() == 65
             assert !workflow.trace.tasks().any { it.name.startsWith("FUNGIFORGE:GATE") }
         }
     }
@@ -122,7 +124,7 @@ nextflow_pipeline {
             def names = workflow.trace.tasks().collect { it.name }
             assert names.count { it.startsWith("FUNGIFORGE:GATE_READS") } == 1 && names.any { it == "FUNGIFORGE:GATE_READS (TESTFUN02)" }
             // TESTFUN02 (hybrid) runs READ_QC, READ_TRIAGE, GATE_READS, REPORT only: 21 tasks -> 4
-            assert workflow.trace.succeeded().size() == 64 - 21 + 4
+            assert workflow.trace.succeeded().size() == 65 - 21 + 4
             ["KMER_PROFILE", "ASSEMBLE", "MEDAKA", "SRPOLISH", "DECONTAM", "ORGANELLE", "ASSEMBLY_QC", "PREDICT", "EGGNOG", "ANNOTATE", "IDENTIFY", "BUSCO_LINEAGE", "RESISTANCE"].each { st ->
                 assert !names.any { it == "FUNGIFORGE:${st} (TESTFUN02)" }
             }
@@ -144,7 +146,7 @@ nextflow_pipeline {
         }
         then {
             assert workflow.success
-            assert workflow.trace.succeeded().size() == 58
+            assert workflow.trace.succeeded().size() == 59
             assert !workflow.trace.tasks().any { it.name.contains("READ_TRIAGE") || it.name.contains("KMER_PROFILE") }
         }
     }
@@ -161,8 +163,21 @@ nextflow_pipeline {
             assert workflow.success
             def names = workflow.trace.tasks().collect { it.name }
             assert names.count { it.startsWith("FUNGIFORGE:INTERPROSCAN") } == 3 && !names.any { it.contains("EGGNOG") }
-            assert workflow.trace.succeeded().size() == 64
+            assert workflow.trace.succeeded().size() == 65
             assert path("$outputDir/TESTFUN01/07_annotate/TESTFUN01.interproscan.json").exists()
+        }
+    }
+
+    test("--skip_cohort removes the run-level cohort stage") {
+        when {
+            params {
+                outdir = "$outputDir"
+                skip_cohort = true
+            }
+        }
+        then {
+            assert workflow.success
+            assert workflow.trace.succeeded().size() == 64 && !workflow.trace.tasks().any { it.name.contains("COHORT") }
         }
     }
 

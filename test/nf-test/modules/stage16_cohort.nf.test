@@ -1,0 +1,26 @@
+// Stub test for modules/stage16_cohort.nf — the run-level cohort stage (W3.1) with three isolates' files.
+nextflow_process {
+
+    name "COHORT stub"
+    script "modules/stage16_cohort.nf"
+    process "COHORT"
+    options "-stub-run"
+
+    test("emits cohort.json and the cohort files") {
+        when {
+            process {
+                """
+                input[0] = [file("$baseDir/test/samplesheet.test.csv"), file("$baseDir/nf-test.config")]
+                input[1] = [file("$baseDir/README.md")]
+                input[2] = [file("$baseDir/LICENSE")]
+                input[3] = [file("$baseDir/pyproject.toml")]
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert process.out.json.size() == 1 && process.out.json[0].endsWith('cohort/cohort.json')
+            assert path(process.out.json[0]).json.stage == 'cohort'
+        }
+    }
+}

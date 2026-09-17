@@ -119,6 +119,13 @@ Pending on the dev deployment after `fetch_references.sh genomes`: CEA10 and DF-
 with their nearest reference genomes (Af293 / NRRL 3357) above 98 % ANI. In-image skani check on
 the local CEA10 assembly: 99.59 % ANI to Af293 (aligned fraction 94 %), known_species.
 
+### 1.8 Cohort phylogenomics and clonality (W3.1)
+
+Pending on the dev deployment: the study batch's species clusters against the identifications,
+the supermatrix tree, and SNP distances within the *A. flavus* cluster; the published CEA10 / C87 /
+C6 / E142 relationships as the topology check. In-image mini cohort (CEA10, Af293, NRRL 3357): CEA10 and
+Af293 cluster at 99.59 % ANI with 42,457 core SNVs over 27.4 Mb; NRRL 3357 separate (UPGRADE_PLAN W3.1).
+
 ## 2. Reference-genome benchmarks
 
 | Isolate | Reference | Status |
