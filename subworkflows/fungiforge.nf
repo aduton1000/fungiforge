@@ -10,6 +10,7 @@ include { SR_ASSEMBLE } from '../modules/stage02b_srassemble.nf'
 include { MEDAKA }      from '../modules/stage03_polish.nf'
 include { SRPOLISH }    from '../modules/stage03b_srpolish.nf'
 include { DECONTAM }    from '../modules/stage04_decontam.nf'
+include { ORGANELLE }   from '../modules/stage04b_organelle.nf'
 include { ASSEMBLY_QC } from '../modules/stage05_assembly_qc.nf'
 include { GATE as GATE_READS; GATE as GATE_ASSEMBLY } from '../modules/stage05b_gate.nf'
 include { REPEATMASK }  from '../modules/stage06_repeatmask.nf'
@@ -96,6 +97,9 @@ workflow FUNGIFORGE {
     // 4. decontamination + organelle split -> nuclear / mito
     DECONTAM(SRPOLISH.out.assembly)
 
+    // 4b. mitochondrial genome: core genes, introns, circularity, copy number, heteroplasmy (W2.7)
+    ORGANELLE(DECONTAM.out.mito.join(DECONTAM.out.nuclear).join(reads_ok))
+
     // 5. assembly QC + completeness (compleasm/BUSCO + contiguity)
     ASSEMBLY_QC(DECONTAM.out.nuclear)
 
@@ -167,7 +171,7 @@ workflow FUNGIFORGE {
     // 14. aggregate every per-stage result.json per isolate -> report + master row
     all_json = READ_QC.out.json
       .mix(basecall_json, triage_json, gate_reads_json, kmer_json, ASSEMBLE.out.json, SR_ASSEMBLE.out.json, MEDAKA.out.json,
-           SRPOLISH.out.json, DECONTAM.out.json, ASSEMBLY_QC.out.json, GATE_ASSEMBLY.out.json, REPEATMASK.out.json,
+           SRPOLISH.out.json, DECONTAM.out.json, ORGANELLE.out.json, ASSEMBLY_QC.out.json, GATE_ASSEMBLY.out.json, REPEATMASK.out.json,
            PREDICT.out.json, eggnog_json, ips_json, ANNOTATE.out.json, IDENTIFY.out.json, BUSCO_LINEAGE.out.json, RESISTANCE.out.json,
            mobile_ch, bgc_ch, novelty_ch, extras_ch)
       .map { meta, j -> tuple(meta.id, meta, j) }

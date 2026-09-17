@@ -40,6 +40,8 @@ MASTER_COLS = [
     "n_proteins", "pct_pfam", "pct_go", "pct_eggnog", "pct_interpro", "annotation_training",
     # appended 0.2.0 (W2.6): extras counts (ploidy and mating_type above are now nQuire / Pfam-based)
     "n_secreted", "n_effectors", "n_cazymes", "n_phibase_hits",
+    # appended 0.2.0 (W2.7): mitochondrial genome
+    "mito_size_kb", "mito_core_genes", "mito_circular", "mito_copy_ratio", "mito_heteroplasmic_sites",
 ]
 
 
@@ -83,6 +85,7 @@ def build_row(sample, compartment, facility, season, S):
     nov = S.get("novelty", {})
     ext = S.get("extras", {})
     ann = S.get("annotate", {})
+    org = S.get("organelle", {})
     prd = S.get("predict", {})
     mob = S.get("mobile", {})
     pol = S.get("polish", {})
@@ -141,6 +144,11 @@ def build_row(sample, compartment, facility, season, S):
                                 if isinstance(prd, dict) and prd else "NA"),
         "n_secreted": g(ext, "n_secreted"), "n_effectors": g(ext, "n_effectors"),
         "n_cazymes": g(ext, "n_cazymes"), "n_phibase_hits": g(ext, "n_phibase_hits"),
+        "mito_size_kb": round((org.get("mito_size_estimate") or org["mito_size"]) / 1000, 1) if isinstance(org, dict) and org.get("mito_size") else "NA",
+        "mito_core_genes": f"{org['n_core_genes']}/15" if isinstance(org, dict) and "n_core_genes" in org and org.get("mito_present") else "NA",
+        "mito_circular": g(org, "circular") if g(org, "mito_present", default=False) else "NA",
+        "mito_copy_ratio": g(org, "copy_ratio"),
+        "mito_heteroplasmic_sites": g(org, "heteroplasmy", "n_heteroplasmic_sites"),
     }
     return row
 
