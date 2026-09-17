@@ -102,3 +102,10 @@ def test_read_triage_and_kmer_columns():
     assert r2["coverage"] == 50.0 and r2["genome_size_est"] == "NA" and r2["read_verdict"] == "NA"
     S3 = {"triage": {"status": "ok", "verdict": "non_fungal"}, "gate": {"stage": "gate", "status": "skipped", "reason": "read_triage:non_fungal"}}
     assert row(S3)["gate"] == "skipped(read_triage:non_fungal)" and row(S3)["read_verdict"] == "non_fungal"
+
+
+def test_top_taxon_falls_back_to_the_read_triage_when_decontam_never_ran():
+    S = {"triage": {"status": "ok", "verdict": "non_fungal", "top_species": [{"name": "Klebsiella pneumoniae", "pct": 71.2}]},
+         "gate": {"stage": "gate", "status": "skipped", "reason": "read_triage:non_fungal"}}
+    r = row(S)
+    assert r["top_taxon"] == "Klebsiella pneumoniae (71.2%)" and r["sample_verdict"] == "NA" and r["read_verdict"] == "non_fungal"
