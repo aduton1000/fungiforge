@@ -32,7 +32,7 @@ i.e. W0.1–W0.3 + the /tmp fix, before W1.1/W2.x):
 | Check | CEA10 (hybrid) | DF-005 (Illumina-only) |
 |---|---|---|
 | species / confidence | *A. fumigatus* / high, ITS 100 % | *A. flavus* (ITS) |
-| assembly | 29,986,658 bp, 48 contigs, BUSCO 99.7 %, qc_pass | 37.8 Mb class (table rows re-checked with the fixed validator) |
+| assembly | 29,986,658 bp, 48 contigs, N50 2,646,760, BUSCO 99.7 %, qc_pass | 37,804,321 bp, 70 contigs, N50 1,038,584, BUSCO 99.7 %, qc_pass (identical to the recorded run) |
 | proteins | 9,607 (expected 9,630 ± 5 %) | 12,464 (expected 12,473 ± 5 %) |
 | BGC regions | 52 (expected 50 ± 15 %) | 102 (expected 102 ± 15 %) |
 | resistance | none; 0 known mutations; cyp51A located, promoter wild-type | none |
@@ -41,7 +41,9 @@ i.e. W0.1–W0.3 + the /tmp fix, before W1.1/W2.x):
 | provenance | 27 tool versions, images hashed; all stage JSONs carry status/versions | same |
 | stages not `ok` | readqc:partial (NanoPlot exit 1, L31), assemble:partial (purge_dups not in the Flye image, L30), assembly_qc:partial (phantom QUAST, fixed) | assembly_qc:partial (phantom QUAST, fixed) |
 
-Every scientific check passes within tolerance on both isolates. The first pass of the validator
+Validator result with the fixed lookup: CEA10 20/21, DF-005 15/16 — the single failure on each is
+`stages_all_ok`, i.e. the `partial` stages listed above, all from code that has since changed except
+purge_dups (L30). Every scientific check passes within tolerance on both isolates. The first pass of the validator
 reported the assembly-QC metrics as missing because it looked the stage JSON up by stage name
 (`assembly_qc`) while the file is `<sample>.assemblyqc.json`; fixed (`6f8fd55`), a real bug the
 first real run exposed. CEA10 wall time 2 h 09 m on the production run; on the dev install the
