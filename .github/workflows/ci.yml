@@ -133,10 +133,12 @@ jobs:
       - uses: nf-core/setup-nextflow@v2
         with:
           version: ${{ env.NXF_VER }}
-      - name: install nf-test
+      - name: install nf-test (pinned release from GitHub; the get.nf-test.com installer is not relied on)
         run: |
-          curl -fsSL https://get.nf-test.com | bash
-          sudo mv nf-test /usr/local/bin/
+          V=0.9.5
+          curl -fsSL --retry 5 --retry-delay 10 -o nf-test.tar.gz "https://github.com/askimed/nf-test/releases/download/v${V}/nf-test-${V}.tar.gz"
+          tar -xzf nf-test.tar.gz
+          sudo mv nf-test /usr/local/bin/ && sudo mv nf-test.jar /usr/local/bin/ 2>/dev/null || true
           nf-test version
       - name: run
         run: |
