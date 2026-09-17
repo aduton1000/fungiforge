@@ -141,23 +141,30 @@ staged under `--data_dir`.
 |:--|:----------|:--------------------|:-----------------------------|
 | 00 | Basecall *(optional)* | Dorado (native host binary / base image) | pod5 dir → `*.ont.fastq.gz` |
 | 01 | Read QC & filter | NanoPlot, chopper, fastp / base image | raw reads → `*.ont.filt.fastq.gz`, `readqc.json` (mode-aware) |
-| 02c | Haplotig purging | purge_dups / base image | draft → `*.purged.fasta`, `purge.json` |
-| 02 | Assembly (long-read) | Flye \| Canu \| Raven + purge_dups / `staphb/flye` | filtered ONT → `*.assembly.fasta` |
+| 02 | Assembly (long-read) | Flye \| Canu \| Raven / `staphb/flye` | filtered ONT → `*.assembly.fasta` |
 | 02b | Assembly (short-read) | SPAdes \| MEGAHIT / `staphb/spades` | Illumina-only → `*.assembly.fasta` |
+| 02c | Haplotig purging | purge_dups + minimap2 / base image | long-read draft → `*.purged.fasta`, `purge.json` |
 | 03a | ONT polish | Medaka / `staphb/medaka` | draft + ONT → `*.medaka.fasta` (long-read isolates) |
 | 03b | Short-read polish (hybrid) / Illumina-only passthrough | bwa + Polypolish / `staphb/polypolish` | Medaka + Illumina → `*.polished.fasta`, `polish.json`; Illumina-only passes through (`mode=illumina_only`) |
-| 04 | Decontam + organelle split | Kraken2 per contig (drops bacterial/archaeal/viral/human; records composition + fungal/non_fungal verdict) / base image | polished → `*.nuclear.fasta`, `*.mito.fasta`, `decontam.json` |
-| 05 | Assembly QC + completeness | QUAST, compleasm/BUSCO / `ezlabgva/busco` | nuclear → `assemblyqc.json` (contiguity, BUSCO, `qc_pass`) |
+| 04 | Decontam + organelle split | Kraken2 per contig; mitochondrial contigs separated by core-gene tblastn / base image | polished → `*.nuclear.fasta`, `*.mito.fasta`, `decontam.json` |
+| 04b | Mitochondrial genome | core genes, rRNAs, introns, circularity, copy number, heteroplasmy / base image | mito + reads → `organelle.json`, `*.mito.gff` |
+| 05 | Assembly QC + completeness | compleasm/BUSCO + contiguity / `ezlabgva/busco` | nuclear → `assemblyqc.json`, `*.busco_sc.faa` (single-copy proteins for the cohort tree) |
+| 05b | Gate | records why an isolate is stopped (non-fungal verdict, failed QC) / base image | → `gate.json` |
 | 06 | Repeat model + soft-mask | RepeatModeler2, RepeatMasker / `dfam/tetools` | nuclear → `*.masked.fasta`, `*.telib.fasta`, `repeat.json` |
-| 07 | Eukaryotic annotation | Funannotate / `nextgenusfs/funannotate` | masked → `*.proteins.faa`, `*.gbk`, `annotate.json` |
+| 07a | Gene prediction | Funannotate predict (GeneMark-ES when licensed; species-aware training) / `nextgenusfs/funannotate` | masked + species → `predict_results/`, `predict.json` |
+| 07b | eggNOG-mapper | emapper vs eggNOG 5 / `eggnog-mapper` image | proteins → `*.emapper.annotations` |
+| 07c | InterProScan *(opt-in)* | InterProScan 5 / `interpro/interproscan` | proteins → `*.iprscan.xml` |
+| 07 | Functional annotation | Funannotate annotate / `nextgenusfs/funannotate` | prediction + eggNOG + InterPro → `*.proteins.faa`, `*.gbk`, `annotate.json` |
 | 08 | Identification (multi-locus concordance) | ITSx, barrnap, vsearch/UNITE, tblastn/blastn vs type-material sets, mlst, sourmash / base image | nuclear → `*.species.txt`, `*.markers.fasta`, `*.busco_lineage.txt`, `identify.json` |
 | 08b | Species-aware BUSCO | compleasm/BUSCO with the lineage from stage 08 / BUSCO image | nuclear + lineage → `busco_lineage.json` |
 | 09 | **Antifungal resistance ★** | `af_resistance.py` + `cyp51a_TR.py` / base image | proteins + species + nuclear + GBK → `resistance.json` |
-| 10 | Mobile & repeat elements | `te_summary.py`, geNomad/RVDB / base image | TE library + mito → `mobile.json` |
+| 10 | Mobile & repeat elements | RepeatMasker table, geNomad, RVDB screen, mito homing endonucleases / base image | TE library + assembly + mito → `mobile.json` |
 | 11 | Biosynthetic gene clusters | fungiSMASH (antiSMASH 8) / `antismash/standalone:8.0.0` | GBK → `bgc.json`, `*.regions.gbk` |
-| 12 | Novelty | skani + ITS distance + IQ-TREE / base image | nuclear + markers + ID → `novelty.json` |
-| 13 | Eukaryote extras | nQuire/Smudgeplot, dbCAN, EffectorP, mating-type / base image | proteins + reads → `extras.json` |
-| 14 | Report + master table | `make_report.py` (jinja2) / base image | all `result.json` → `*.report.html`, `*.master.tsv` |
+| 12 | Novelty | skani vs the reference genome set + ITS/secondary loci / base image | nuclear + ID → `novelty.json` |
+| 13 | Eukaryote extras | SignalP 6 (site image), EffectorP 3, dbCAN, PHI-base, Pfam MAT locus, nQuire / base image | proteins + GBK + read BAM → `extras.json` |
+| 14 | Report + master row | `make_report.py` (Jinja2 template) / base image | all `result.json` → `*.report.html`, `*.master.tsv` |
+| 16 | Cohort phylogenomics *(run-level)* | skani clusters, BUSCO supermatrix + IQ-TREE 3, core SNP distances, BiG-SCAPE families / base image | every passing isolate → `cohort/` |
+| 17 | Cohort summary *(run-level)* | merged + validated master table, cohort report, MultiQC content / base image | all master rows → `04_summary/` |
 
 **Nextflow / profile model.** `main.nf` parses the sample sheet and calls the single
 subworkflow `FUNGIFORGE`, which wires the 15 modules. Behaviour is set by **two composable
