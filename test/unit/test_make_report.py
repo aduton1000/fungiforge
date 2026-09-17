@@ -11,9 +11,10 @@ def row(S):
 
 def test_columns_are_append_only_and_end_with_status_columns():
     assert m.MASTER_COLS[:4] == ["sample", "compartment", "facility", "season"]
-    assert m.MASTER_COLS[-5:] == ["mito_size_kb", "mito_core_genes", "mito_circular", "mito_copy_ratio", "mito_heteroplasmic_sites"]
-    assert m.MASTER_COLS[-9:-5] == ["n_secreted", "n_effectors", "n_cazymes", "n_phibase_hits"]
-    assert m.MASTER_COLS[-32:-9] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
+    assert m.MASTER_COLS[-4:] == ["te_ltr_pct", "n_genomad_virus", "n_genomad_plasmid", "n_mito_heg"]
+    assert m.MASTER_COLS[-9:-4] == ["mito_size_kb", "mito_core_genes", "mito_circular", "mito_copy_ratio", "mito_heteroplasmic_sites"]
+    assert m.MASTER_COLS[-13:-9] == ["n_secreted", "n_effectors", "n_cazymes", "n_phibase_hits"]
+    assert m.MASTER_COLS[-36:-13] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
                                    "read_verdict", "genome_size_est", "heterozygosity_pct", "ploidy_hint", "coverage",
                                    "id_loci_agree", "id_flags", "mlst_st", "busco_lineage_specific", "busco_complete_specific",
                                    "resistance_read_support", "copy_number_flags",
@@ -153,3 +154,10 @@ def test_organelle_columns_w27():
     assert (r["mito_size_kb"], r["mito_core_genes"], r["mito_circular"], r["mito_copy_ratio"], r["mito_heteroplasmic_sites"]) == (30.7, "15/15", True, 35.2, 2)
     r2 = row({"organelle": {"mito_present": False, "mito_size": 0, "n_core_genes": 0}})
     assert (r2["mito_size_kb"], r2["mito_core_genes"], r2["mito_circular"]) == ("NA", "NA", "NA")
+
+
+def test_mobile_columns_w28():
+    S = {"mobile": {"te_percent": 4.67, "te_landscape": {"ltr_pct": 2.93}, "n_genomad_virus": 1, "n_genomad_plasmid": 0, "n_mycovirus": 2, "n_mito_heg": 5}}
+    r = row(S)
+    assert (r["te_percent"], r["te_ltr_pct"], r["n_genomad_virus"], r["n_mycovirus"], r["n_mito_heg"]) == (4.67, 2.93, 1, 2, 5)
+    assert r["n_genomad_plasmid"] == 0

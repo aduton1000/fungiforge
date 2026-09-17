@@ -42,6 +42,8 @@ MASTER_COLS = [
     "n_secreted", "n_effectors", "n_cazymes", "n_phibase_hits",
     # appended 0.2.0 (W2.7): mitochondrial genome
     "mito_size_kb", "mito_core_genes", "mito_circular", "mito_copy_ratio", "mito_heteroplasmic_sites",
+    # appended 0.2.0 (W2.8): mobile elements (te_percent and n_mycovirus above are now populated by stage 10)
+    "te_ltr_pct", "n_genomad_virus", "n_genomad_plasmid", "n_mito_heg",
 ]
 
 
@@ -149,6 +151,8 @@ def build_row(sample, compartment, facility, season, S):
         "mito_circular": g(org, "circular") if g(org, "mito_present", default=False) else "NA",
         "mito_copy_ratio": g(org, "copy_ratio"),
         "mito_heteroplasmic_sites": g(org, "heteroplasmy", "n_heteroplasmic_sites"),
+        "te_ltr_pct": g(mob, "te_landscape", "ltr_pct"), "n_genomad_virus": g(mob, "n_genomad_virus"),
+        "n_genomad_plasmid": g(mob, "n_genomad_plasmid"), "n_mito_heg": g(mob, "n_mito_heg"),
     }
     return row
 

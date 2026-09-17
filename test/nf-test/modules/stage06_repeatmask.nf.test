@@ -24,6 +24,7 @@ nextflow_process {
             assert process.out.telib[0][1].endsWith('S1.telib.fasta')
             assert path(process.out.telib[0][1]).exists()
             assert process.out.json.size() == 1
+            assert process.out.tbl.size() == 1 && process.out.tbl[0][1].endsWith('S1.repeatmasker.tbl')
             assert process.out.json[0][1].endsWith('S1.repeat.json')
             assert path(process.out.json[0][1]).exists()
             def js = path(process.out.json[0][1]).json
