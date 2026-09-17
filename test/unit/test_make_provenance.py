@@ -158,3 +158,19 @@ def test_mini_validator_semantics():
     errs = make_provenance.validate_doc({"a": True, "b": [1], "c": 0}, schema)
     assert any("expected ['integer', 'null']" in e for e in errs)      # bool is not an integer
     assert any("b[0]" in e for e in errs) and any("unexpected key 'c'" in e for e in errs)
+
+
+
+def test_images_marks_config_only_containers_as_unused_from_the_trace(tmp_path):
+    sif = tmp_path / "site.sif"; sif.write_bytes(b"x" * 10)
+    doc, _ = aggregate(tmp_path, [stage_json(tmp_path, "S1", "assemble")])
+    prov = tmp_path / "provenance.json"
+    d = json.load(open(prov)); d["containers"] = {"withLabel:report": "aduton1000/fungiforge:0.1.0", "withLabel:report|readqc": str(sif)}
+    json.dump(d, open(prov, "w"))
+    (tmp_path / "trace.txt").write_text("task_id\thash\tname\tstatus\tcontainer\n1\tab/cd\tREPORT (S1)\tCOMPLETED\t" + str(sif) + "\n")
+    r = run_cli("images", "--provenance", str(prov), "--engine", "apptainer", "--no-hash")
+    assert r.returncode == 0, r.stderr
+    d = json.load(open(prov))
+    assert d["images"][str(sif)]["used"] is True and d["images"][str(sif)]["resolved"] is True
+    assert d["images"]["aduton1000/fungiforge:0.1.0"]["used"] is False and "overridden" in d["images"]["aduton1000/fungiforge:0.1.0"]["note"]
+    assert "1/1 used images resolved" in r.stdout and "1 listed but unused" in r.stdout
