@@ -97,6 +97,14 @@ site-built SignalP 6 image: CEA10 expected MAT1-1 (published for CEA10) and `hap
 DF-005 haploid; secretome, CAZyme and effector counts within the ranges published for the two
 species.
 
+### 1.5 Mitochondrial genome (W2.7)
+
+Pending on the dev deployment: CEA10 expected one circular contig of about 31 kb (Af293:
+30,696 bp) with 15/15 core genes and a mito/nuclear depth ratio in the tens; DF-005 (Illumina)
+mitogenome separated and annotated. In-image check on the local CEA10 assembly: 15/15 core genes,
+cox1 intron 2,011 bp (Af293 2,020 bp), rRNAs 100 %, redundant Flye fragments recognised (size
+estimate 29.4 kb), copy ratio 32 (details in UPGRADE_PLAN W2.7).
+
 ## 2. Reference-genome benchmarks
 
 | Isolate | Reference | Status |

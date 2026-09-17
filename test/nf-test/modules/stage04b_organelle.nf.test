@@ -1,0 +1,24 @@
+// Stub test for modules/stage04b_organelle.nf — mitochondrial genome annotation (W2.7).
+nextflow_process {
+
+    name "ORGANELLE stub"
+    script "modules/stage04b_organelle.nf"
+    process "ORGANELLE"
+    options "-stub-run"
+
+    test("emits the organelle JSON and GFF for one isolate") {
+        when {
+            process {
+                """
+                input[0] = [[id:'S1', assembly_mode:'longread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/test/samplesheet.test.csv"), file("$baseDir/nf-test.config"), file("$baseDir/test/reads/TESTFUN01.ont.fastq.gz"), file("$baseDir/assets/NO_R1"), file("$baseDir/assets/NO_R2")]
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert process.out.json.size() == 1 && process.out.json[0][1].endsWith('S1.organelle.json')
+            assert path(process.out.json[0][1]).json.stage == 'organelle'
+            assert process.out.gff[0][1].endsWith('S1.mito.gff')
+        }
+    }
+}
