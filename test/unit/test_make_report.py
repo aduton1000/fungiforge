@@ -11,8 +11,9 @@ def row(S):
 
 def test_columns_are_append_only_and_end_with_status_columns():
     assert m.MASTER_COLS[:4] == ["sample", "compartment", "facility", "season"]
-    assert m.MASTER_COLS[-4:] == ["n_secreted", "n_effectors", "n_cazymes", "n_phibase_hits"]
-    assert m.MASTER_COLS[-27:-4] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
+    assert m.MASTER_COLS[-5:] == ["mito_size_kb", "mito_core_genes", "mito_circular", "mito_copy_ratio", "mito_heteroplasmic_sites"]
+    assert m.MASTER_COLS[-9:-5] == ["n_secreted", "n_effectors", "n_cazymes", "n_phibase_hits"]
+    assert m.MASTER_COLS[-32:-9] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
                                    "read_verdict", "genome_size_est", "heterozygosity_pct", "ploidy_hint", "coverage",
                                    "id_loci_agree", "id_flags", "mlst_st", "busco_lineage_specific", "busco_complete_specific",
                                    "resistance_read_support", "copy_number_flags",
@@ -144,3 +145,11 @@ def test_annotation_columns_w25():
     r = row(S)
     assert (r["n_proteins"], r["pct_pfam"], r["pct_eggnog"]) == (9607, 61.2, 70.5) and r["annotation_training"] == "aspergillus_fumigatus/eurotiomycetes/genemark:yes"
     assert row({})["annotation_training"] == "NA" and row({})["n_proteins"] == "NA"
+
+
+def test_organelle_columns_w27():
+    S = {"organelle": {"mito_present": True, "mito_size": 30696, "n_core_genes": 15, "circular": True, "copy_ratio": 35.2, "heteroplasmy": {"n_heteroplasmic_sites": 2}}}
+    r = row(S)
+    assert (r["mito_size_kb"], r["mito_core_genes"], r["mito_circular"], r["mito_copy_ratio"], r["mito_heteroplasmic_sites"]) == (30.7, "15/15", True, 35.2, 2)
+    r2 = row({"organelle": {"mito_present": False, "mito_size": 0, "n_core_genes": 0}})
+    assert (r2["mito_size_kb"], r2["mito_core_genes"], r2["mito_circular"]) == ("NA", "NA", "NA")

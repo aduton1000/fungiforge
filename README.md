@@ -166,7 +166,7 @@ results/
 │   ├── 01_readqc/       # *.ont.filt.fastq.gz, readqc.json, NanoPlot/fastp reports
 │   ├── 02_assembly/     # <sample>.assembly.fasta
 │   ├── 03_polish/       # <sample>.medaka.fasta, <sample>.polished.fasta, polish.json (mode + confidence)
-│   ├── 04_decontam/     # <sample>.nuclear.fasta, <sample>.mito.fasta, decontam.json
+│   ├── 04_decontam/     # <sample>.nuclear.fasta, <sample>.mito.fasta, decontam.json, organelle.json, <sample>.mito.gff
 │   ├── 05_assembly_qc/  # assemblyqc.json (QUAST contiguity, BUSCO/compleasm, qc_pass)
 │   ├── 06_repeatmask/   # <sample>.masked.fasta, <sample>.telib.fasta, repeat.json
 │   ├── 07_annotate/     # <sample>.proteins.faa, <sample>.gbk, annotate.json, predict.json, eggnog.json (+ emapper table, InterProScan XML)

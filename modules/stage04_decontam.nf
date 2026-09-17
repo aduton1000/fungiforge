@@ -1,7 +1,9 @@
 // Stage 04 — decontamination + organelle split. Kraken2 classifies every contig;
 // bacterial/archaeal/viral/human contigs are dropped and the domain composition +
 // a fungal/non_fungal verdict are recorded (surfaced in master_fungi.tsv); the mitochondrial genome is
-// separated (oatk/GetOrganelle) because its mobile introns matter in Stage 10.
+// separated from the assembly (W2.7: contigs carrying >= 2 core mitochondrial genes by tblastn of the
+// bundled reference proteins, <= 250 kb, AT-rich) because its mobile introns matter in Stage 10 and
+// stage 04b annotates it.
 process DECONTAM {
   tag { meta.id }
   label 'decontam'
@@ -27,8 +29,18 @@ process DECONTAM {
         --sample "${meta.id}" --mito ${meta.id}.mito.fasta \\
         --out-fasta ${meta.id}.nuclear.fasta --out-json ${meta.id}.decontam.json
   fi
-  # organelle: extract mito (placeholder — oatk/GetOrganelle wired in milestone 3)
-  touch ${meta.id}.mito.fasta
+  # organelle split (W2.7): the mitochondrial contigs leave the nuclear set
+  ff_run makeblastdb -- bash -c "makeblastdb -in ${meta.id}.nuclear.fasta -dbtype nucl -out asm_db > makeblastdb.log 2>&1"
+  ff_run tblastn_mito -- bash -c "tblastn -query '${params.mito_proteins}' -db asm_db -evalue 1e-10 -max_target_seqs 50 -num_threads ${task.cpus} -outfmt '6 qseqid sseqid pident length qstart qend sstart send evalue bitscore' > mito_hits.tsv 2>tblastn.log"
+  mv ${meta.id}.nuclear.fasta pre_split.fasta
+  ff_run mito_extract -- mito_extract.py --sample "${meta.id}" --assembly pre_split.fasta --tblastn mito_hits.tsv \
+      --max-len ${params.mito_max_len} --out-mito ${meta.id}.mito.fasta --out-nuclear ${meta.id}.nuclear.fasta --json mito_extract.json
+  python3 - <<'PY'
+  import json
+  d = json.load(open("${meta.id}.decontam.json")); m = json.load(open("mito_extract.json"))
+  d.update(mito_contigs=m["mito_contigs"], mito_bp=m["mito_bp"], mito_candidates=m["candidates"])
+  json.dump(d, open("${meta.id}.decontam.json", "w"), indent=2)
+  PY
   ff_finalize
   """
   stub:
