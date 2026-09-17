@@ -607,15 +607,24 @@ The `polish.json` records the mode, the polisher version, the bp changed, and th
 
 ## 9.6 Stage 04 — Decontamination + organelle split
 
-**Kraken2** (against `--data_dir/kraken2`) plus tiara/BlobTools-style GC×coverage triage drop
-bacterial/human contigs, keeping fungal + unclassified contigs as the **nuclear** assembly; the
-**mitochondrial** genome is separated (GetOrganelle/oatk) because its mobile introns matter in
-Stage 10. Skipped (assembly passes through as nuclear) when `--skip_decontam` or no `--data_dir`.
-Emits `*.nuclear.fasta`, `*.mito.fasta`, `decontam.json`.
+**Kraken2** (against `--data_dir/kraken2`) classifies every contig; bacterial, archaeal, viral and
+human contigs are dropped, the domain composition and a fungal / non-fungal verdict are recorded
+(`sample_verdict`, `contam_removed_pct`, `top_taxon`), and a non-fungal isolate is kept whole and
+flagged for the gate rather than "decontaminated". The **mitochondrial genome** is then separated
+from the assembly (`mito_extract.py`): a contig is mitochondrial when tblastn of the bundled core
+mitochondrial proteins (`fungiforge/resources/mito/`, 15 genes from *A. fumigatus*, *S. cerevisiae*
+and *C. neoformans*) finds at least two core genes on it, it is at most `--mito_max_len` (250 kb)
+and AT-rich (GC < 40 %). Emits `*.nuclear.fasta`, `*.mito.fasta` and `decontam.json` (with the
+mitochondrial contigs and rejected candidates).
 
-> **Honest limitation.** The shipped module keeps *all* contigs as nuclear (a `seqkit` pass) and
-> writes an empty mito placeholder — the BlobTools refinement and organelle extraction are wired
-> for milestone 3. Kraken2 is invoked but its classification is not yet used to drop contigs.
+## 9.6b Stage 04b — Mitochondrial genome
+
+`mito_annotate.py` annotates the separated mitogenome: the 15 core genes by tblastn (best
+reference species, identity, coverage, exons and introns from HSP gaps, extra copies), rnl/rns by
+blastn, circularity from a terminal repeat, and, from a read subsample mapped to mitogenome +
+nuclear genome, the mito/nuclear depth ratio (copy number) and heteroplasmic sites (minor allele
+≥ 10 % at ≥ 20×; `--organelle_reads_check false` skips the mapping). Emits `organelle.json` and
+`*.mito.gff`. tRNAs are not annotated.
 
 ## 9.7 Stage 05 — Assembly QC + completeness
 
@@ -864,7 +873,7 @@ Under `results/<sample>/`:
 |:------------|:--------------|:--------------------------------------------|
 | Filtered reads | `01_readqc/` | ONT filtered FASTQ + NanoPlot |
 | Polished assembly | `03_polish/` | `*.polished.fasta` + `polish.json` (mode) |
-| Nuclear / mito | `04_decontam/` | `*.nuclear.fasta`, `*.mito.fasta` |
+| Nuclear / mito | `04_decontam/` | `*.nuclear.fasta`, `*.mito.fasta`, `organelle.json`, `*.mito.gff` |
 | Assembly QC | `05_assembly_qc/` | `assemblyqc.json` (N50, BUSCO, `qc_pass`) |
 | Annotation | `07_annotate/` | `*.proteins.faa`, `*.gbk` |
 | Identification | `08_identify/` | `*.species.txt`, `identify.json` (loci, concordance, MLST), `busco_lineage.json` |
@@ -892,7 +901,8 @@ read_verdict, genome_size_est, heterozygosity_pct, ploidy_hint, coverage,
 id_loci_agree, id_flags, mlst_st, busco_lineage_specific, busco_complete_specific,
 resistance_read_support, copy_number_flags,
 n_proteins, pct_pfam, pct_go, pct_eggnog, pct_interpro, annotation_training,
-n_secreted, n_effectors, n_cazymes, n_phibase_hits
+n_secreted, n_effectors, n_cazymes, n_phibase_hits,
+mito_size_kb, mito_core_genes, mito_circular, mito_copy_ratio, mito_heteroplasmic_sites
 ```
 
 ### Stage status contract
