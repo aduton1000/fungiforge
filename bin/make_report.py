@@ -31,6 +31,9 @@ MASTER_COLS = [
     "gate",
     # appended 0.2.0 (W2.2): read-level triage verdict and the k-mer profile
     "read_verdict", "genome_size_est", "heterozygosity_pct", "ploidy_hint", "coverage",
+    # appended 0.2.0 (W2.3): identification evidence — secondary loci that agree with ITS, flags
+    # (tie/discordant/unavailable), MLST scheme:ST, species-aware BUSCO lineage and completeness
+    "id_loci_agree", "id_flags", "mlst_st", "busco_lineage_specific", "busco_complete_specific",
 ]
 
 
@@ -68,6 +71,10 @@ def build_row(sample, compartment, facility, season, S):
     dc  = S.get("decontam", {})
     tri = S.get("triage", {})
     km  = S.get("kmer", {})
+    bl  = S.get("busco_lineage", {})
+    ml  = g(ident, "mlst", default={})
+    agree = g(ident, "concordance", "secondary_agree", default=[])
+    flags = g(ident, "flags", default=[])
     tops = g(dc, "top_species", default=[])
     if not (isinstance(tops, list) and tops):
         tops = g(tri, "top_species", default=[])          # isolate stopped at read triage: use the read-level taxon
@@ -102,6 +109,12 @@ def build_row(sample, compartment, facility, season, S):
         "heterozygosity_pct": g(km, "heterozygosity_pct", default="NA"),
         "ploidy_hint": g(km, "ploidy_hint", default="NA"),
         "coverage": g(km, "coverage_from_kmers", default=g(km, "coverage_from_read_bases", default="NA")),
+        "id_loci_agree": ";".join(agree) if isinstance(agree, list) and agree else "none",
+        "id_flags": ";".join(flags) if isinstance(flags, list) and flags else "none",
+        "mlst_st": (f"{ml.get('scheme')}:ST{ml.get('st')}" if isinstance(ml, dict) and ml.get("scheme") and ml.get("st")
+                    else f"{ml.get('scheme')}:ST-" if isinstance(ml, dict) and ml.get("scheme") else "NA"),
+        "busco_lineage_specific": g(bl, "lineage", default="NA") if g(bl, "busco_complete", default=None) not in (None, "NA") else "NA",
+        "busco_complete_specific": g(bl, "busco_complete", default="NA"),
     }
     return row
 

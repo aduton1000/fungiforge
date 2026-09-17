@@ -13,7 +13,7 @@
 #   bin/fetch_references.sh images antismash funannotate   # selected steps
 #
 # Steps: images antismash funannotate eggnog busco unite kraken2 refseq_fungi
-#        fungamr rvdb
+#        fungamr rvdb benchmarks markers mlst
 #
 # NB several DBs are downloaded THROUGH their tool container (funannotate setup,
 # eggnog, antismash) so the relevant image is pulled first. Version/URL-sensitive
@@ -23,7 +23,7 @@
 set -uo pipefail
 
 DB="${FUNGIFORGE_DB:?set FUNGIFORGE_DB to the target data dir, e.g. /data/fungiforge_db}"
-mkdir -p "$DB"/{containers,funannotate,eggnog,antismash,busco,unite,kraken2,refseq_fungi,fungamr,rvdb,logs}
+mkdir -p "$DB"/{containers,funannotate,eggnog,antismash,busco,unite,kraken2,refseq_fungi,fungamr,rvdb,markers,mlst,logs}
 LOGDIR="$DB/logs"; MANIFEST="$DB/MANIFEST.tsv"
 [ -f "$MANIFEST" ] || echo -e "database\tdetail\tstatus\ttimestamp" > "$MANIFEST"
 
@@ -122,16 +122,23 @@ step_eggnog(){
 # ---- BUSCO / compleasm fungal lineages --------------------------------------
 # compleasm is fastest; if not installed, fall back to BUSCO container download.
 step_busco(){
+  # fungi_odb10 is the lineage of the early QC gate (stage 05); the others are the species-aware
+  # lineages stage 08b re-runs BUSCO with (fungiforge/resources/busco_lineages.tsv). Override the
+  # set with BUSCO_LINEAGES="fungi_odb10 eurotiales_odb10 ..." (space-separated).
   is_done busco && { log "busco lineages present — skip"; return; }
-  log "fetching fungal BUSCO/compleasm lineages -> $DB/busco"
-  if command -v compleasm >/dev/null 2>&1; then
-    compleasm download fungi_odb10 -L "$DB/busco" >>"$LOGDIR/busco.log" 2>&1 \
-      && mark busco "compleasm fungi_odb10" || fail busco "compleasm download"
-  else
-    docker run --rm --platform linux/amd64 -v "$DB/busco":/busco -w /busco \
-        ezlabgva/busco:v5.7.1_cv1 busco --download fungi_odb10 >>"$LOGDIR/busco.log" 2>&1 \
-      && mark busco "busco fungi_odb10" || fail busco "busco --download"
-  fi
+  local lineages="${BUSCO_LINEAGES:-fungi_odb10 eurotiales_odb10 saccharomycetes_odb10 hypocreales_odb10 tremellomycetes_odb10 mucorales_odb10 onygenales_odb10 sordariomycetes_odb10}"
+  local ok=1 l
+  log "fetching BUSCO lineages ($lineages) -> $DB/busco"
+  for l in $lineages; do
+    if [ -d "$DB/busco/$l" ] || [ -d "$DB/busco/lineages/$l" ] || [ -d "$DB/busco/busco_downloads/lineages/$l" ]; then log "have $l — skip"; continue; fi
+    if command -v compleasm >/dev/null 2>&1; then
+      compleasm download "$l" -L "$DB/busco" >>"$LOGDIR/busco.log" 2>&1 || { fail busco "compleasm download $l"; ok=0; }
+    else
+      docker run --rm --platform linux/amd64 -v "$DB/busco":/busco -w /busco \
+          ezlabgva/busco:v5.7.1_cv1 busco --download "$l" >>"$LOGDIR/busco.log" 2>&1 || { fail busco "busco --download $l"; ok=0; }
+    fi
+  done
+  [ "$ok" = 1 ] && mark busco "$lineages"
 }
 
 # ---- UNITE fungal ITS reference (version-sensitive URL) ----------------------
@@ -239,8 +246,26 @@ step_benchmarks(){
   [ "$ok" = 1 ] && mark benchmarks "A1163 GCA_000150145.1 + NRRL3357 GCA_009017415.1"
 }
 
+# ---- type-material reference sets for the secondary ID loci (W2.3) ------------
+# NCBI records flagged "sequence from type" for CaM, BenA, TEF1, RPB2 and LSU (D1/D2); the
+# per-locus BLAST databases are built inside the identification task, so no BLAST is needed here.
+step_markers(){
+  is_done markers && { log "marker reference sets present — skip"; return; }
+  log "fetching type-material marker sets -> $DB/markers"
+  python3 "$REPO_DIR/bin/fetch_marker_refs.py" --out-dir "$DB/markers" >>"$LOGDIR/markers.log" 2>&1 \
+    && mark markers "NCBI type-material CaM/BenA/TEF1/RPB2/LSU $(date +%F)" || fail markers "fetch_marker_refs.py (see logs/markers.log)"
+}
+
+# ---- fungal PubMLST schemes for mlst (W2.3) ------------------------------------
+step_mlst(){
+  is_done mlst && { log "mlst schemes present — skip"; return; }
+  log "fetching PubMLST fungal schemes -> $DB/mlst/pubmlst"
+  python3 "$REPO_DIR/bin/fetch_mlst_schemes.py" --out-dir "$DB/mlst" >>"$LOGDIR/mlst.log" 2>&1 \
+    && mark mlst "PubMLST afumigatus calbicans cglabrata ctropicalis ckrusei $(date +%F)" || fail mlst "fetch_mlst_schemes.py (see logs/mlst.log)"
+}
+
 # ---- driver -----------------------------------------------------------------
-STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggnog busco unite kraken2 refseq_fungi fungamr rvdb benchmarks)
+STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggnog busco unite kraken2 refseq_fungi fungamr rvdb benchmarks markers mlst)
 log "==== fungiforge fetch_references start · DB=$DB · steps: ${STEPS[*]} ===="
 for s in "${STEPS[@]}"; do "step_$s"; done
 log "==== fetch_references finished ===="
