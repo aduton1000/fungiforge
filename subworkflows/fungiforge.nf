@@ -15,6 +15,7 @@ include { GATE as GATE_READS; GATE as GATE_ASSEMBLY } from '../modules/stage05b_
 include { REPEATMASK }  from '../modules/stage06_repeatmask.nf'
 include { ANNOTATE }    from '../modules/stage07_annotate.nf'
 include { IDENTIFY }    from '../modules/stage08_identify.nf'
+include { BUSCO_LINEAGE } from '../modules/stage08b_busco_lineage.nf'
 include { RESISTANCE }  from '../modules/stage09_resistance.nf'
 include { MOBILE }      from '../modules/stage10_mobile.nf'
 include { BGC }         from '../modules/stage11_bgc.nf'
@@ -120,8 +121,11 @@ workflow FUNGIFORGE {
     // 7. eukaryotic gene prediction + functional annotation (Funannotate)
     ANNOTATE(REPEATMASK.out.masked)
 
-    // 8. identification (ITS/LSU + genome ANI + MLST, GCPSR multi-locus)
+    // 8. identification (ITS + CaM/BenA/TEF1/RPB2/LSU concordance, MLST, optional genome ANI)
     IDENTIFY(nuclear_ok)
+
+    // 8b. species-aware BUSCO with the lineage chosen from the species call (W2.3)
+    BUSCO_LINEAGE(nuclear_ok.join(IDENTIFY.out.lineage))
 
     // 9. antifungal resistance (bespoke panel + cyp51A TR34/TR46 module).
     //    needs proteins (substitutions) + species + nuclear & GBK (promoter TR locus)
@@ -149,7 +153,7 @@ workflow FUNGIFORGE {
     all_json = READ_QC.out.json
       .mix(basecall_json, triage_json, gate_reads_json, kmer_json, ASSEMBLE.out.json, SR_ASSEMBLE.out.json, MEDAKA.out.json,
            SRPOLISH.out.json, DECONTAM.out.json, ASSEMBLY_QC.out.json, GATE_ASSEMBLY.out.json, REPEATMASK.out.json,
-           ANNOTATE.out.json, IDENTIFY.out.json, RESISTANCE.out.json,
+           ANNOTATE.out.json, IDENTIFY.out.json, BUSCO_LINEAGE.out.json, RESISTANCE.out.json,
            mobile_ch, bgc_ch, novelty_ch, extras_ch)
       .map { meta, j -> tuple(meta.id, meta, j) }
       .groupTuple(by: 0)

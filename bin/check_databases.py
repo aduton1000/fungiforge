@@ -31,6 +31,8 @@ OPTIONAL = {
     "genomad_db":           "geNomad (stage 10, used when present)",
     "refseq_fungi_genomes": "reference genome set for ANI novelty (stage 12, used when present)",
     "rvdb":                 "RVDB-prot mycovirus references (fetched; consumed from W2.8 onwards)",
+    "markers":              "type-material reference sets for CaM/BenA/TEF1/RPB2/LSU (stage 08 secondary loci, used when present)",
+    "mlst":                 "PubMLST fungal schemes for mlst (stage 08, used when present)",
 }
 
 
