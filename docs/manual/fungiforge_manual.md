@@ -373,13 +373,14 @@ external/scratch drive.
 | **Funannotate** DB (~30–50 GB: Pfam, dbCAN, MEROPS, InterPro, BUSCO) | eukaryotic annotation | 07 | `funannotate` (`funannotate setup -i all`) |
 | **eggNOG** 5.0.2 (~12 GB compressed: `eggnog.db`, `eggnog_proteins.dmnd`, taxa) | eggNOG-mapper orthology annotation | 07b | `eggnog` (direct download) |
 | **InterProScan** data release 5.78-109.0 (6.9 GB; matches the image tag) | InterProScan domains / GO | 07c | `interproscan` (on request) |
-| **dbCAN** family HMMs (V13), **PHI-base** FASTA, **EffectorP 3** (repository with WEKA) | CAZymes, virulence, effectors | 13 | `dbcan`, `phibase`, `effectorp` |
+| **dbCAN** family HMMs (V14), **PHI-base** FASTA, **EffectorP 3** (repository with WEKA) | CAZymes, virulence, effectors | 13 | `dbcan`, `phibase`, `effectorp` |
+| **geNomad** database v1.9 (0.8 GB) | viruses / plasmids / proviruses | 10 | `genomad` |
 | **BUSCO / compleasm** `fungi_odb10` + the order/class lineages of `busco_lineages.tsv` | assembly completeness (gate, then species-aware) | 05, 08b | `busco` (`BUSCO_LINEAGES` overrides the set) |
 | **UNITE** general FASTA (Fungi v10.0, 2025) | ITS species identification | 08 | `unite` |
 | **Kraken2** (PlusPF-8 GB) | decontamination | 04 | `kraken2` |
 | **sourmash/RefSeq-fungi** (GenBank fungi k=31) | genome-ANI ID & novelty | 08, 12 | `refseq_fungi` |
 | **FungAMR** tables + built reference proteins + derived panel | antifungal-resistance calling (panel rows with evidence tiers are derived from the table at run time when `fungamr_panel.tsv` is absent) | 09 | `fungamr` (+ `build_fungamr_refs.py`) |
-| **RVDB-prot** (v31.0 RdRp) | mycovirus / EVE screen (staged now; consumed from the W2.8 mobile/mycovirus upgrade) | 10 | `rvdb` |
+| **RVDB-prot** (v31.0, 786 k proteins) | mycovirus / endogenous-viral-element screen | 10 | `rvdb` |
 | **Type-material marker sets** (NCBI "sequence from type": CaM, BenA, TEF1, RPB2, LSU; optional) | secondary-locus identification | 08 | `markers` (`fetch_marker_refs.py`; `NCBI_API_KEY` speeds it up) |
 | **PubMLST fungal schemes** (optional) | MLST | 08 | `mlst` (`fetch_mlst_schemes.py`) |
 
@@ -750,10 +751,19 @@ contradict the assembly), `low_evidence` (tier 8), `provisional_minor_allele` (r
 
 ## 9.12 Stage 10 — Mobile & repeat elements
 
-`te_summary.py` tallies the TE library by superfamily (LTR Gypsy/Copia, TIR, LINE, Helitron);
-**geNomad** (with `--data_dir/genomad_db`) scans for mycovirus / endogenous viral elements;
-`mobile_merge.py` combines them, noting the **DNA-only caveat** (RNA mycoviruses are not captured
-by WGS). Skippable with `--skip_mge`. Emits `mobile.json`.
+Four blocks, each optional: (1) the **TE landscape** from RepeatMasker's summary table
+(`repeatmasker_tbl.py`: `te_percent`, interspersed-repeat fraction, LTR/Gypsy/Copia, LINE, DNA
+transposon, Helitron, unclassified and simple-repeat percentages) plus the RepeatModeler family
+counts by superfamily (`te_summary.py`); (2) **geNomad** on nuclear + mitochondrial contigs
+(viruses, proviruses, plasmids; `--data_dir/genomad_db`, `fetch_references.sh genomad`;
+`--genomad false` disables); (3) the **mycovirus / endogenous-viral-element screen**: DIAMOND
+blastx of every contig against RVDB-prot (`--data_dir/rvdb`, database built in the task;
+`--rvdb_evalue`, `--rvdb_sensitivity`), loci classified by virus family — mycovirus families,
+retroelement-like (LTR retrotransposons, reported apart), other viral — with the DNA-only caveat:
+RNA mycoviruses are visible only as reverse-transcribed endogenous copies; (4) **mitochondrial
+homing-endonuclease ORFs** (`mito_heg.py`: six-frame ORFs under genetic code 4 searched with the
+Pfam LAGLIDADG / GIY-YIG / HNH profiles from the funannotate database). Emits `mobile.json` and
+the raw RVDB hits.
 
 ## 9.13 Stage 11 — Biosynthetic gene clusters
 
@@ -904,7 +914,8 @@ id_loci_agree, id_flags, mlst_st, busco_lineage_specific, busco_complete_specifi
 resistance_read_support, copy_number_flags,
 n_proteins, pct_pfam, pct_go, pct_eggnog, pct_interpro, annotation_training,
 n_secreted, n_effectors, n_cazymes, n_phibase_hits,
-mito_size_kb, mito_core_genes, mito_circular, mito_copy_ratio, mito_heteroplasmic_sites
+mito_size_kb, mito_core_genes, mito_circular, mito_copy_ratio, mito_heteroplasmic_sites,
+te_ltr_pct, n_genomad_virus, n_genomad_plasmid, n_mito_heg
 ```
 
 ### Stage status contract
