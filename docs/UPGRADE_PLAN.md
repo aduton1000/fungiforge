@@ -38,7 +38,7 @@ Legend: `todo` · `in progress` · `built` (code + tests) · `validated` (real-d
 | W3.2 | Cohort BGC families and mycotoxin flags | built | develop: `a4b4a7d` | 231 unit tests (KnownClusterBlast JSON parsing under both key names, compound flags, region GenBank parsing, DIAMOND similarity and family clustering, CLIs, master columns), nf-test (stage 16 inputs, DAG 65), in-image family clustering of the 40 CEA10 antiSMASH regions duplicated as a second isolate (80 regions → exactly 40 families, each shared by both copies and none merged across distinct regions, 1.3 s); real-data validation pending on the dev deployment with `--cb-knownclusters` (DF-005 aflatoxin, CEA10 gliotoxin) |
 | W3.3 | Reporting: per-isolate HTML, cohort MultiQC, merged master table, schema | built | develop: `c2195d1` | 238 unit tests (schema vs MASTER_COLS, type/enum/duplicate/missing-column validation, merge order, cohort tallies and metric ranges, MultiQC export, CLIs), nf-test (stage 17 stub, DAG 66), rendered on a synthetic 12-isolate cohort and a full CEA10-style isolate; real-data validation pending on the dev deployment (batch cohort report + Layer 2 end to end) |
 | W4.1 | Engineering hygiene and documentation pass | built | develop: `65a4efe` | 245 unit tests (samplesheet validation: ids, pairing, missing/empty files, metadata typos, header problems, path resolution, CLI and strict mode), nf-test (purge stage stub, DAG 68), duplicate-id rejection verified on a real stub run; CHANGELOG, CITATION 0.2.0, manual sweep |
-| W4.2 | Database fetch, installer and site config updates for new resources | todo | | |
+| W4.2 | Database fetch, installer and site config updates for new resources | built | develop: (this commit) | the fetch steps landed with their items (markers, mlst, dbcan, phibase, effectorp, genomad, genomes, interproscan, multi-lineage busco, direct eggNOG); container-driven downloads now run under Apptainer/Singularity or Docker (L24), verified to degrade cleanly with no runtime; installer stages the SignalP image and pre-pulls the two new public images; deployment guide rewritten with the database table and the licensed resources |
 | W5.1 | Cluster upgrade to v0.2.0 and re-validation | todo | | |
 
 ## Limitations captured (inventory)
@@ -76,7 +76,7 @@ Everything the assessment and the code audit found, mapped to the item that clos
 | L21 | Samplesheet and metadata are not validated (compartment/facility/season free text) — **built** in W4.1 (`fungiforge check`, duplicate/malformed ids fail at launch, metadata typo warnings) | main.nf, cli.py | W4.1 |
 | L22 | Manual describes mito, mycovirus and extras as working — **resolved** in W2.6/W2.7/W2.8 (the stages now do the work) and the manual rewritten section by section in W4.1 | docs/manual | W4.1 |
 | L23 | Layer-2 R scripts are skeletons that assume columns not yet populated (`has_af_resistance`, `azole_R`, `echino_R`) — **built** in W3.3 (they derive from the populated columns, read the merged table and the cohort tables; the remaining objectives get their pass in W4.1) | analysis/scripts | W3.3, W4.1 |
-| L24 | Fetch script downloads through Docker for antiSMASH/funannotate/eggNOG; needs Apptainer path | fetch_references.sh | W4.2 |
+| L24 | Fetch script downloads through Docker for antiSMASH/funannotate/eggNOG; needs Apptainer path — **built** in W4.2 (`crun`: Apptainer/Singularity first, Docker fallback; eggNOG is a direct download since W2.5) | fetch_references.sh | W4.2 |
 | L25 | No chromosome-level scaffolding or telomere check for long-read assemblies; no RNA-seq path | — | out of scope for v0.2 (recorded) |
 
 ## Work items
@@ -180,6 +180,8 @@ Samplesheet and metadata schema validation with clear errors; `nextflow lint` cl
 #### W4.2 Databases, installer, site config
 Fetch script gains geNomad, reference genome set, marker-locus references, InterPro data, eggNOG, SignalP model placement; Apptainer path for the container-driven downloads; installer and site config updated for new images and resources; deployment guide updated.
 
+**As built (2026-09-17).** The fetch steps were added with the items that needed them: `markers` and `mlst` (W2.3), `genomad` (W2.8), `genomes` (W2.9), `dbcan`, `phibase`, `effectorp` (W2.6), `interproscan` (W2.5), multi-lineage `busco` by direct download instead of a container (W2.3), and eggNOG as a direct download after the container route failed on the cluster (W2.5). W4.2 closed the last gap (L24): `crun` in `bin/fetch_references.sh` runs the two container-built databases (funannotate `setup -i all`, `download-antismash-databases`) under **Apptainer or Singularity** when present — pulling into the shared image cache, bypassing the image entrypoint — and under Docker otherwise, so a cluster with no Docker daemon can stage everything; with no runtime at all it fails with one clear line. The installer stages the licensed SignalP 6 image (`--signalp`) and writes the `extras` label into `site.config`, pre-pulls the two new public images (eggnog-mapper, interproscan — picked up automatically from `conf/base.config`), refuses a stale environment lock, and its smoke check exercises nQuire, BiG-SCAPE, MultiQC and purge_dups. `docs/hpc_deployment.md` now carries the full database table with sizes and the two licensed resources.
+
 ### Phase 5 — Deployment
 
 #### W5.1 Cluster upgrade and re-validation
@@ -193,6 +195,7 @@ After production runs complete: merge `develop` → `main`, tag `v0.2.0`, `hpc_i
 
 ## Change log of this document
 
+- 2026-09-17 — W4.2 built: container-driven database downloads run under Apptainer/Singularity or Docker (L24), deployment guide rewritten with the database table and the licensed resources; the individual fetch steps had landed with their own items.
 - 2026-09-17 — W4.1 built: samplesheet pre-flight validation (`fungiforge check`) with duplicate/malformed ids failing at launch, haplotig purging moved to its own stage in the base image (L30), installer guard against a stale environment lock, CHANGELOG and CITATION for 0.2.0.
 - 2026-09-17 — W3.3 built: master-table JSON schema and validator, Jinja2 per-isolate report, run-level stage 17 writing the merged master_fungi.tsv, cohort_report.html, cohort_summary.json and MultiQC custom content; BiG-SCAPE 2 became the primary gene-cluster-family method (W3.2) now that it fits the image; L19 closed.
 - 2026-09-17 — W3.2 built: KnownClusterBlast enabled in stage 11 (it had never run), best MIBiG hit per region and mycotoxin / bioactive flags from a curated compound list, cohort gene-cluster families by shared-protein clustering in stage 16; three master columns; L18 closed.
