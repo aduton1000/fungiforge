@@ -103,11 +103,26 @@ FF_TAG="aduton1000/fungiforge:$VERSION";      FF_SIF="$PREFIX/images/fungiforge-
 AS_TAG="aduton1000/antismash-ff:8.0.0-r3";    AS_SIF="$PREFIX/images/antismash-ff-8.0.0-r3.sif"
 if [ "$SKIP_IMAGES" = 0 ]; then
   export APPTAINER_TMPDIR="${APPTAINER_TMPDIR:-$PREFIX/images/.tmp}"; mkdir -p "$APPTAINER_TMPDIR"
+  # Guard (W4.1): the base image is normally built from the explicit lock (env/base.linux-64.lock)
+  # so rebuilds reproduce the validated environment byte for byte. When env/base.yml is NEWER, the
+  # lock predates a pin change and a lock build would silently lack the new tools — so build from
+  # base.yml instead, loudly, and ask for the lock to be regenerated from the image that results.
+  ENV_SPEC="env/base.linux-64.lock"
+  if [ "$REPO_DIR/env/base.yml" -nt "$REPO_DIR/env/base.linux-64.lock" ]; then
+    ENV_SPEC="env/base.yml"
+    log "NOTE env/base.yml is newer than the lock — building the base image from base.yml (the lock is stale)."
+    log "     After this install, regenerate and commit the lock:  bin/lock_env.sh $FF_TAG"
+  fi
+
   build_sif(){ # build_sif <tag> <dockerfile> <context> <sif>
     local tag="$1" df="$2" ctx="$3" sif="$4"
     if [ -s "$sif" ] && [ "$REBUILD_IMAGES" = 0 ]; then echo "  have $sif — skip (use --rebuild-images)"; return; fi
     log "docker build $tag  (native linux/amd64)"
-    run docker build --platform linux/amd64 -t "$tag" -f "$df" "$ctx"
+    if [ "$df" = "$REPO_DIR/env/Dockerfile" ]; then
+      run docker build --platform linux/amd64 --build-arg "ENV_SPEC=$ENV_SPEC" -t "$tag" -f "$df" "$ctx"
+    else
+      run docker build --platform linux/amd64 -t "$tag" -f "$df" "$ctx"
+    fi
     log "convert -> $sif"
     # build to a temp name and rename only on success: an interrupted build (ssh drop,
     # Ctrl-C) must never leave a truncated .sif that a rerun would treat as finished.
@@ -132,7 +147,7 @@ if [ "$SKIP_IMAGES" = 0 ]; then
     fi
   fi
   log "sanity: tools inside the images"
-  run "$RT" exec "$FF_SIF" bash -c 'ps --version | head -1; fungiforge version; ITSx -h 2>&1 | head -1; sourmash --version'
+  run "$RT" exec "$FF_SIF" bash -c 'ps --version | head -1; fungiforge version; ITSx -h 2>&1 | head -1; sourmash --version; nQuire 2>&1 | head -1; bigscape --version; multiqc --version; purge_dups 2>&1 | head -1'
   run "$RT" exec "$AS_SIF" bash -c 'ps --version | head -1; antismash --version'
   log "pre-pull public images into the shared cache (funannotate ≈15 GB — be patient)"
   export FUNGIFORGE_DB="$DB" NXF_APPTAINER_CACHEDIR="$PREFIX/images/cache" NXF_SINGULARITY_CACHEDIR="$PREFIX/images/cache"

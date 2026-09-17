@@ -5,7 +5,7 @@ authors:
   - family-names: Adu
     given-names: Bright
     alias: aduton1000
-version: 0.1.0
+version: 0.2.0
 license: MIT
 repository-code: "https://github.com/aduton1000/fungiforge"
 keywords:

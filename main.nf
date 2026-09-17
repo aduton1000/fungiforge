@@ -71,6 +71,28 @@ def resolve_path(p) {
   return near.exists() ? near : cwdf
 }
 
+// Cross-row checks the per-row parser cannot make; run once at launch over the whole sheet.
+// `fungiforge check --samplesheet` (W4.1, bin/validate_samplesheet.py) is the full pre-flight
+// (metadata typos, unknown columns, empty files); this guards the run itself, because duplicate
+// ids would silently overwrite each other's results.
+def check_samplesheet(sheet) {
+  def ids = [] as Set
+  def dups = [] as Set
+  file(sheet).splitCsv(header: true).each { row ->
+    def sid = row.sample?.trim()
+    if (!sid)
+      error "Samplesheet ${sheet}: a row has no sample id."
+    if (!(sid ==~ /^[A-Za-z0-9][A-Za-z0-9._-]*$/))
+      error "Sample '${sid}': the id must start with a letter or digit and contain only letters, digits, dot, dash or underscore (it becomes file names and tool arguments)."
+    if (!ids.add(sid)) dups.add(sid)
+  }
+  if (dups)
+    error "Samplesheet ${sheet}: duplicate sample id(s) ${dups.join(', ')} — ids must be unique (results would overwrite each other). Run `fungiforge check --samplesheet ${sheet}` for the full pre-flight."
+  if (!ids)
+    error "Samplesheet ${sheet}: no data rows."
+  log.info "[fungiforge] samplesheet: ${ids.size()} isolate(s)"
+}
+
 def parse_row(row) {
   def has_ont  = row.ont_fastq?.trim()
   def has_r1   = row.illumina_r1?.trim()
@@ -146,6 +168,7 @@ workflow {
   if (params.basecall && !params.dorado_model)
     error "--basecall set but --dorado_model missing."
 
+  check_samplesheet(params.samplesheet)
   samples  = channel.fromPath(params.samplesheet).splitCsv(header: true).map { row -> parse_row(row) }
   run_info = channel.of(run_info_json()).collectFile(name: 'run_info.json', newLine: true)
   FUNGIFORGE(samples, run_info)

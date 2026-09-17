@@ -6,6 +6,8 @@ Subcommands:
                (ONT-only, Illumina-only, or hybrid — per sample, whichever are found)
   fetch-refs   print the reference-database fetch command (bin/fetch_references.sh)
   validate     compare a finished run with an expected-results file (bin/validate_run.py)
+  check        validate a samplesheet before a run (bin/validate_samplesheet.py)
+  check-master validate a master table against the schema (bin/validate_master.py)
   version
 """
 from __future__ import annotations
@@ -96,6 +98,23 @@ def cmd_validate(a):
     return subprocess.call(cmd)
 
 
+def cmd_check(a):
+    """Validate a samplesheet before launching (exit 1 on any error)."""
+    cmd = [sys.executable, os.path.join(REPO, "bin", "validate_samplesheet.py"), "--samplesheet", a.samplesheet]
+    if a.json: cmd += ["--json", a.json]
+    if a.strict: cmd += ["--strict"]
+    if a.no_check_files: cmd += ["--no-check-files"]
+    return subprocess.call(cmd)
+
+
+def cmd_check_master(a):
+    """Validate a master table against fungiforge/resources/master_schema.json."""
+    cmd = [sys.executable, os.path.join(REPO, "bin", "validate_master.py"), "--master", a.master]
+    if a.json: cmd += ["--json", a.json]
+    if a.strict: cmd += ["--strict"]
+    return subprocess.call(cmd)
+
+
 def cmd_version(a):
     print(f"FungiForge v{__version__}")
 
@@ -129,6 +148,18 @@ def build_parser():
     va.add_argument("--expected", default=None, help="expected JSON (default: test/expected/<sample>.json)")
     va.add_argument("-o", "--out", default=None, help="write the check table as TSV")
     va.set_defaults(func=cmd_validate)
+
+    c = sub.add_parser("check", help="validate a samplesheet before a run")
+    c.add_argument("--samplesheet", required=True)
+    c.add_argument("--json", default=None, help="write the report as JSON")
+    c.add_argument("--strict", action="store_true", help="treat warnings as errors")
+    c.add_argument("--no-check-files", action="store_true", help="do not open the read files (headers and ids only)")
+    c.set_defaults(func=cmd_check)
+
+    cm = sub.add_parser("check-master", help="validate a master table against the schema")
+    cm.add_argument("--master", required=True, help="master_fungi.tsv or a per-isolate *.master.tsv")
+    cm.add_argument("--json", default=None); cm.add_argument("--strict", action="store_true")
+    cm.set_defaults(func=cmd_check_master)
 
     v = sub.add_parser("version"); v.set_defaults(func=cmd_version)
     return p

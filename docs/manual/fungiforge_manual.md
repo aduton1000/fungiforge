@@ -141,6 +141,7 @@ staged under `--data_dir`.
 |:--|:----------|:--------------------|:-----------------------------|
 | 00 | Basecall *(optional)* | Dorado (native host binary / base image) | pod5 dir → `*.ont.fastq.gz` |
 | 01 | Read QC & filter | NanoPlot, chopper, fastp / base image | raw reads → `*.ont.filt.fastq.gz`, `readqc.json` (mode-aware) |
+| 02c | Haplotig purging | purge_dups / base image | draft → `*.purged.fasta`, `purge.json` |
 | 02 | Assembly (long-read) | Flye \| Canu \| Raven + purge_dups / `staphb/flye` | filtered ONT → `*.assembly.fasta` |
 | 02b | Assembly (short-read) | SPAdes \| MEGAHIT / `staphb/spades` | Illumina-only → `*.assembly.fasta` |
 | 03a | ONT polish | Medaka / `staphb/medaka` | draft + ONT → `*.medaka.fasta` (long-read isolates) |

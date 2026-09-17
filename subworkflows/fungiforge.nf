@@ -7,6 +7,7 @@ include { READ_TRIAGE } from '../modules/stage00b_triage.nf'
 include { KMER_PROFILE } from '../modules/stage01b_kmer.nf'
 include { ASSEMBLE }    from '../modules/stage02_assemble.nf'
 include { SR_ASSEMBLE } from '../modules/stage02b_srassemble.nf'
+include { PURGE_DUPS } from '../modules/stage02c_purge.nf'
 include { MEDAKA }      from '../modules/stage03_polish.nf'
 include { SRPOLISH }    from '../modules/stage03b_srpolish.nf'
 include { DECONTAM }    from '../modules/stage04_decontam.nf'
@@ -92,7 +93,9 @@ workflow FUNGIFORGE {
     //    flow straight into Stage 03b, which records mode=illumina_only (high conf).
     ont_ch  = reads_lr.map { meta, ont, _r1, _r2 -> tuple(meta, ont) }
     ilmn_ch = reads_ok.map { meta, _ont, r1, r2 -> tuple(meta, r1, r2) }
-    MEDAKA(ASSEMBLE.out.assembly.join(ont_ch))
+    // 2c. haplotig purging in the base image (L30): long-read assemblies only
+    PURGE_DUPS(ASSEMBLE.out.assembly.join(ont_ch))
+    MEDAKA(PURGE_DUPS.out.assembly.join(ont_ch))
     pre_srpolish = MEDAKA.out.assembly.mix(SR_ASSEMBLE.out.assembly)
     SRPOLISH(pre_srpolish.join(ilmn_ch))
 
@@ -173,7 +176,7 @@ workflow FUNGIFORGE {
     // 14. aggregate every per-stage result.json per isolate -> report + master row
     all_json = READ_QC.out.json
       .mix(basecall_json, triage_json, gate_reads_json, kmer_json, ASSEMBLE.out.json, SR_ASSEMBLE.out.json, MEDAKA.out.json,
-           SRPOLISH.out.json, DECONTAM.out.json, ORGANELLE.out.json, ASSEMBLY_QC.out.json, GATE_ASSEMBLY.out.json, REPEATMASK.out.json,
+           PURGE_DUPS.out.json, SRPOLISH.out.json, DECONTAM.out.json, ORGANELLE.out.json, ASSEMBLY_QC.out.json, GATE_ASSEMBLY.out.json, REPEATMASK.out.json,
            PREDICT.out.json, eggnog_json, ips_json, ANNOTATE.out.json, IDENTIFY.out.json, BUSCO_LINEAGE.out.json, RESISTANCE.out.json,
            mobile_ch, bgc_ch, novelty_ch, extras_ch)
       .map { meta, j -> tuple(meta.id, meta, j) }
