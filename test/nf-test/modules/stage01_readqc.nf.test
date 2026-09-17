@@ -18,7 +18,7 @@ nextflow_process {
         then {
             assert process.success
             assert process.out.reads.size() == 1
-            assert process.out.reads[0][1].endsWith('S1.ont.filt.fastq.gz')
+            assert process.out.reads[0][1].endsWith('S1.ont.filt.fastq.gz') && process.out.reads[0][2].endsWith('S1_R1.trim.fastq.gz')
             assert path(process.out.reads[0][1]).exists()
             assert process.out.json.size() == 1
             assert process.out.json[0][1].endsWith('S1.readqc.json')

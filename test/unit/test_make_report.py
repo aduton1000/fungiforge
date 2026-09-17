@@ -11,7 +11,8 @@ def row(S):
 
 def test_columns_are_append_only_and_end_with_status_columns():
     assert m.MASTER_COLS[:4] == ["sample", "compartment", "facility", "season"]
-    assert m.MASTER_COLS[-5:] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate"]
+    assert m.MASTER_COLS[-10:] == ["sample_verdict", "contam_removed_pct", "top_taxon", "stages_failed", "gate",
+                                   "read_verdict", "genome_size_est", "heterozygosity_pct", "ploidy_hint", "coverage"]
     assert len(m.MASTER_COLS) == len(set(m.MASTER_COLS))
 
 
@@ -88,3 +89,16 @@ def test_gate_column_reports_skipped_reason_and_stages_failed():
     assert r["gate"] == "skipped(verdict:non_fungal)" and r["stages_failed"] == "gate:skipped"
     assert r["species"] == "NA" and r["n_bgc"] == "NA"
     assert row({"decontam": {"status": "ok", "verdict": "fungal"}})["gate"] == "pass"
+
+
+def test_read_triage_and_kmer_columns():
+    S = {"triage": {"status": "ok", "verdict": "likely_fungal"},
+         "kmer": {"status": "partial", "genome_size_est": 28864332, "heterozygosity_pct": None, "ploidy_hint": "haploid",
+                  "coverage_from_kmers": 40.5, "coverage_from_read_bases": 50.0}}
+    r = row(S)
+    assert r["read_verdict"] == "likely_fungal" and r["genome_size_est"] == 28864332 and r["heterozygosity_pct"] == "NA"
+    assert r["ploidy_hint"] == "haploid" and r["coverage"] == 40.5 and r["stages_failed"] == "kmer:partial"
+    r2 = row({"kmer": {"status": "ok", "genome_size_est": None, "coverage_from_kmers": None, "coverage_from_read_bases": 50.0}})
+    assert r2["coverage"] == 50.0 and r2["genome_size_est"] == "NA" and r2["read_verdict"] == "NA"
+    S3 = {"triage": {"status": "ok", "verdict": "non_fungal"}, "gate": {"stage": "gate", "status": "skipped", "reason": "read_triage:non_fungal"}}
+    assert row(S3)["gate"] == "skipped(read_triage:non_fungal)" and row(S3)["read_verdict"] == "non_fungal"

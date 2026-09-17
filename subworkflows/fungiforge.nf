@@ -3,13 +3,15 @@
 include { DB_CHECK }    from '../modules/stage00_dbcheck.nf'
 include { BASECALL }    from '../modules/stage00_basecall.nf'
 include { READ_QC }     from '../modules/stage01_readqc.nf'
+include { READ_TRIAGE } from '../modules/stage00b_triage.nf'
+include { KMER_PROFILE } from '../modules/stage01b_kmer.nf'
 include { ASSEMBLE }    from '../modules/stage02_assemble.nf'
 include { SR_ASSEMBLE } from '../modules/stage02b_srassemble.nf'
 include { MEDAKA }      from '../modules/stage03_polish.nf'
 include { SRPOLISH }    from '../modules/stage03b_srpolish.nf'
 include { DECONTAM }    from '../modules/stage04_decontam.nf'
 include { ASSEMBLY_QC } from '../modules/stage05_assembly_qc.nf'
-include { GATE }        from '../modules/stage05b_gate.nf'
+include { GATE as GATE_READS; GATE as GATE_ASSEMBLY } from '../modules/stage05b_gate.nf'
 include { REPEATMASK }  from '../modules/stage06_repeatmask.nf'
 include { ANNOTATE }    from '../modules/stage07_annotate.nf'
 include { IDENTIFY }    from '../modules/stage08_identify.nf'
@@ -44,12 +46,35 @@ workflow FUNGIFORGE {
       basecall_json = channel.empty()
     }
 
-    // 1. read QC + filtering (ONT chopper/NanoPlot; Illumina fastp — mode-aware)
+    // 1. read QC + filtering (ONT chopper/NanoPlot; Illumina fastp — mode-aware). Emits the
+    //    filtered ONT reads and the TRIMMED Illumina reads: everything downstream uses these.
     READ_QC(reads_bc)
 
+    // 00b. read-level triage (W2.2): Kraken2 on a subsample -> early verdict; an isolate that
+    //      is non_fungal/human at read level is stopped here (reason read_triage:<verdict>)
+    //      and never assembled. --force_all disables it; --read_triage false skips the stage.
+    if (params.read_triage) {
+      READ_TRIAGE(READ_QC.out.reads)
+      triage_json = READ_TRIAGE.out.json
+      read_gate = READ_TRIAGE.out.json.map { meta, tj ->
+        def v = new groovy.json.JsonSlurper().parseText(tj.text)?.verdict ?: 'not_run'
+        tuple(meta, (!params.force_all && v in ['non_fungal', 'human']) ? "read_triage:${v}" : null)
+      }
+      GATE_READS(read_gate.filter { _meta, reason -> reason != null })
+      gate_reads_json = GATE_READS.out.json
+      reads_ok = READ_QC.out.reads.join(read_gate.filter { _meta, reason -> reason == null }.map { meta, _reason -> tuple(meta) })
+    } else {
+      triage_json = channel.empty(); gate_reads_json = channel.empty()
+      reads_ok = READ_QC.out.reads
+    }
+
+    // 01b. k-mer profile (W2.2): genome size, heterozygosity, ploidy hint, coverage
+    if (params.kmer_profile) { KMER_PROFILE(reads_ok); kmer_json = KMER_PROFILE.out.json }
+    else                     { kmer_json = channel.empty() }
+
     // Split isolates by assembly mode: long-read (ONT ± hybrid) vs short-read (Illumina only).
-    reads_lr = READ_QC.out.reads.filter { row -> row[0].assembly_mode == 'longread' }
-    reads_sr = READ_QC.out.reads.filter { row -> row[0].assembly_mode == 'shortread' }
+    reads_lr = reads_ok.filter { row -> row[0].assembly_mode == 'longread' }
+    reads_sr = reads_ok.filter { row -> row[0].assembly_mode == 'shortread' }
 
     // 2. assembly — long-read (Flye --nano-hq + purge_dups) OR short-read (SPAdes)
     ASSEMBLE(reads_lr)
@@ -59,7 +84,7 @@ workflow FUNGIFORGE {
     //    short reads are present. Short-read-only assemblies skip Medaka (no ONT) and
     //    flow straight into Stage 03b, which records mode=illumina_only (high conf).
     ont_ch  = reads_lr.map { meta, ont, _r1, _r2 -> tuple(meta, ont) }
-    ilmn_ch = READ_QC.out.reads.map { meta, _ont, r1, r2 -> tuple(meta, r1, r2) }
+    ilmn_ch = reads_ok.map { meta, _ont, r1, r2 -> tuple(meta, r1, r2) }
     MEDAKA(ASSEMBLE.out.assembly.join(ont_ch))
     pre_srpolish = MEDAKA.out.assembly.mix(SR_ASSEMBLE.out.assembly)
     SRPOLISH(pre_srpolish.join(ilmn_ch))
@@ -86,7 +111,7 @@ workflow FUNGIFORGE {
       tuple(meta, reason)
     }
     pass_meta = gate.filter { _meta, reason -> reason == null }.map { meta, _reason -> tuple(meta) }
-    GATE(gate.filter { _meta, reason -> reason != null })
+    GATE_ASSEMBLY(gate.filter { _meta, reason -> reason != null })
     nuclear_ok = DECONTAM.out.nuclear.join(pass_meta)     // (meta, nuclear) for isolates that passed the gate
 
     // 6. repeat modeling + soft-masking (RepeatModeler2 / RepeatMasker)
@@ -118,12 +143,12 @@ workflow FUNGIFORGE {
     if (!params.skip_novelty) { NOVELTY(DECONTAM.out.nuclear.join(IDENTIFY.out.markers).join(IDENTIFY.out.json)); novelty_ch = NOVELTY.out.json }
 
     extras_ch = channel.empty()
-    if (!params.skip_extras)  { EXTRAS(ANNOTATE.out.proteins.join(READ_QC.out.reads)); extras_ch = EXTRAS.out.json }
+    if (!params.skip_extras)  { EXTRAS(ANNOTATE.out.proteins.join(reads_ok)); extras_ch = EXTRAS.out.json }
 
     // 14. aggregate every per-stage result.json per isolate -> report + master row
     all_json = READ_QC.out.json
-      .mix(basecall_json, ASSEMBLE.out.json, SR_ASSEMBLE.out.json, MEDAKA.out.json,
-           SRPOLISH.out.json, DECONTAM.out.json, ASSEMBLY_QC.out.json, GATE.out.json, REPEATMASK.out.json,
+      .mix(basecall_json, triage_json, gate_reads_json, kmer_json, ASSEMBLE.out.json, SR_ASSEMBLE.out.json, MEDAKA.out.json,
+           SRPOLISH.out.json, DECONTAM.out.json, ASSEMBLY_QC.out.json, GATE_ASSEMBLY.out.json, REPEATMASK.out.json,
            ANNOTATE.out.json, IDENTIFY.out.json, RESISTANCE.out.json,
            mobile_ch, bgc_ch, novelty_ch, extras_ch)
       .map { meta, j -> tuple(meta.id, meta, j) }
