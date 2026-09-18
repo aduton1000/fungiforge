@@ -682,7 +682,10 @@ eggnog`, fungal taxonomic scope) and **07c InterProScan** (`interpro/interprosca
 data release from `fetch_references.sh interproscan`, `--interproscan_data`; `--run_interproscan
 true`, off by default because it takes hours per genome) annotate the predicted proteins in
 parallel; each is skipped with an empty table when its data are not staged, and `--skip_eggnog`
-removes 07b.
+removes 07b. Stage 07b treats a database that is present but short (a staging run still downloading
+or decompressing) as not staged, and an emapper that fails is recorded `partial` rather than failing
+the isolate, so a run started while `fetch_references.sh eggnog` is in flight still completes; add
+the table later with `-resume`, which reruns only 07b and annotation.
 
 **07 Annotate.** `funannotate annotate` (Pfam, dbCAN, MEROPS, UniProt, BUSCO, plus `--eggnog` /
 `--iprscan` when the tables exist) on a private copy of the prediction. Emits the **proteins
