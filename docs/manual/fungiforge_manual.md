@@ -508,7 +508,7 @@ the knobs you will touch most.
 | `--skip_eggnog` | `false` | remove Stage 07b eggNOG-mapper |
 | `--genemark_dir` | `null` | unpacked GeneMark-ES directory (licensed; bound into the container) |
 | `--ploidy` | `auto` | ploidy handling |
-| `--genemark_key` | `null` | path to the free-academic GeneMark licence key (with `--genemark_dir`) |
+| `--genemark_key` | `null` | path to the free-academic GeneMark licence key (with `--genemark_dir`). Its directory is bound into the container, so the key may sit beside the GeneMark directory rather than inside it |
 | `--af_panel` | bundled `af_resistance_panel.tsv` | curated resistance panel (Stage 09) |
 | `--skip_decontam` | `false` | skip Stage 04 decontamination |
 | `--skip_mge` | `false` | skip Stage 10 mobile elements |
