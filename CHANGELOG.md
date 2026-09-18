@@ -5,6 +5,9 @@ master-table columns are append-only, so a newer release never breaks a Layer-2 
 
 ## [0.2.0] — unreleased (branch `develop`)
 
+The pipeline version, the Python package and the default image tag are all 0.2.0 from this point,
+so a dev deployment builds `fungiforge-0.2.0.sif` and `bin/lock_env.sh` finds the matching tag.
+
 The correctness and completeness release: every stage that silently did nothing now does what the
 manual says, or records why it could not. Validated on *A. fumigatus* CEA10 (hybrid), *A. flavus*
 DF-005 (Illumina-only) and a bacterial study isolate; see `docs/validation.md`.
