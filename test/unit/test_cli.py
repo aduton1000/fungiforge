@@ -79,3 +79,62 @@ def test_validate_subcommand_runs_validate_run(monkeypatch, tmp_path):
     cmd = seen["cmd"]
     assert cmd[1].endswith("validate_run.py") and cmd[cmd.index("--expected") + 1].endswith(os.path.join("test", "expected", "AfumCEA10.json"))
     assert "--sample" in cmd and "--out" in cmd
+
+
+# ── repo-root resolution ─────────────────────────────────────────────────────
+# A site install pip-installs the package into cli-env/site-packages, where deriving the
+# root from __file__ points at a directory with no bin/. Every helper-backed subcommand
+# then fails on a path that cannot exist, so FUNGIFORGE_HOME has to win.
+
+def _reload(monkeypatch, **env):
+    import importlib
+    for k, v in env.items():
+        monkeypatch.setenv(k, v) if v is not None else monkeypatch.delenv(k, raising=False)
+    return importlib.reload(cli)
+
+
+def test_repo_root_prefers_fungiforge_home(monkeypatch, tmp_path):
+    checkout = tmp_path / "repo"; (checkout / "bin").mkdir(parents=True)
+    (checkout / "main.nf").write_text("// pipeline\n")
+    (checkout / "bin" / "validate_samplesheet.py").write_text("#!/usr/bin/env python3\n")
+    mod = _reload(monkeypatch, FUNGIFORGE_HOME=str(checkout))
+    try:
+        assert mod.REPO == str(checkout)
+        assert mod.helper("validate_samplesheet.py") == str(checkout / "bin" / "validate_samplesheet.py")
+    finally:
+        _reload(monkeypatch, FUNGIFORGE_HOME=None)
+
+
+def test_repo_root_falls_back_to_root_plus_repo(monkeypatch, tmp_path):
+    root = tmp_path / "install"; (root / "repo").mkdir(parents=True)
+    (root / "repo" / "main.nf").write_text("// pipeline\n")
+    mod = _reload(monkeypatch, FUNGIFORGE_HOME=None, FUNGIFORGE_ROOT=str(root))
+    try:
+        assert mod.REPO == str(root / "repo")
+    finally:
+        _reload(monkeypatch, FUNGIFORGE_ROOT=None)
+
+
+def test_repo_root_ignores_a_home_without_main_nf(monkeypatch, tmp_path):
+    """A stale or wrong FUNGIFORGE_HOME must not shadow a working source checkout."""
+    mod = _reload(monkeypatch, FUNGIFORGE_HOME=str(tmp_path / "nope"), FUNGIFORGE_ROOT=None)
+    try:
+        assert os.path.isfile(os.path.join(mod.REPO, "main.nf"))
+    finally:
+        _reload(monkeypatch, FUNGIFORGE_HOME=None)
+
+
+def test_helper_falls_back_to_path_then_fails_loudly(monkeypatch, tmp_path):
+    binsh = tmp_path / "pathbin"; binsh.mkdir()
+    (binsh / "validate_master.py").write_text("#!/usr/bin/env python3\n")
+    os.chmod(binsh / "validate_master.py", 0o755)   # shutil.which only returns executables
+    mod = _reload(monkeypatch, FUNGIFORGE_HOME=str(tmp_path / "empty"))
+    try:
+        monkeypatch.setenv("PATH", str(binsh) + os.pathsep + os.environ["PATH"])
+        monkeypatch.setattr(mod, "REPO", str(tmp_path / "empty"))
+        assert mod.helper("validate_master.py") == str(binsh / "validate_master.py")
+        with pytest.raises(SystemExit) as e:
+            mod.helper("definitely_not_a_helper.py")
+        assert "FUNGIFORGE_HOME" in str(e.value)
+    finally:
+        _reload(monkeypatch, FUNGIFORGE_HOME=None)
