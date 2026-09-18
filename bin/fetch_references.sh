@@ -146,17 +146,30 @@ step_funannotate(){
 step_eggnog(){
   # eggNOG 5 data for eggNOG-mapper 2.1 (stage 07b): direct download, no container needed
   # (the funannotate image ships no emapper; stage 07b runs the eggnog-mapper image).
+  # A file is only accepted when it reaches its expected size: a truncated leftover from an
+  # interrupted or failed earlier attempt is non-empty, and treating that as done shipped a
+  # 1.5 GB eggnog directory that emapper cannot use.
   is_done eggnog && { log "eggnog db present — skip"; return; }
   local base="${EGGNOG_URL:-http://eggnog5.embl.de/download/emapperdb-5.0.2}"
-  local ok=1 f
-  log "downloading eggNOG 5.0.2 data (eggnog.db ~6.8 GB + eggnog_proteins.dmnd ~5.2 GB, compressed) -> $DB/eggnog"
-  for f in eggnog.db.gz eggnog_proteins.dmnd.gz eggnog.taxa.tar.gz; do
-    [ -s "$DB/eggnog/${f%.gz}" ] || [ -s "$DB/eggnog/${f%.tar.gz}" ] && { log "have ${f%.gz} — skip"; continue; }
-    ( cd "$DB/eggnog" && dl "$base/$f" "$f" \
+  local ok=1 f name min have
+  log "downloading eggNOG 5.0.2 data (eggnog.db ~12 GB and eggnog_proteins.dmnd ~9 GB once decompressed) -> $DB/eggnog"
+  for f in eggnog.db.gz:eggnog.db:8000000000 eggnog_proteins.dmnd.gz:eggnog_proteins.dmnd:4000000000 eggnog.taxa.tar.gz:eggnog.taxa.db:1000000; do
+    name="${f#*:}"; min="${name#*:}"; name="${name%%:*}"; f="${f%%:*}"
+    have=$(stat -c%s "$DB/eggnog/$name" 2>/dev/null || stat -f%z "$DB/eggnog/$name" 2>/dev/null || echo 0)
+    if [ "$have" -ge "$min" ]; then log "have $name ($(numfmt --to=iec "$have" 2>/dev/null || echo "$have")) — skip"; continue; fi
+    [ "$have" -gt 0 ] && log "  $name is $(numfmt --to=iec "$have" 2>/dev/null || echo "$have"), expected >= $(numfmt --to=iec "$min" 2>/dev/null || echo "$min") — re-downloading"
+    ( cd "$DB/eggnog" && rm -f "$name" && dl "$base/$f" "$f" \
       && { case "$f" in *.tar.gz) tar xzf "$f" && rm -f "$f";; *.gz) gunzip -f "$f";; esac; } ) >>"$LOGDIR/eggnog.log" 2>&1 \
       || { fail eggnog "$f"; ok=0; }
   done
-  [ "$ok" = 1 ] && [ -s "$DB/eggnog/eggnog.db" ] && [ -s "$DB/eggnog/eggnog_proteins.dmnd" ] && mark eggnog "emapperdb-5.0.2 (eggnog.db, eggnog_proteins.dmnd, taxa)"
+  local db_size dmnd_size
+  db_size=$(stat -c%s "$DB/eggnog/eggnog.db" 2>/dev/null || stat -f%z "$DB/eggnog/eggnog.db" 2>/dev/null || echo 0)
+  dmnd_size=$(stat -c%s "$DB/eggnog/eggnog_proteins.dmnd" 2>/dev/null || stat -f%z "$DB/eggnog/eggnog_proteins.dmnd" 2>/dev/null || echo 0)
+  if [ "$ok" = 1 ] && [ "$db_size" -ge 8000000000 ] && [ "$dmnd_size" -ge 4000000000 ]; then
+    mark eggnog "emapperdb-5.0.2 (eggnog.db $(numfmt --to=iec "$db_size" 2>/dev/null || echo "$db_size"), eggnog_proteins.dmnd $(numfmt --to=iec "$dmnd_size" 2>/dev/null || echo "$dmnd_size"), taxa)"
+  else
+    fail eggnog "incomplete after download (eggnog.db=$db_size dmnd=$dmnd_size); see logs/eggnog.log"
+  fi
 }
 
 # ---- InterProScan data release (W2.5, stage 07c) ------------------------------
