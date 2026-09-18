@@ -186,7 +186,9 @@ if [ "$SKIP_CLI" = 0 ]; then
     export CONDA_PKGS_DIRS="${CONDA_PKGS_DIRS:-$HOME/.conda/pkgs}"
     run "$CONDA" create -y -q -p "$PREFIX/cli-env" -c conda-forge python=3.11 pip
   fi
-  run "$PREFIX/cli-env/bin/pip" install -q --no-cache-dir "$REPO_DIR"
+  # Editable: the pipeline (main.nf, bin/, conf/) is already read live from $REPO_DIR, so a
+  # copied package only adds a second version of the CLI that a `git pull` silently leaves stale.
+  run "$PREFIX/cli-env/bin/pip" install -q --no-cache-dir -e "$REPO_DIR"
   run "$PREFIX/cli-env/bin/fungiforge" version
 fi
 
