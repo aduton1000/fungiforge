@@ -20,8 +20,8 @@ process ASSEMBLE {
     *)     echo "Unknown --assembler '${params.assembler}' (use flye|canu|raven)" >&2; exit 1 ;;
   esac
   cp asm.fasta ${meta.id}.assembly.fasta
-  printf '{"sample":"%s","stage":"assemble","assembler":"%s","purge_dups_applied":%s,"n_contigs":%s}\\n' \\
-    "${meta.id}" "${params.assembler}" "\$PURGED" "\$(grep -c '^>' ${meta.id}.assembly.fasta)" > ${meta.id}.assemble.json
+  printf '{"sample":"%s","stage":"assemble","assembler":"%s","n_contigs":%s}\\n' \\
+    "${meta.id}" "${params.assembler}" "\$(grep -c '^>' ${meta.id}.assembly.fasta)" > ${meta.id}.assemble.json
   ff_finalize
   """
   stub:

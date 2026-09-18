@@ -47,9 +47,18 @@ process PREDICT {
     ff_skip genemark "no --genemark_dir (unpacked GeneMark-ES directory): ab-initio prediction runs without GeneMark"
   fi
   # Species-aware training start (AUGUSTUS_SPECIES / BUSCO_DB), verified against what is staged.
-  eval "\$(annotation_training.py --species ${species} --map '${params.annotation_training_map}' \\
+  # The helper prints both assignments; if it cannot run, `eval ""` succeeds silently and the
+  # failure would only surface far below as an unbound variable naming neither cause nor helper.
+  # So check it here and fall back to the documented defaults instead.
+  if TRAIN="\$(annotation_training.py --species ${species} --map '${params.annotation_training_map}' \\
              --augustus-config "\$AUGUSTUS_CONFIG_PATH" --funannotate-db "\$FUNANNOTATE_DB" \\
-             --default-busco ${params.funannotate_busco} --json training.json)"
+             --default-species ${params.funannotate_seed} --default-busco ${params.funannotate_busco} \\
+             --json training.json)"; then
+    eval "\$TRAIN"
+  else
+    ff_skip annotation_training "annotation_training.py failed; falling back to Augustus ${params.funannotate_seed} / BUSCO set ${params.funannotate_busco}"
+  fi
+  : "\${AUGUSTUS_SPECIES:=${params.funannotate_seed}}"; : "\${BUSCO_DB:=${params.funannotate_busco}}"
   # funannotate requires short (<=16 char), space-free headers: `funannotate sort` renames them;
   # a description-stripping sed is the fallback.
   ff_run funannotate_sort --optional -- bash -c "funannotate sort -i ${masked} -o clean.fasta -b contig --minlen ${params.min_contig_len} 2>sort.log"
