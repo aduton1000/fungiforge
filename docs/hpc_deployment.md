@@ -91,7 +91,7 @@ present and Docker otherwise, so no Docker daemon is needed on a cluster.
 | `genomad` | geNomad database v1.9 | 0.8 GB |
 | `benchmarks` | A1163 and NRRL 3357 reference genomes | ~80 MB |
 | `genomes` *(on request)* | one reference genome per species of `novelty_genera.txt`, for genome-ANI novelty | tens of GB |
-| `interproscan` *(on request)* | InterProScan data release matching the image tag | 6.9 GB |
+| `interproscan` *(on request)* | InterProScan data release matching the image tag (`--run_interproscan true` to use it) | 6.9 GB |
 
 The multi-GB databases (eggNOG, Kraken 2, geNomad, UNITE) are fetched with `aria2c` when it is
 installed, otherwise `wget -c`, otherwise `curl`. Install `aria2c` if you can: it is the only one of
@@ -99,8 +99,9 @@ the three that downloads in parallel chunks, and on a link that drops connection
 transfer from byte 0 each retry, so the file grows and shrinks without ever finishing. Every archive
 is integrity-checked before decompression and deleted if it fails, so a rerun starts clean. The step
 only marks itself done when the decompressed files meet their expected sizes, and one fetch per data
-directory runs at a time (a second one refuses to start rather than writing over the first, and
-names the process holding the lock so you can stop it).
+directory runs at a time: a second one refuses to start rather than writing over the first, and
+names the process holding the lock so you can stop it. Pass `--wait` to queue behind a running
+fetch instead, which is how you line up a second database while a multi-hour download finishes.
 
 Two resources are **licensed** and staged by hand (Appendix A of the upgrade plan):
 

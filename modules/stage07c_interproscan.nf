@@ -23,7 +23,7 @@ process INTERPROSCAN {
         --cpu ${task.cpus} -T "\$TMPDIR" ${params.interproscan_apps ? "-appl ${params.interproscan_apps}" : ''}
     N=\$(grep -c '<protein>' ${meta.id}.iprscan.xml || true)
   else
-    ff_skip interproscan "InterProScan data not mounted at /opt/interproscan/data (--interproscan_data / bin/fetch_references.sh interproscan)"
+    ff_skip interproscan "InterProScan data not mounted at /opt/interproscan/data — stage it with 'fetch_references.sh interproscan' (expected at <data_dir>/interproscan/data) or pass --interproscan_data"
     : > ${meta.id}.iprscan.xml; N=0
   fi
   printf '{"sample":"%s","stage":"interproscan","n_proteins_scanned":%s}\\n' "${meta.id}" "\${N:-0}" > ${meta.id}.interproscan.json

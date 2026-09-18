@@ -503,7 +503,7 @@ the knobs you will touch most.
 | `--busco_lineage` | `auto` | `auto` (order-specific after ID) \| `fungi_odb10` \| `<lineage>` |
 | `--genome_id` | `false` | Stage 08 genome-level sourmash gather (slow emulated; ITS is primary) |
 | `--run_interproscan` | `false` | Stage 07c InterProScan in its own image (heavy; needs `--interproscan_data`) |
-| `--interproscan_data` | `null` | InterProScan data directory (`<data_dir>/interproscan/interproscan-<ver>/data`) |
+| `--interproscan_data` | `null` | InterProScan data directory. Defaults to `<data_dir>/interproscan/data`, the stable symlink `fetch_references.sh interproscan` writes, so only a non-standard location needs this |
 | `--skip_eggnog` | `false` | remove Stage 07b eggNOG-mapper |
 | `--genemark_dir` | `null` | unpacked GeneMark-ES directory (licensed; bound into the container) |
 | `--ploidy` | `auto` | ploidy handling |
@@ -679,8 +679,9 @@ predicted proteins.
 
 **07b eggNOG-mapper** (`eggnog-mapper` image, eggNOG 5.0.2 data from `fetch_references.sh
 eggnog`, fungal taxonomic scope) and **07c InterProScan** (`interpro/interproscan` image with the
-data release from `fetch_references.sh interproscan`, `--interproscan_data`; `--run_interproscan
-true`, off by default because it takes hours per genome) annotate the predicted proteins in
+data release from `fetch_references.sh interproscan`, found under `--data_dir` without further
+configuration; enable with `--run_interproscan true`, off by default because it takes hours per
+genome) annotate the predicted proteins in
 parallel; each is skipped with an empty table when its data are not staged, and `--skip_eggnog`
 removes 07b. Stage 07b treats a database that is present but short (a staging run still downloading
 or decompressing) as not staged, and an emapper that fails is recorded `partial` rather than failing
