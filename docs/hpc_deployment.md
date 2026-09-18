@@ -110,7 +110,14 @@ Two resources are **licensed** and staged by hand (Appendix A of the upgrade pla
   site-only image from it and points the extras stage at it in `site.config`.
 
 The `fungiforge` CLI finds the pipeline through `FUNGIFORGE_HOME` (set by `fungiforge-env.sh`),
-falling back to `$FUNGIFORGE_ROOT/repo`, then to its own source tree. Outside a login that sources
+falling back to `$FUNGIFORGE_ROOT/repo`, then to its own source tree. It is pip-installed editable
+from `repo/`, so `git -C <install_root>/repo pull` updates the CLI along with the pipeline; an
+installation made before this was the case needs one `pip install -e` to catch up:
+
+```bash
+<install_root>/cli-env/bin/pip install -q --no-cache-dir -e <install_root>/repo
+```
+ Outside a login that sources
 the site environment, set `FUNGIFORGE_HOME` to the checkout or the helper subcommands (`check`,
 `validate`, `check-master`) cannot find `bin/`.
 
