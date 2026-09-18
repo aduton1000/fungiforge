@@ -5,4 +5,4 @@ CLI front door plus the bespoke per-isolate callers invoked by the pipeline's bi
 scripts (antifungal-resistance panel, novelty, report). Kept stdlib-light so the CLI
 has no heavy dependencies — the real runtime tools live in the conda envs / containers.
 """
-__version__ = "0.1.0"
+__version__ = "0.2.0"
