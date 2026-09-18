@@ -502,6 +502,7 @@ the knobs you will touch most.
 | `--dorado_duplex` | `false` | Dorado duplex basecalling |
 | `--busco_lineage` | `auto` | `auto` (order-specific after ID) \| `fungi_odb10` \| `<lineage>` |
 | `--genome_id` | `false` | Stage 08 genome-level sourmash gather (slow emulated; ITS is primary) |
+| `--funannotate_seed` | `anidulans` | fallback Augustus species when the species map has no entry and when the training helper cannot run |
 | `--run_interproscan` | `false` | Stage 07c InterProScan in its own image (heavy; needs `--interproscan_data`) |
 | `--interproscan_data` | `null` | InterProScan data directory. Defaults to `<data_dir>/interproscan/data`, the stable symlink `fetch_references.sh interproscan` writes, so only a non-standard location needs this |
 | `--skip_eggnog` | `false` | remove Stage 07b eggNOG-mapper |
