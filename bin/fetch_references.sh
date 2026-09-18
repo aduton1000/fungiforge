@@ -49,12 +49,30 @@ dl(){  # dl <url> <output-filename>   (run inside the target dir)
     aria2c --continue=true -x16 -s16 -k1M --max-tries=0 --retry-wait=10 \
            --file-allocation=none --auto-file-renaming=false --console-log-level=warn \
            -o "$out" "$url"
+  elif command -v wget >/dev/null 2>&1; then
+    # Preferred over curl for the multi-GB databases. curl's --retry rewinds to byte 0 when the
+    # server drops a transfer that -C - had positioned, so a flaky link makes the file grow and
+    # shrink forever; wget -c re-issues a Range request from the bytes already on disk on every
+    # retry. -nv keeps one line per event in the log instead of a rewriting progress bar.
+    wget -c -nv --tries=0 --timeout=60 --read-timeout=300 --waitretry=30 -O "$out" "$url"
   else
     # -sS: no progress meter. Everything here is appended to a log file, where curl's meter
     # rewrites one line thousands of times and buries the real messages; errors still print.
     # Watch progress by file size instead:  watch -n 20 'ls -lh <db>/<dir>'
     curl -fL -C - --retry 999 --retry-delay 10 --retry-all-errors -sS -o "$out" "$url"
   fi
+}
+
+# A resumed multi-GB download that picked up from a corrupt offset still decompresses to a short,
+# useless database. Check the archive before trusting it; a failure here deletes the file so the
+# next run starts clean rather than resuming onto the same damage.
+verify_archive(){  # verify_archive <file>   (run inside the target dir)
+  local f="$1"
+  case "$f" in
+    *.tar.gz|*.tgz) tar tzf "$f" >/dev/null 2>&1 ;;
+    *.gz)     gzip -t "$f" 2>/dev/null ;;
+    *)        return 0 ;;
+  esac || { echo "[fetch] $f is corrupt (failed its integrity check) — removing it" >&2; rm -f "$f"; return 1; }
 }
 
 
@@ -186,7 +204,7 @@ step_eggnog(){
     have=$(stat -c%s "$DB/eggnog/$name" 2>/dev/null || stat -f%z "$DB/eggnog/$name" 2>/dev/null || echo 0)
     if [ "$have" -ge "$min" ]; then log "have $name ($(numfmt --to=iec "$have" 2>/dev/null || echo "$have")) — skip"; continue; fi
     [ "$have" -gt 0 ] && log "  $name is $(numfmt --to=iec "$have" 2>/dev/null || echo "$have"), expected >= $(numfmt --to=iec "$min" 2>/dev/null || echo "$min") — re-downloading"
-    ( cd "$DB/eggnog" && rm -f "$name" && dl "$base/$f" "$f" \
+    ( cd "$DB/eggnog" && rm -f "$name" && dl "$base/$f" "$f" && verify_archive "$f" \
       && { case "$f" in *.tar.gz) tar xzf "$f" && rm -f "$f";; *.gz) gunzip -f "$f";; esac; } ) >>"$LOGDIR/eggnog.log" 2>&1 \
       || { fail eggnog "$f"; ok=0; }
   done
@@ -238,7 +256,7 @@ step_busco(){
     ver=$(awk -v L="$l" -F'\t' '$1==L {print $2; exit}' "$DB/busco/file_versions.tsv")
     if [ -z "$ver" ]; then fail busco "$l not in file_versions.tsv"; ok=0; continue; fi
     log "downloading $l ($ver)"
-    ( cd "$DB/busco/lineages" && dl "$base/lineages/$l.$ver.tar.gz" "$l.tar.gz" && tar xzf "$l.tar.gz" && rm -f "$l.tar.gz" ) >>"$LOGDIR/busco.log" 2>&1 \
+    ( cd "$DB/busco/lineages" && dl "$base/lineages/$l.$ver.tar.gz" "$l.tar.gz" && verify_archive "$l.tar.gz" && tar xzf "$l.tar.gz" && rm -f "$l.tar.gz" ) >>"$LOGDIR/busco.log" 2>&1 \
       && [ -d "$DB/busco/lineages/$l" ] || { fail busco "download/extract $l"; ok=0; }
   done
   [ "$ok" = 1 ] && mark busco "$lineages"
@@ -256,7 +274,7 @@ step_unite(){
   local UNITE_URL="${UNITE_URL:-https://s3.hpc.ut.ee/plutof-public/original/9489f7bc-7cc1-4e0a-84dc-c732476b9acd.tgz}"
   if [ -z "$UNITE_URL" ]; then fail unite "UNITE_URL not set — resolve current release"; return; fi
   log "downloading UNITE -> $DB/unite"
-  ( cd "$DB/unite" && dl "$UNITE_URL" unite.tgz && tar xzf unite.tgz ) >>"$LOGDIR/unite.log" 2>&1 \
+  ( cd "$DB/unite" && dl "$UNITE_URL" unite.tgz && verify_archive unite.tgz && tar xzf unite.tgz ) >>"$LOGDIR/unite.log" 2>&1 \
     && mark unite "$UNITE_URL" || fail unite "$UNITE_URL"
 }
 
@@ -268,7 +286,7 @@ step_kraken2(){
   local K2_URL="${K2_URL:-https://genome-idx.s3.amazonaws.com/kraken/k2_pluspf_08gb_20250402.tar.gz}"
   if [ -z "$K2_URL" ]; then fail kraken2 "K2_URL not set — resolve current index at genome-idx.s3"; return; fi
   log "downloading Kraken2 DB -> $DB/kraken2"
-  ( cd "$DB/kraken2" && dl "$K2_URL" k2.tgz && tar xzf k2.tgz ) >>"$LOGDIR/kraken2.log" 2>&1 \
+  ( cd "$DB/kraken2" && dl "$K2_URL" k2.tgz && verify_archive k2.tgz && tar xzf k2.tgz ) >>"$LOGDIR/kraken2.log" 2>&1 \
     && mark kraken2 "$K2_URL" || fail kraken2 "$K2_URL"
 }
 
@@ -406,7 +424,7 @@ step_genomad(){
   local url="${GENOMAD_DB_URL:-https://zenodo.org/api/records/14886553/files/genomad_db_v1.9.tar.gz/content}"
   mkdir -p "$DB/genomad_db"
   log "downloading geNomad database v1.9 (~0.8 GB) -> $DB/genomad_db"
-  ( cd "$DB" && dl "$url" genomad_db.tar.gz && tar xzf genomad_db.tar.gz && rm -f genomad_db.tar.gz ) >>"$LOGDIR/genomad.log" 2>&1 \
+  ( cd "$DB" && dl "$url" genomad_db.tar.gz && verify_archive genomad_db.tar.gz && tar xzf genomad_db.tar.gz && rm -f genomad_db.tar.gz ) >>"$LOGDIR/genomad.log" 2>&1 \
     && [ -s "$DB/genomad_db/genomad_db" ] || [ -s "$DB/genomad_db/version.txt" ] && mark genomad_db "$url" || fail genomad_db "$url"
 }
 
