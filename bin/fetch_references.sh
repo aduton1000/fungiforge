@@ -414,8 +414,14 @@ log "current state (latest entry per database; full log: $MANIFEST)"
     last="$(awk -F'\t' -v n="$name" '$1==n {row=$0} END{print row}' "$MANIFEST")"
     state="missing"; [ -f "$d/.done" ] && state="present"
     [ -z "$(ls -A "$d" 2>/dev/null)" ] && state="empty"
+    # these are staged only when asked for (large, and nothing needs them by default)
+    case "$name" in
+      interproscan|refseq_fungi_genomes)
+        [ "$state" = "present" ] || state="on request" ;;
+    esac
     size="$(du -sh "$d" 2>/dev/null | cut -f1)"
     echo -e "$name\t$state\t${size:--}\t$(echo "$last" | cut -f2 | cut -c1-60)\t$(echo "$last" | cut -f4)"
   done
 } | column -t -s $'\t' 2>/dev/null || cat "$MANIFEST"
-log "a database shown 'missing' or 'empty' is re-fetched by naming its step: bin/fetch_references.sh <step>"
+log "'missing'/'empty' -> re-fetch by naming the step: bin/fetch_references.sh <step>"
+log "'on request' -> optional, nothing needs it by default: interproscan (6.9 GB, stage 07c), genomes (tens of GB, stage 12 ANI novelty)"
