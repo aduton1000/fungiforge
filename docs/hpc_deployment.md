@@ -93,6 +93,14 @@ present and Docker otherwise, so no Docker daemon is needed on a cluster.
 | `genomes` *(on request)* | one reference genome per species of `novelty_genera.txt`, for genome-ANI novelty | tens of GB |
 | `interproscan` *(on request)* | InterProScan data release matching the image tag | 6.9 GB |
 
+The multi-GB databases (eggNOG, Kraken 2, geNomad, UNITE) are fetched with `aria2c` when it is
+installed, otherwise `wget -c`, otherwise `curl`. Install `aria2c` if you can: it is the only one of
+the three that downloads in parallel chunks, and on a link that drops connections `curl` restarts a
+transfer from byte 0 each retry, so the file grows and shrinks without ever finishing. Every archive
+is integrity-checked before decompression and deleted if it fails, so a rerun starts clean. The step
+only marks itself done when the decompressed files meet their expected sizes, and one fetch per data
+directory runs at a time (a second one waits on a lock rather than writing over the first).
+
 Two resources are **licensed** and staged by hand (Appendix A of the upgrade plan):
 
 - **GeneMark-ES** — unpack the academic tarball and pass `--genemark_dir <dir> --genemark_key <key>`
