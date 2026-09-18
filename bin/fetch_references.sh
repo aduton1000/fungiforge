@@ -11,6 +11,7 @@
 #   export FUNGIFORGE_DB="/path/to/fungiforge_db"
 #   bin/fetch_references.sh                 # all steps
 #   bin/fetch_references.sh images antismash funannotate   # selected steps
+#   bin/fetch_references.sh --wait interproscan            # queue behind a running fetch
 #
 # Steps: images antismash funannotate eggnog busco unite kraken2 refseq_fungi
 #        fungamr rvdb benchmarks markers mlst dbcan phibase effectorp genomad genomes interproscan
@@ -28,9 +29,19 @@ LOGDIR="$DB/logs"; MANIFEST="$DB/MANIFEST.tsv"
 
 # One fetch at a time per data dir. Two concurrent runs resume the same partial file and
 # truncate each other's work — a download that grows, shrinks and never finishes.
+# --wait queues behind a running fetch instead of refusing, so a second database can be lined up
+# while a multi-hour download finishes.
+FF_LOCK_WAIT=0; _args=()
+for _a in "$@"; do
+  case "$_a" in --wait) FF_LOCK_WAIT=1 ;; *) _args+=("$_a") ;; esac
+done
+set -- ${_args[@]+"${_args[@]}"}
+unset _a _args
 if command -v flock >/dev/null 2>&1; then
   exec 9>"$DB/.fetch.lock"
-  if ! flock -n 9; then
+  if [ "$FF_LOCK_WAIT" = 1 ]; then
+    flock -n 9 || { echo "another fetch_references run is using $DB — waiting for it (--wait)" >&2; flock 9; }
+  elif ! flock -n 9; then
     echo "another fetch_references run is using $DB (lock: $DB/.fetch.lock)." >&2
     # Name the holder. Killing the script alone can leave a download running that still holds the
     # lock, and "pkill -f fetch_references" then looks like it did nothing.
@@ -41,6 +52,7 @@ if command -v flock >/dev/null 2>&1; then
     else
       echo "wait for it, or stop it first:  pkill -f fetch_references" >&2
     fi
+    echo "or queue behind it:  $0 --wait $*" >&2
     exit 1
   fi
 fi
@@ -240,9 +252,13 @@ step_interproscan(){
   local url="${IPS_DATA_URL:-https://ftp.ebi.ac.uk/pub/software/unix/iprscan/5/$ver/alt/interproscan-data-$ver.tar.gz}"
   mkdir -p "$DB/interproscan"
   log "downloading InterProScan data $ver -> $DB/interproscan"
+  # The release unpacks into a versioned directory. Leave a stable `data` symlink beside it so the
+  # pipeline can derive the bind path from --data_dir alone, without being told the version.
   ( cd "$DB/interproscan" && dl "$url" "interproscan-data-$ver.tar.gz" && dl "$url.md5" "interproscan-data-$ver.tar.gz.md5" \
-    && md5sum -c "interproscan-data-$ver.tar.gz.md5" && tar xzf "interproscan-data-$ver.tar.gz" && rm -f "interproscan-data-$ver.tar.gz" ) >>"$LOGDIR/interproscan.log" 2>&1 \
-    && [ -d "$DB/interproscan/interproscan-$ver/data" ] && mark interproscan "$ver -> interproscan-$ver/data" || fail interproscan "$url"
+    && md5sum -c "interproscan-data-$ver.tar.gz.md5" && verify_archive "interproscan-data-$ver.tar.gz" \
+    && tar xzf "interproscan-data-$ver.tar.gz" && rm -f "interproscan-data-$ver.tar.gz" \
+    && ln -sfn "interproscan-$ver/data" data ) >>"$LOGDIR/interproscan.log" 2>&1 \
+    && [ -d "$DB/interproscan/data" ] && mark interproscan "$ver -> data -> interproscan-$ver/data" || fail interproscan "$url"
 }
 
 # ---- BUSCO / compleasm fungal lineages --------------------------------------
