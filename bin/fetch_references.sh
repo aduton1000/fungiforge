@@ -25,6 +25,17 @@ set -uo pipefail
 DB="${FUNGIFORGE_DB:?set FUNGIFORGE_DB to the target data dir, e.g. /data/fungiforge_db}"
 mkdir -p "$DB"/{containers,funannotate,eggnog,antismash,busco,unite,kraken2,refseq_fungi,fungamr,rvdb,markers,mlst,interproscan,dbcan,phibase,effectorp,logs}
 LOGDIR="$DB/logs"; MANIFEST="$DB/MANIFEST.tsv"
+
+# One fetch at a time per data dir. Two concurrent runs resume the same partial file and
+# truncate each other's work — a download that grows, shrinks and never finishes.
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$DB/.fetch.lock"
+  if ! flock -n 9; then
+    echo "another fetch_references run is using $DB (lock: $DB/.fetch.lock)." >&2
+    echo "wait for it, or stop it first:  pkill -f fetch_references" >&2
+    exit 1
+  fi
+fi
 [ -f "$MANIFEST" ] || echo -e "database\tdetail\tstatus\ttimestamp" > "$MANIFEST"
 
 log(){ echo "[$(date '+%F %T')] $*" | tee -a "$LOGDIR/fetch.log" ; }
