@@ -389,4 +389,20 @@ STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggn
 log "==== fungiforge fetch_references start · DB=$DB · steps: ${STEPS[*]} ===="
 for s in "${STEPS[@]}"; do "step_$s"; done
 log "==== fetch_references finished ===="
-log "manifest: $MANIFEST"; column -t -s $'\t' "$MANIFEST" 2>/dev/null || cat "$MANIFEST"
+# CURRENT state, one row per database: $MANIFEST is an append-only log, so a database that failed
+# in July and succeeded in September has both rows in it and the raw log reads as broken. The
+# `.done` marker on disk is the authority; the log stays for the audit trail.
+log "current state (latest entry per database; full log: $MANIFEST)"
+{
+  echo -e "database\tstate\tsize\tdetail\twhen"
+  for d in "$DB"/*/; do
+    name="$(basename "$d")"
+    [ "$name" = "logs" ] && continue
+    last="$(awk -F'\t' -v n="$name" '$1==n {row=$0} END{print row}' "$MANIFEST")"
+    state="missing"; [ -f "$d/.done" ] && state="present"
+    [ -z "$(ls -A "$d" 2>/dev/null)" ] && state="empty"
+    size="$(du -sh "$d" 2>/dev/null | cut -f1)"
+    echo -e "$name\t$state\t${size:--}\t$(echo "$last" | cut -f2 | cut -c1-60)\t$(echo "$last" | cut -f4)"
+  done
+} | column -t -s $'\t' 2>/dev/null || cat "$MANIFEST"
+log "a database shown 'missing' or 'empty' is re-fetched by naming its step: bin/fetch_references.sh <step>"
