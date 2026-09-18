@@ -39,8 +39,25 @@ dl(){  # dl <url> <output-filename>   (run inside the target dir)
            --file-allocation=none --auto-file-renaming=false --console-log-level=warn \
            -o "$out" "$url"
   else
-    curl -fL -C - --retry 999 --retry-delay 10 --retry-all-errors -o "$out" "$url"
+    # -sS: no progress meter. Everything here is appended to a log file, where curl's meter
+    # rewrites one line thousands of times and buries the real messages; errors still print.
+    # Watch progress by file size instead:  watch -n 20 'ls -lh <db>/<dir>'
+    curl -fL -C - --retry 999 --retry-delay 10 --retry-all-errors -sS -o "$out" "$url"
   fi
+}
+
+
+# Print the growing file's size every 60 s while a download runs in the background, so a long
+# fetch shows progress in the log without a progress meter. Usage: watch_size <file> & ; WPID=$!
+watch_size(){
+  local f="$1" last=0 now
+  while sleep 60; do
+    [ -e "$f" ] || continue
+    now=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null || echo 0)
+    [ "$now" = "$last" ] && continue
+    log "  $(basename "$f"): $(numfmt --to=iec "$now" 2>/dev/null || echo "$now")"
+    last=$now
+  done
 }
 
 # ---- run a command inside a container image, whatever runtime the host has (L24) -------------
