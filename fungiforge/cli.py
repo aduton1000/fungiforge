@@ -15,15 +15,54 @@ import argparse
 import re
 import glob
 import os
+import shutil
 import subprocess
 import sys
 from . import __version__
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def _repo_root():
+    """Locate the pipeline checkout (main.nf, bin/, test/expected/).
+
+    Deriving it from __file__ only works when the CLI runs from a source tree. A site
+    install pip-installs the package into cli-env/lib/.../site-packages, where the
+    parent directory holds no bin/, and every subcommand that shells out to a helper
+    died on a path that cannot exist. FUNGIFORGE_HOME is set by the site environment
+    (share/fungiforge-env.sh.example) and names the checkout, so prefer it.
+    """
+    for cand in (os.environ.get("FUNGIFORGE_HOME"), os.environ.get("FUNGIFORGE_ROOT", "") and
+                 os.path.join(os.environ["FUNGIFORGE_ROOT"], "repo"),
+                 os.path.dirname(os.path.dirname(os.path.abspath(__file__)))):
+        if cand and os.path.isfile(os.path.join(cand, "main.nf")):
+            return os.path.abspath(cand)
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+REPO = _repo_root()
+
+
+def helper(name):
+    """Absolute path to a bin/ helper script, or exit with an actionable message.
+
+    Falls back to PATH: the site environment puts $FUNGIFORGE_HOME/bin on it, so an
+    installed CLI outside a checkout still finds the scripts.
+    """
+    local = os.path.join(REPO, "bin", name)
+    if os.path.isfile(local):
+        return local
+    found = shutil.which(name)
+    if found:
+        return found
+    sys.exit("[fungiforge] cannot find bin/%s. Looked in %s and on PATH. Point FUNGIFORGE_HOME "
+             "at the pipeline checkout (the directory holding main.nf), or run from it." % (name, REPO))
 
 
 def cmd_run(a):
-    cmd = ["nextflow", "run", os.path.join(REPO, "main.nf"), "-profile", a.profile]
+    entry = os.path.join(REPO, "main.nf")
+    if not os.path.isfile(entry):
+        sys.exit("[fungiforge] cannot find main.nf under %s. Point FUNGIFORGE_HOME at the "
+                 "pipeline checkout." % REPO)
+    cmd = ["nextflow", "run", entry, "-profile", a.profile]
     if a.samplesheet: cmd += ["--samplesheet", a.samplesheet]
     if a.data_dir:    cmd += ["--data_dir", a.data_dir]
     if a.outdir:      cmd += ["--outdir", a.outdir]
@@ -86,13 +125,13 @@ def cmd_samplesheet(a):
 
 def cmd_fetch_refs(a):
     print(f'export FUNGIFORGE_DB="{a.data_dir}"')
-    print(f'bash {os.path.join(REPO, "bin", "fetch_references.sh")}')
+    print(f'bash {helper("fetch_references.sh")}')
 
 
 def cmd_validate(a):
     """Compare results/ with test/expected/<sample>.json (exit 1 on any failed check)."""
     exp = a.expected or os.path.join(REPO, "test", "expected", f"{a.sample}.json")
-    cmd = [sys.executable, os.path.join(REPO, "bin", "validate_run.py"), "--results", a.results, "--expected", exp]
+    cmd = [sys.executable, helper("validate_run.py"), "--results", a.results, "--expected", exp]
     if a.sample: cmd += ["--sample", a.sample]
     if a.out:    cmd += ["--out", a.out]
     return subprocess.call(cmd)
@@ -100,7 +139,7 @@ def cmd_validate(a):
 
 def cmd_check(a):
     """Validate a samplesheet before launching (exit 1 on any error)."""
-    cmd = [sys.executable, os.path.join(REPO, "bin", "validate_samplesheet.py"), "--samplesheet", a.samplesheet]
+    cmd = [sys.executable, helper("validate_samplesheet.py"), "--samplesheet", a.samplesheet]
     if a.json: cmd += ["--json", a.json]
     if a.strict: cmd += ["--strict"]
     if a.no_check_files: cmd += ["--no-check-files"]
@@ -109,7 +148,7 @@ def cmd_check(a):
 
 def cmd_check_master(a):
     """Validate a master table against fungiforge/resources/master_schema.json."""
-    cmd = [sys.executable, os.path.join(REPO, "bin", "validate_master.py"), "--master", a.master]
+    cmd = [sys.executable, helper("validate_master.py"), "--master", a.master]
     if a.json: cmd += ["--json", a.json]
     if a.strict: cmd += ["--strict"]
     return subprocess.call(cmd)
