@@ -92,6 +92,12 @@ else
   run git clone -q "$REPO" "$PREFIX/repo"
   run git -C "$PREFIX/repo" checkout -q "$REF"
 fi
+# Fail on bad arguments before anything expensive: an unreadable SignalP package used to surface
+# only after ~35 minutes of image building.
+[ -z "$SIGNALP_TGZ" ] || [ -s "$SIGNALP_TGZ" ] || die "--signalp: '$SIGNALP_TGZ' not found or empty.
+  Stage the licensed package first, e.g.
+    sudo mkdir -p /hpc/opt/licensed/signalp6 && sudo cp ~/signalp-6.0i.fast.tar.gz /hpc/opt/licensed/signalp6/"
+
 REPO_DIR="$PREFIX/repo"
 VERSION="$(grep -oE "version *= *'[^']+'" "$REPO_DIR/nextflow.config" 2>/dev/null | head -1 | sed -E "s/.*'([^']+)'/\1/" || true)"
 [ -n "$VERSION" ] || { [ "$DRY" = 1 ] && VERSION=0.1.0 || die "cannot read manifest.version from $REPO_DIR/nextflow.config"; }
@@ -104,14 +110,29 @@ AS_TAG="aduton1000/antismash-ff:8.0.0-r3";    AS_SIF="$PREFIX/images/antismash-f
 if [ "$SKIP_IMAGES" = 0 ]; then
   export APPTAINER_TMPDIR="${APPTAINER_TMPDIR:-$PREFIX/images/.tmp}"; mkdir -p "$APPTAINER_TMPDIR"
   # Guard (W4.1): the base image is normally built from the explicit lock (env/base.linux-64.lock)
-  # so rebuilds reproduce the validated environment byte for byte. When env/base.yml is NEWER, the
-  # lock predates a pin change and a lock build would silently lack the new tools — so build from
-  # base.yml instead, loudly, and ask for the lock to be regenerated from the image that results.
+  # so rebuilds reproduce the validated environment byte for byte. The lock is stale when a `==`
+  # pin in env/base.yml is absent from it — checked by CONTENT, not modification time, because a
+  # git checkout stamps every file with the same time. A stale lock would silently ship an image
+  # without the newer tools, so build from base.yml instead and ask for the lock to be refreshed.
   ENV_SPEC="env/base.linux-64.lock"
-  if [ "$REPO_DIR/env/base.yml" -nt "$REPO_DIR/env/base.linux-64.lock" ]; then
+  MISSING_PINS="$(python3 - "$REPO_DIR/env/base.yml" "$REPO_DIR/env/base.linux-64.lock" <<'PY' || true
+import re, sys
+pins = dict(re.findall(r'^\s*- ([A-Za-z0-9_.-]+)==([^\s#]+)', open(sys.argv[1]).read(), re.M))
+have = {}
+for line in open(sys.argv[2]):
+    if line.startswith("https"):
+        fn = line.rsplit("/", 1)[1].split("#")[0]
+        m = re.match(r'(.+?)-(\d[^-]*)-[^-]+\.(conda|tar\.bz2)$', fn)
+        if m:
+            have[m.group(1).lower()] = m.group(2)
+print(" ".join(f"{k}=={v}" for k, v in pins.items() if have.get(k.lower()) != v))
+PY
+)"
+  if [ -n "$MISSING_PINS" ]; then
     ENV_SPEC="env/base.yml"
-    log "NOTE env/base.yml is newer than the lock — building the base image from base.yml (the lock is stale)."
-    log "     After this install, regenerate and commit the lock:  bin/lock_env.sh $FF_TAG"
+    log "NOTE the lock does not carry these env/base.yml pins: $MISSING_PINS"
+    log "     building the base image from env/base.yml; afterwards regenerate and commit the lock:"
+    log "       bash $REPO_DIR/bin/lock_env.sh $FF_TAG"
   fi
 
   build_sif(){ # build_sif <tag> <dockerfile> <context> <sif>
@@ -135,7 +156,6 @@ if [ "$SKIP_IMAGES" = 0 ]; then
   # W2.6: site-only SignalP 6 image from the licensed package (never pushed); the `extras` label is
   # pointed at it in site.config below. Rebuilt whenever the base image is rebuilt (--rebuild-images).
   if [ -n "$SIGNALP_TGZ" ]; then
-    [ -s "$SIGNALP_TGZ" ] || die "--signalp: $SIGNALP_TGZ not found"
     SP_SIF="$PREFIX/images/fungiforge-signalp6-$VERSION.sif"; SP_TAG="aduton1000/fungiforge-signalp6:$VERSION"
     if [ -s "$SP_SIF" ] && [ "$REBUILD_IMAGES" = 0 ]; then echo "  have $SP_SIF — skip (use --rebuild-images)"; else
       SP_CTX="$(mktemp -d)"; run cp "$SIGNALP_TGZ" "$SP_CTX/signalp6.tar.gz"
@@ -178,12 +198,23 @@ if [ "$DRY" = 0 ]; then
   done
   if [ ! -f "$PREFIX/site.config" ]; then
     sed -e "s#/hpc/opt/fungiforge#$PREFIX#g" \
-        -e "s#fungiforge-0.1.0.sif#$(basename "$FF_SIF")#" \
+        -e "s#fungiforge-[0-9][0-9.a-z-]*\.sif#$(basename "$FF_SIF")#" \
         "$REPO_DIR/share/site.config.example" > "$PREFIX/site.config"
     if [ -n "$PARTITION" ]; then   # (no sed -i: differs between GNU and BSD)
       sed "s#// slurm_partition = 'global'.*#slurm_partition = '$PARTITION'#" "$PREFIX/site.config" > "$PREFIX/site.config.tmp" && mv "$PREFIX/site.config.tmp" "$PREFIX/site.config"
     fi
-  else echo "  keeping existing $PREFIX/site.config"; fi
+  else
+    echo "  keeping existing $PREFIX/site.config"
+    # the .sif paths are derived, not user tuning: repoint them at what this install built,
+    # otherwise a version bump leaves the config on a file that no longer exists.
+    for pair in "fungiforge-[0-9][0-9.a-z-]*\.sif:$(basename "$FF_SIF")" "antismash-ff-[0-9][0-9.a-z-]*\.sif:$(basename "$AS_SIF")"; do
+      pat="${pair%%:*}"; new="${pair##*:}"
+      if grep -qE "$pat" "$PREFIX/site.config" && ! grep -q "$new" "$PREFIX/site.config"; then
+        sed -E "s#$pat#$new#g" "$PREFIX/site.config" > "$PREFIX/site.config.tmp" && mv "$PREFIX/site.config.tmp" "$PREFIX/site.config"
+        echo "  site.config: image path -> $new"
+      fi
+    done
+  fi
   if [ -n "${SP_SIF:-}" ] && [ -s "${SP_SIF:-}" ] && ! grep -q "fungiforge-signalp6" "$PREFIX/site.config"; then
     printf '\n// W2.6: the site-built SignalP 6 image (licensed package) runs the extras stage\nprocess { withLabel: extras { container = %s } }\n' "'$SP_SIF'" >> "$PREFIX/site.config"
     echo "  site.config: extras label -> $SP_SIF"
