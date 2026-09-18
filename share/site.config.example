@@ -23,7 +23,7 @@ params {
 // .sif files (built by bin/hpc_install.sh from env/Dockerfile + env/antismash-ff.Dockerfile).
 // (Set here as label containers, not params: base.config reads params at parse time.)
 process {
-  withLabel: 'readqc|basecall|decontam|identify|resistance|mge|extras|report' { container = '/hpc/opt/fungiforge/images/fungiforge-0.1.0.sif' }
+  withLabel: 'readqc|basecall|decontam|identify|resistance|mge|extras|report' { container = '/hpc/opt/fungiforge/images/fungiforge-0.2.0.sif' }
   withLabel: bgc                                                             { container = '/hpc/opt/fungiforge/images/antismash-ff-8.0.0-r3.sif' }
   // W2.6: when the site built the SignalP 6 image (bin/hpc_install.sh --signalp <tarball>), run the extras stage in it:
   // withLabel: extras { container = '/hpc/opt/fungiforge/images/fungiforge-signalp6-<version>.sif' }
