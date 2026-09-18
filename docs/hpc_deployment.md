@@ -109,6 +109,11 @@ Two resources are **licensed** and staged by hand (Appendix A of the upgrade pla
 - **SignalP 6** — `bash bin/hpc_install.sh … --signalp <signalp-6.0*.fast.tar.gz>` builds a
   site-only image from it and points the extras stage at it in `site.config`.
 
+The `fungiforge` CLI finds the pipeline through `FUNGIFORGE_HOME` (set by `fungiforge-env.sh`),
+falling back to `$FUNGIFORGE_ROOT/repo`, then to its own source tree. Outside a login that sources
+the site environment, set `FUNGIFORGE_HOME` to the checkout or the helper subcommands (`check`,
+`validate`, `check-master`) cannot find `bin/`.
+
 ## 3. Run (any user)
 
 ```bash
