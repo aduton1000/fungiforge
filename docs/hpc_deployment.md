@@ -99,7 +99,8 @@ the three that downloads in parallel chunks, and on a link that drops connection
 transfer from byte 0 each retry, so the file grows and shrinks without ever finishing. Every archive
 is integrity-checked before decompression and deleted if it fails, so a rerun starts clean. The step
 only marks itself done when the decompressed files meet their expected sizes, and one fetch per data
-directory runs at a time (a second one waits on a lock rather than writing over the first).
+directory runs at a time (a second one refuses to start rather than writing over the first, and
+names the process holding the lock so you can stop it).
 
 Two resources are **licensed** and staged by hand (Appendix A of the upgrade plan):
 
