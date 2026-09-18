@@ -32,7 +32,15 @@ if command -v flock >/dev/null 2>&1; then
   exec 9>"$DB/.fetch.lock"
   if ! flock -n 9; then
     echo "another fetch_references run is using $DB (lock: $DB/.fetch.lock)." >&2
-    echo "wait for it, or stop it first:  pkill -f fetch_references" >&2
+    # Name the holder. Killing the script alone can leave a download running that still holds the
+    # lock, and "pkill -f fetch_references" then looks like it did nothing.
+    holder="$( { fuser "$DB/.fetch.lock" 2>/dev/null || lsof -t "$DB/.fetch.lock" 2>/dev/null; } | tr -s ' ' '\n' | grep -E '^[0-9]+$' | sort -u | tr '\n' ' ')"
+    if [ -n "${holder// /}" ]; then
+      echo "held by:" >&2; ps -o pid=,etime=,args= -p ${holder} 2>/dev/null | sed 's/^/  /' >&2
+      echo "wait for it, or stop it:  kill ${holder}" >&2
+    else
+      echo "wait for it, or stop it first:  pkill -f fetch_references" >&2
+    fi
     exit 1
   fi
 fi
@@ -40,6 +48,9 @@ fi
 
 log(){ echo "[$(date '+%F %T')] $*" | tee -a "$LOGDIR/fetch.log" ; }
 
+# The downloader must not inherit the lock file descriptor (9<&- below): a download that outlives a
+# killed parent would otherwise keep the data dir locked, and the next run reports a fetch in
+# progress that no longer exists.
 # Robust, resumable, multi-connection download. aria2c preferred (16 parallel
 # connections, --continue resumes a broken transfer from where it stopped, infinite
 # retries); curl -C - is the fallback. Never restarts a partial file from scratch.
@@ -48,18 +59,18 @@ dl(){  # dl <url> <output-filename>   (run inside the target dir)
   if command -v aria2c >/dev/null 2>&1; then
     aria2c --continue=true -x16 -s16 -k1M --max-tries=0 --retry-wait=10 \
            --file-allocation=none --auto-file-renaming=false --console-log-level=warn \
-           -o "$out" "$url"
+           -o "$out" "$url" 9<&-
   elif command -v wget >/dev/null 2>&1; then
     # Preferred over curl for the multi-GB databases. curl's --retry rewinds to byte 0 when the
     # server drops a transfer that -C - had positioned, so a flaky link makes the file grow and
     # shrink forever; wget -c re-issues a Range request from the bytes already on disk on every
     # retry. -nv keeps one line per event in the log instead of a rewriting progress bar.
-    wget -c -nv --tries=0 --timeout=60 --read-timeout=300 --waitretry=30 -O "$out" "$url"
+    wget -c -nv --tries=0 --timeout=60 --read-timeout=300 --waitretry=30 -O "$out" "$url" 9<&-
   else
     # -sS: no progress meter. Everything here is appended to a log file, where curl's meter
     # rewrites one line thousands of times and buries the real messages; errors still print.
     # Watch progress by file size instead:  watch -n 20 'ls -lh <db>/<dir>'
-    curl -fL -C - --retry 999 --retry-delay 10 --retry-all-errors -sS -o "$out" "$url"
+    curl -fL -C - --retry 999 --retry-delay 10 --retry-all-errors -sS -o "$out" "$url" 9<&-
   fi
 }
 
