@@ -106,6 +106,9 @@ fetch instead, which is how you line up a second database while a multi-hour dow
 Two resources are **licensed** and staged by hand (Appendix A of the upgrade plan):
 
 - **GeneMark-ES** — unpack the academic tarball and pass `--genemark_dir <dir> --genemark_key <key>`
+  (both the directory and the key's directory are bound into the container; the stage copies the
+  key to a per-task `$HOME/.gm_key`, and prediction falls back to Augustus alone, recording why, if
+  the key is unusable)
   to the run; the profiles bind the directory into the annotation container.
 - **SignalP 6** — `bash bin/hpc_install.sh … --signalp <signalp-6.0*.fast.tar.gz>` builds a
   site-only image from it and points the extras stage at it in `site.config`.
