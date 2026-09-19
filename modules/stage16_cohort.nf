@@ -36,19 +36,25 @@ process COHORT {
       --method ${params.gcf_method} --gcf-cutoff ${params.gcf_cutoff} --data-dir "${params.data_dir ?: ''}" \\
       ${params.funannotate_db ? "--pfam-path ${params.funannotate_db}/Pfam-A.hmm" : ''} \\
       --min-sim ${params.gcf_min_similarity} --min-pident ${params.gcf_min_pident}
-  # the stage status rides inside cohort.json (run-level: no per-sample stage JSON)
+  # The stage status rides inside cohort/cohort.json: a run-level stage has no per-sample stage
+  # JSON. ff_finalize must run FIRST — it is what writes the status document this block reads.
+  ff_finalize
   python3 - <<'PY'
-  import json
-  st = json.load(open("cohort.json")); d = json.load(open("cohort/cohort.json"))
-  d.update({k: st[k] for k in ("status", "tools", "skipped_tools", "versions") if k in st} if "status" in st else {})
-  d["stage_status"] = st.get("status"); d["versions"] = st.get("versions", {})
+  import json, os
+  d = json.load(open("cohort/cohort.json")) if os.path.exists("cohort/cohort.json") else {"stage": "cohort"}
+  if os.path.exists("cohort.json"):
+      st = json.load(open("cohort.json"))
+      for k in ("status", "tools", "skipped_tools", "versions"):
+          if k in st:
+              d[k] = st[k]
+      d["stage_status"] = st.get("status")
   try:
       d["bgc_families"] = {k: v for k, v in json.load(open("cohort/bgc_families.json")).items() if k != "families"}
   except Exception:
       pass
+  os.makedirs("cohort", exist_ok=True)
   json.dump(d, open("cohort/cohort.json", "w"), indent=2)
   PY
-  ff_finalize
   """
   stub:
   "mkdir -p cohort; echo '{\"stage\":\"cohort\",\"n_isolates\":0}' > cohort/cohort.json; touch cohort/species_clusters.tsv cohort/bgc_families.tsv"
