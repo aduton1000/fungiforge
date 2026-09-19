@@ -134,8 +134,17 @@ def test_bash_pipeline_exit_code_is_captured_with_pipefail(tmp_path):
 
 
 def test_bash_skip_is_recorded(tmp_path):
+    """A stage whose only outcome is a skip reports `skipped`: nothing ran, so nothing succeeded."""
     rc, doc, _ = run_bash(tmp_path, "ff_skip genomad 'database not staged'")
-    assert rc == 0 and doc["status"] == "ok" and doc["skipped_tools"]["genomad"] == "database not staged"
+    assert rc == 0 and doc["status"] == "skipped"
+    assert doc["skipped_tools"]["genomad"] == "database not staged"
+
+
+def test_bash_skip_alongside_real_work_stays_ok(tmp_path):
+    """The stage did its job; the skipped extra is recorded without downgrading the status."""
+    rc, doc, _ = run_bash(tmp_path, "ff_skip genemark 'no licence key'\nff_run echo -- echo hi")
+    assert rc == 0 and doc["status"] == "ok"
+    assert doc["skipped_tools"]["genemark"] == "no licence key"
 
 
 # ---------------------------------------------------------------- ff_version (W0.2)
@@ -171,3 +180,15 @@ def test_finalize_versions_tsv_without_tools_entry_goes_to_versions_only(tmp_pat
                         "--json", str(js), "--tools", str(tools), "--versions", str(vers)], capture_output=True, text=True)
     doc = json.load(open(js))
     assert r.returncode == 0 and doc["tools"]["flye"]["version"] == "2.9.6" and doc["versions"]["minimap2"] == "2.28"
+
+
+def test_a_stage_that_only_skipped_reports_skipped():
+    """Nothing ran, so the stage did no work — `ok` would claim success for an empty output."""
+    status, note = ff_status.compute_status({}, skips={"interproscan": "data not mounted"})
+    assert status == "skipped"
+    assert "interproscan" in note and "data not mounted" in note
+
+
+def test_a_skipped_extra_alongside_real_work_is_still_ok():
+    tools = {"funannotate_predict": {"exit": 0, "optional": False, "seconds": 9}}
+    assert ff_status.compute_status(tools, skips={"genemark": "no licence key"}) == ("ok", "")
