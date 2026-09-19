@@ -44,9 +44,12 @@ ANN_HDR = ["GeneID", "TranscriptID", "Feature", "Contig", "Start", "Stop", "Stra
            "PFAM", "InterPro", "EggNog", "COG", "GO Terms", "Secreted", "Membrane", "Protease", "CAZyme", "Notes", "gDNA", "mRNA", "CDS-transcript", "Translation"]
 
 
-def ann_row(gid, product="hypothetical protein", pfam="", ipr="", egg="", go="", sec="", caz="", prot="", busco="", ec=""):
+# funannotate 1.8.17 writes "mRNA" in the Feature column, not "CDS". The fixture said CDS, which
+# is why every test passed while a real 9,844-gene table produced n_annotated = 0.
+def ann_row(gid, product="hypothetical protein", pfam="", ipr="", egg="", go="", sec="", caz="", prot="", busco="", ec="",
+            feature="mRNA"):
     d = dict.fromkeys(ANN_HDR, "")
-    d.update({"GeneID": gid, "TranscriptID": gid + "-T1", "Feature": "CDS", "Product": product, "PFAM": pfam, "InterPro": ipr, "EggNog": egg,
+    d.update({"GeneID": gid, "TranscriptID": gid + "-T1", "Feature": feature, "Product": product, "PFAM": pfam, "InterPro": ipr, "EggNog": egg,
               "GO Terms": go, "Secreted": sec, "CAZyme": caz, "Protease": prot, "BUSCO": busco, "EC_number": ec})
     return "\t".join(d[k] for k in ANN_HDR)
 
@@ -107,3 +110,35 @@ def test_table_without_a_feature_column_is_still_counted(tmp_path):
     p.write_text("\t".join(hdr) + "\n" + "\t".join(row[c] for c in hdr) + "\n")
     st = ast_.annotation_stats(str(p))
     assert st["n_annotated"] == 1 and st["pct_pfam"] == 100.0
+
+
+# ── which Feature values count as protein-coding ─────────────────────────────
+
+def _table(tmp_path, rows):
+    p = tmp_path / "S.annotations.txt"
+    p.write_text("\t".join(ANN_HDR) + "\n" + "\n".join(rows) + "\n")
+    return str(p)
+
+
+def test_mrna_and_cds_rows_both_count(tmp_path):
+    """The label differs between funannotate builds; both mean a protein-coding transcript."""
+    for feature in ("mRNA", "CDS", ""):
+        st = ast_.annotation_stats(_table(tmp_path, [
+            ann_row("G1", "cytochrome P450", pfam="PF00067", feature=feature),
+            ann_row("G2", feature=feature)]))
+        assert st["n_annotated"] == 2, feature
+        assert st["pct_pfam"] == 50.0
+
+
+def test_noncoding_rows_are_excluded(tmp_path):
+    st = ast_.annotation_stats(_table(tmp_path, [
+        ann_row("G1", "cytochrome P450", pfam="PF00067", feature="mRNA"),
+        ann_row("T1", feature="tRNA"),
+        ann_row("R1", feature="rRNA")]))
+    assert st["n_annotated"] == 1 and st["pct_pfam"] == 100.0
+
+
+def test_an_unfamiliar_feature_label_still_counts(tmp_path):
+    """Better to count an unknown label than to silently report nothing, as CDS-only filtering did."""
+    st = ast_.annotation_stats(_table(tmp_path, [ann_row("G1", pfam="PF00067", feature="transcript")]))
+    assert st["n_annotated"] == 1

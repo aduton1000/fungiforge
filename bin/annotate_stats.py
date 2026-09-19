@@ -12,6 +12,10 @@ from __future__ import annotations
 import argparse, csv, json, os
 
 
+# Record types in funannotate's annotations table that are not protein-coding transcripts.
+NONCODING_FEATURES = {"trna", "rrna", "ncrna", "snrna", "snorna", "tmrna", "misc_rna", "repeat_region"}
+
+
 def count_proteins(faa):
     if not faa or not os.path.exists(faa):
         return None
@@ -31,9 +35,13 @@ def annotation_stats(path):
         reader = csv.DictReader(fh, delimiter="\t")
         header = list(reader.fieldnames or [])
         all_rows = list(reader)
-    # funannotate names the type column "Feature" (CDS / tRNA). Tolerate its absence rather than
-    # filtering every row away and reporting nothing.
-    rows = [r for r in all_rows if (r.get("Feature") or "CDS") in ("CDS", "")] if "Feature" in header else all_rows
+    # The "Feature" column names the record type, and which value marks a protein-coding row
+    # depends on the funannotate build: 1.8.17 writes "mRNA" (the table is per transcript, hence
+    # the TranscriptID column), older notes say "CDS". Keeping only "CDS" discarded every row of a
+    # real 9,844-gene table and left all four coverage columns NA. Exclude the non-coding types
+    # instead, which stays correct whichever label the build uses.
+    rows = [r for r in all_rows
+            if (r.get("Feature") or "").strip().lower() not in NONCODING_FEATURES]
     n = len(rows)
     if not n:
         return {"n_annotated": 0, "annotations_header": header,
