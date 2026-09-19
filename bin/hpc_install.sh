@@ -198,9 +198,18 @@ if [ "$DRY" = 0 ]; then
   for need in share/site.config.example share/fungiforge-env.sh.example share/bin/fungiforge-run bin/fetch_references.sh bin/preflight_qc.sh; do
     [ -f "$REPO_DIR/$need" ] || die "$REPO_DIR/$need missing — the deployed ref '$REF' predates the HPC kit; push the latest main (or pass --ref) and rerun"
   done
+  # Every label whose container is params.fungiforge_image must be repointed at the .sif this
+  # install built. Derive the list from conf/base.config instead of trusting the template: a label
+  # added to the pipeline but missing from the selector sends that one stage to Docker Hub, which
+  # fails mid-run on a private image (stage 16 COHORT did exactly that).
+  BASE_LABELS="$(sed -n 's/^[[:space:]]*withLabel:[[:space:]]*\([a-z_]*\).*params\.fungiforge_image.*/\1/p' \
+                   "$REPO_DIR/conf/base.config" | paste -sd'|' -)"
+  [ -n "$BASE_LABELS" ] || die "could not read the base-image labels from $REPO_DIR/conf/base.config"
+  log "base-image labels: $BASE_LABELS"
   if [ ! -f "$PREFIX/site.config" ]; then
     sed -e "s#/hpc/opt/fungiforge#$PREFIX#g" \
         -e "s#fungiforge-[0-9][0-9.a-z-]*\.sif#$(basename "$FF_SIF")#" \
+        -e "s#^\([[:space:]]*withLabel:[[:space:]]*\)'[a-z_|]*'\([[:space:]]*{[[:space:]]*container[^}]*fungiforge-\)#\1'$BASE_LABELS'\2#" \
         "$REPO_DIR/share/site.config.example" > "$PREFIX/site.config"
     if [ -n "$PARTITION" ]; then   # (no sed -i: differs between GNU and BSD)
       sed "s#// slurm_partition = 'global'.*#slurm_partition = '$PARTITION'#" "$PREFIX/site.config" > "$PREFIX/site.config.tmp" && mv "$PREFIX/site.config.tmp" "$PREFIX/site.config"
@@ -209,6 +218,13 @@ if [ "$DRY" = 0 ]; then
     echo "  keeping existing $PREFIX/site.config"
     # the .sif paths are derived, not user tuning: repoint them at what this install built,
     # otherwise a version bump leaves the config on a file that no longer exists.
+    # Same reasoning as above: an existing site.config predates any label added since it was
+    # written, so refresh the selector before touching the image paths.
+    CUR_LABELS="$(sed -n "s#^[[:space:]]*withLabel:[[:space:]]*'\([a-z_|]*\)'.*fungiforge-[0-9].*#\1#p" "$PREFIX/site.config" | head -1)"
+    if [ -n "$CUR_LABELS" ] && [ "$CUR_LABELS" != "$BASE_LABELS" ]; then
+      sed "s#'$CUR_LABELS'#'$BASE_LABELS'#" "$PREFIX/site.config" > "$PREFIX/site.config.tmp" && mv "$PREFIX/site.config.tmp" "$PREFIX/site.config"
+      echo "  site.config: base-image labels -> $BASE_LABELS (was $CUR_LABELS)"
+    fi
     for pair in "fungiforge-[0-9][0-9.a-z-]*\.sif:$(basename "$FF_SIF")" "antismash-ff-[0-9][0-9.a-z-]*\.sif:$(basename "$AS_SIF")"; do
       pat="${pair%%:*}"; new="${pair##*:}"
       if grep -qE "$pat" "$PREFIX/site.config" && ! grep -q "$new" "$PREFIX/site.config"; then

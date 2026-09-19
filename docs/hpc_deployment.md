@@ -93,6 +93,11 @@ present and Docker otherwise, so no Docker daemon is needed on a cluster.
 | `genomes` *(on request)* | one reference genome per species of `novelty_genera.txt`, for genome-ANI novelty | tens of GB |
 | `interproscan` *(on request)* | InterProScan data release matching the image tag (`--run_interproscan true` to use it) | 6.9 GB |
 
+`site.config` repoints every process label that uses the base image at the locally built `.sif`.
+The installer derives that label list from `conf/base.config` and refreshes it in an existing
+`site.config`, because a label added to the pipeline but missing from the list keeps its Docker Hub
+reference and is pulled mid-run, which fails outright against a private repository.
+
 The multi-GB databases (eggNOG, Kraken 2, geNomad, UNITE) are fetched with `aria2c` when it is
 installed, otherwise `wget -c`, otherwise `curl`. Install `aria2c` if you can: it is the only one of
 the three that downloads in parallel chunks, and on a link that drops connections `curl` restarts a
