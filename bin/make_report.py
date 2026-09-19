@@ -221,6 +221,17 @@ th,td{{border:1px solid #dcdfe6;padding:6px 10px;text-align:left}}th{{background
 """
 
 
+def tsv_value(v):
+    """One TSV field: no tab, CR or LF may survive inside a value.
+
+    Values are assembled from tool output (products, cluster names, notes). One containing a tab
+    would silently add a field to the row, and csv.DictReader files surplus fields away without
+    complaint, so the corruption would reach Layer 2 unnoticed.
+    """
+    s = "NA" if v is None else str(v)
+    return " ".join(s.split()) or "NA"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sample", required=True)
@@ -238,7 +249,7 @@ def main():
     row = build_row(a.sample, a.compartment, a.facility, a.season, S)
     with open(a.master, "w") as fh:
         fh.write("\t".join(MASTER_COLS) + "\n")
-        fh.write("\t".join(str(row.get(c, "NA")) for c in MASTER_COLS) + "\n")
+        fh.write("\t".join(tsv_value(row.get(c, "NA")) for c in MASTER_COLS) + "\n")
     open(a.html, "w").write(render_html(a.sample, meta, S, row, a.version))
     print(f"[make_report] {a.sample}: {row['species']} · {len(S)} stages · report+master written")
 

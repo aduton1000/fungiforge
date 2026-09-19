@@ -19,13 +19,26 @@ def count_proteins(faa):
 
 
 def annotation_stats(path):
+    """Coverage from funannotate's annotations table, with the reason when there is none.
+
+    Returning a bare {} left every pct_* column as NA in the master row with nothing to say
+    whether the table was missing, empty, or filtered away — indistinguishable from a stage that
+    never ran. Every return now carries `annotations_note`, and the header actually seen.
+    """
     if not path or not os.path.exists(path):
-        return {}
+        return {"annotations_note": "annotations table not found: %s" % (path or "<none>")}
     with open(path, encoding="utf-8", errors="replace") as fh:
-        rows = [r for r in csv.DictReader(fh, delimiter="\t") if (r.get("Feature") or "CDS") in ("CDS", "")]
+        reader = csv.DictReader(fh, delimiter="\t")
+        header = list(reader.fieldnames or [])
+        all_rows = list(reader)
+    # funannotate names the type column "Feature" (CDS / tRNA). Tolerate its absence rather than
+    # filtering every row away and reporting nothing.
+    rows = [r for r in all_rows if (r.get("Feature") or "CDS") in ("CDS", "")] if "Feature" in header else all_rows
     n = len(rows)
     if not n:
-        return {"n_annotated": 0}
+        return {"n_annotated": 0, "annotations_header": header,
+                "annotations_note": "no usable rows in %s (%d line(s) read, header: %s)"
+                                    % (path, len(all_rows), ", ".join(header) or "<empty>")}
 
     def has(col):
         return sum(1 for r in rows if (r.get(col) or "").strip())
@@ -33,7 +46,7 @@ def annotation_stats(path):
     def pct(k):
         return round(100.0 * k / n, 1)
     named = sum(1 for r in rows if (r.get("Product") or "").strip().lower() not in ("", "hypothetical protein"))
-    return {"n_annotated": n, "pct_pfam": pct(has("PFAM")), "pct_interpro": pct(has("InterPro")), "pct_go": pct(has("GO Terms")),
+    return {"n_annotated": n, "annotations_header": header, "pct_pfam": pct(has("PFAM")), "pct_interpro": pct(has("InterPro")), "pct_go": pct(has("GO Terms")),
             "pct_eggnog": pct(has("EggNog")), "pct_named_product": pct(named), "n_secreted": has("Secreted"),
             "n_cazyme": has("CAZyme"), "n_protease": has("Protease"), "n_busco": has("BUSCO"), "n_ec": has("EC_number")}
 
