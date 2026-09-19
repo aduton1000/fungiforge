@@ -204,9 +204,13 @@ step_antismash(){
 # ---- Funannotate database (~30-50 GB): Pfam, dbCAN, MEROPS, InterPro, BUSCO --
 step_funannotate(){
   is_done funannotate && { log "funannotate db present — skip"; return; }
-  log "funannotate setup -i all -> $DB/funannotate (large, hours)"
-  FUNANNOTATE_DB=/data crun nextgenusfs/funannotate:latest "$DB/funannotate:/data" -- funannotate setup -i all -d /data >>"$LOGDIR/funannotate.log" 2>&1 \
-    && mark funannotate "funannotate setup all" || fail funannotate "funannotate setup"
+  # `-b all` matters: setup installs only the dikarya BUSCO set by default, and stage 07a's
+  # species-aware training picks a clade set (eurotiomycetes, sordariomycetes, saccharomycetes,
+  # basidiomycota, ascomycota) only when it is actually staged — otherwise it silently falls back
+  # to dikarya and records the reason.
+  log "funannotate setup -i all -b all -> $DB/funannotate (large, hours)"
+  FUNANNOTATE_DB=/data crun nextgenusfs/funannotate:latest "$DB/funannotate:/data" -- funannotate setup -i all -b all -d /data >>"$LOGDIR/funannotate.log" 2>&1 \
+    && mark funannotate "funannotate setup all + all BUSCO sets" || fail funannotate "funannotate setup"
 }
 
 # ---- eggNOG database (~50 GB) -----------------------------------------------
