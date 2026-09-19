@@ -59,9 +59,12 @@ def test_annotation_stats_and_cli(tmp_path, helpers):
         ann_row("FUN_3"),
         ann_row("FUN_4", "Hypothetical protein", prot="S8", ec="3.4.21.-")]) + "\n")
     st = ast_.annotation_stats(str(ann))
-    assert st == {"n_annotated": 4, "pct_pfam": 50.0, "pct_interpro": 25.0, "pct_go": 50.0, "pct_eggnog": 25.0, "pct_named_product": 25.0,
-                  "n_secreted": 1, "n_cazyme": 1, "n_protease": 1, "n_busco": 1, "n_ec": 1}
-    assert ast_.annotation_stats(str(tmp_path / "none.txt")) == {}
+    expect = {"n_annotated": 4, "pct_pfam": 50.0, "pct_interpro": 25.0, "pct_go": 50.0, "pct_eggnog": 25.0,
+              "pct_named_product": 25.0, "n_secreted": 1, "n_cazyme": 1, "n_protease": 1, "n_busco": 1, "n_ec": 1}
+    assert {k: st[k] for k in expect} == expect
+    assert st["annotations_header"] == ANN_HDR and "annotations_note" not in st
+    missing = ast_.annotation_stats(str(tmp_path / "none.txt"))
+    assert "pct_pfam" not in missing and "not found" in missing["annotations_note"]
     faa = helpers["write_fasta"](tmp_path / "p.faa", {"FUN_1-T1": "MAAA", "FUN_2-T1": "MCCC", "FUN_3-T1": "MDDD", "FUN_4-T1": "MEEE"})
     tr = tmp_path / "training.json"; tr.write_text(json.dumps({"augustus_species": "aspergillus_fumigatus", "busco_db": "eurotiomycetes", "basis": "species:x", "notes": []}))
     out = tmp_path / "a.json"
@@ -71,3 +74,36 @@ def test_annotation_stats_and_cli(tmp_path, helpers):
     doc = json.load(open(out))
     assert doc["stage"] == "annotate" and doc["n_proteins"] == 4 and doc["pct_pfam"] == 50.0 and doc["eggnog"] == "yes" and doc["genemark"] == "yes"
     assert doc["training"]["busco_db"] == "eurotiomycetes" and "4 proteins" in r.stdout
+
+
+# ── why the coverage columns are empty ───────────────────────────────────────
+# All four pct_* columns came back NA on a real run while eggNOG and InterProScan had both
+# done real work. annotation_stats returned a bare {}, so the master row could not say whether
+# the table was missing, empty, or filtered away. Every empty result now carries the reason.
+
+def test_missing_annotations_table_explains_itself():
+    st = ast_.annotation_stats("/no/such/file.annotations.txt")
+    assert "pct_pfam" not in st
+    assert "not found" in st["annotations_note"] and "file.annotations.txt" in st["annotations_note"]
+
+
+def test_no_annotations_argument_explains_itself():
+    assert "annotations_note" in ast_.annotation_stats(None)
+
+
+def test_header_only_table_reports_zero_and_the_header(tmp_path):
+    p = tmp_path / "S.annotations.txt"
+    p.write_text("\t".join(ANN_HDR) + "\n")
+    st = ast_.annotation_stats(str(p))
+    assert st["n_annotated"] == 0 and st["annotations_header"] == ANN_HDR
+    assert "no usable rows" in st["annotations_note"]
+
+
+def test_table_without_a_feature_column_is_still_counted(tmp_path):
+    """A different funannotate layout must not filter every row away and report nothing."""
+    hdr = [c for c in ANN_HDR if c != "Feature"]
+    p = tmp_path / "S.annotations.txt"
+    row = dict(zip(ANN_HDR, ann_row("FUN_1", "cytochrome P450", pfam="PF00067").split("\t")))
+    p.write_text("\t".join(hdr) + "\n" + "\t".join(row[c] for c in hdr) + "\n")
+    st = ast_.annotation_stats(str(p))
+    assert st["n_annotated"] == 1 and st["pct_pfam"] == 100.0

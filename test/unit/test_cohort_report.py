@@ -116,3 +116,26 @@ def test_cohort_report_cli_writes_merged_table_report_and_multiqc(tmp_path, help
     write_master(md / "S3.master.tsv", [base_row("S3", n_contigs="lots")])
     r2 = subprocess.run([sys.executable, os.path.join(helpers["BIN"], "cohort_report.py"), "--masters", str(md), "--outdir", str(out), "--no-multiqc-export"], capture_output=True, text=True)
     assert r2.returncode == 1 and "INVALID" in r2.stdout and (out / "master_fungi.tsv").exists()
+
+
+def test_validate_master_flags_a_ragged_row(tmp_path):
+    """A value containing a tab gives a row with more fields than the header; DictReader hides it."""
+    schema = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__)))), "fungiforge", "resources", "master_schema.json")))
+    names = [c["name"] for c in schema["columns"]]
+    p = tmp_path / "m.tsv"
+    good = ["S1"] + ["NA"] * (len(names) - 1)
+    p.write_text("\t".join(names) + "\n" + "\t".join(good) + "\textra\n")
+    rep = vm.validate(str(p), schema)
+    assert not rep["valid"]
+    assert any("more than the header" in e for e in rep["errors"])
+
+
+def test_validate_master_flags_a_short_row(tmp_path):
+    schema = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__)))), "fungiforge", "resources", "master_schema.json")))
+    names = [c["name"] for c in schema["columns"]]
+    p = tmp_path / "m.tsv"
+    p.write_text("\t".join(names) + "\n" + "\t".join(["S1"] + ["NA"] * (len(names) - 3)) + "\n")
+    rep = vm.validate(str(p), schema)
+    assert not rep["valid"] and any("fewer than the header" in e for e in rep["errors"])
