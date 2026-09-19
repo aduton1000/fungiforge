@@ -172,3 +172,29 @@ def test_bgc_mycotoxin_columns_w32():
     assert r2["mycotoxin_clusters"] == "none" and r2["bioactive_clusters"] == "none"
     r3 = row({"bgc": {"status": "ok", "n_clusters": 3, "knownclusterblast": {"ran": False}}})
     assert r3["mycotoxin_clusters"] == "NA" and r3["n_bgc_mibig_hits"] == "NA"
+
+
+# ── TSV field integrity ──────────────────────────────────────────────────────
+# Master values come from tool output. A tab or newline inside one would add or split fields,
+# and csv.DictReader accepts a ragged row silently, so it would reach Layer 2 uncorrected.
+
+def test_tsv_value_collapses_every_kind_of_whitespace():
+    assert m.tsv_value("a\tb") == "a b"
+    assert m.tsv_value("a\nb\r\nc") == "a b c"
+    assert m.tsv_value("  padded  ") == "padded"
+    assert m.tsv_value("") == "NA" and m.tsv_value(None) == "NA"
+    assert m.tsv_value(0) == "0" and m.tsv_value(1.5) == "1.5"
+
+
+def test_master_row_has_exactly_one_field_per_column(tmp_path):
+    import subprocess
+    bgc = tmp_path / "bgc.json"
+    bgc.write_text('{"stage": "bgc", "status": "ok", "n_clusters": 2, '
+                   '"mycotoxin_compounds": ["gliotoxin\tcontaminated"], "bioactive_compounds": []}')
+    out = tmp_path / "m.tsv"
+    r = subprocess.run([sys.executable, os.path.join(HERE, "..", "..", "bin", "make_report.py"),
+                        "--sample", "X", "--jsons", str(bgc), "--html", str(tmp_path / "r.html"),
+                        "--master", str(out)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    lines = [l.split("\t") for l in out.read_text().rstrip("\n").split("\n")]
+    assert len(lines[0]) == len(lines[1]) == len(m.MASTER_COLS)

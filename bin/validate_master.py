@@ -57,12 +57,15 @@ def validate(master_path, schema):
     na = schema.get("na_value", "NA")
     cols = schema["columns"]
     names = [c["name"] for c in cols]
+    delim = schema.get("delimiter", "\t")
     with open(master_path) as fh:
-        rows = list(csv.DictReader(fh, delimiter=schema.get("delimiter", "\t")))
-        header = list(rows[0].keys()) if rows else []
+        rows = list(csv.DictReader(fh, delimiter=delim))
+    # Read the header from the file, not from rows[0].keys(): a row with surplus fields puts a
+    # None key in there, and every later join over the header then raised TypeError instead of
+    # reporting the ragged row.
+    with open(master_path) as fh:
+        header = fh.readline().rstrip("\n").split(delim)
     if not rows:
-        with open(master_path) as fh:
-            header = (fh.readline().rstrip("\n").split(schema.get("delimiter", "\t")))
         warnings.append("no data rows")
     missing = [n for n in names if n not in header]
     if missing:
@@ -75,6 +78,15 @@ def validate(master_path, schema):
         warnings.append(f"columns not in this schema version (newer pipeline?): {', '.join(extra)}")
     seen = set()
     for i, r in enumerate(rows, 1):
+        # csv.DictReader files surplus fields under the None key and pads short rows with None,
+        # both silently, so a value containing a tab would give a ragged row that still validated.
+        if None in r:
+            errors.append("row %d: %d field(s) more than the header — a value probably contains a "
+                          "tab (%s)" % (i, len(r[None]), "; ".join(str(x) for x in r[None])[:120]))
+        short = [c for c, v in r.items() if v is None and c is not None]
+        if short:
+            errors.append("row %d: %d field(s) fewer than the header (from '%s' on)"
+                          % (i, len(short), short[0]))
         s = (r.get("sample") or "").strip()
         if not s or s == na:
             errors.append(f"row {i}: empty sample")
