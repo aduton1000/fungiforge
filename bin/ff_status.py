@@ -53,7 +53,7 @@ def read_versions(path):
     return versions
 
 
-def compute_status(tools, stage_skipped=None):
+def compute_status(tools, stage_skipped=None, skips=None):
     if stage_skipped:
         return "skipped", f"stage skipped: {stage_skipped}"
     failed = [k for k, v in tools.items() if v["exit"] != 0 and not v["optional"]]
@@ -62,6 +62,12 @@ def compute_status(tools, stage_skipped=None):
         return "failed", "required tool(s) failed: " + ", ".join(f"{k} (exit {tools[k]['exit']})" for k in failed)
     if degraded:
         return "partial", "optional tool(s) failed, fallback used: " + ", ".join(f"{k} (exit {tools[k]['exit']})" for k in degraded)
+    # A stage where nothing ran and everything was skipped did no work: reporting `ok` made
+    # InterProScan and eggNOG claim success for writing an empty table when their data were absent.
+    # (A stage that did run its tools and skipped an optional extra is still `ok`; the skip is
+    # recorded in skipped_tools.)
+    if not tools and skips:
+        return "skipped", "no tool ran: " + "; ".join(f"{k}: {v}" for k, v in skips.items())
     return "ok", ""
 
 
@@ -70,7 +76,7 @@ def cmd_finalize(a):
     for label, v in versions.items():
         if label in tools:
             tools[label]["version"] = v
-    status, note = compute_status(tools, a.stage_skipped)
+    status, note = compute_status(tools, a.stage_skipped, skips)
     doc = {}
     if os.path.exists(a.json):
         try:
