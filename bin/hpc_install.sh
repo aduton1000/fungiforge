@@ -198,7 +198,13 @@ if [ "$SKIP_CLI" = 0 ]; then
   fi
   # Editable: the pipeline (main.nf, bin/, conf/) is already read live from $REPO_DIR, so a
   # copied package only adds a second version of the CLI that a `git pull` silently leaves stale.
+  # Uninstall first: a real `fungiforge/` directory left in site-packages by an earlier
+  # non-editable install SHADOWS the editable finder, so the CLI silently keeps serving the old
+  # subcommands (a cluster install went on offering only run/samplesheet/fetch-refs/version long
+  # after check, validate and check-master existed in the checkout).
+  run "$PREFIX/cli-env/bin/pip" uninstall -y -q fungiforge >/dev/null 2>&1 || true
   run "$PREFIX/cli-env/bin/pip" install -q --no-cache-dir -e "$REPO_DIR"
+  run "$PREFIX/cli-env/bin/fungiforge" --help >/dev/null
   run "$PREFIX/cli-env/bin/fungiforge" version
 fi
 
