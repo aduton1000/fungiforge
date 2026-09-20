@@ -32,6 +32,7 @@ test/sra/
 test/reads/*
 !test/reads/TESTFUN0?.ont.fastq.gz
 !test/reads/TESTFUN0?_R?.fastq.gz
+!test/reads/TESTFUN0?_RNA_R?.fastq.gz
 results_cea10/
 results_*/
 # tests / coverage
