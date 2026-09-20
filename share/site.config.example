@@ -29,7 +29,10 @@ process {
   withLabel: 'readqc|basecall|decontam|identify|resistance|mge|extras|cohort|report' { container = '/hpc/opt/fungiforge/images/fungiforge-0.2.0.sif' }
   withLabel: bgc                                                             { container = '/hpc/opt/fungiforge/images/antismash-ff-8.0.0-r3.sif' }
   // W2.6: when the site built the SignalP 6 image (bin/hpc_install.sh --signalp <tarball>), run the extras stage in it:
-  // withLabel: extras { container = '/hpc/opt/fungiforge/images/fungiforge-signalp6-<version>.sif' }
+  // The SignalP 6 site image (bin/hpc_install.sh --signalp) must use withName, not withLabel:
+  // the base-image selector above also matches `extras`, and between two matching withLabel
+  // selectors the base image wins, so the stage silently runs without SignalP.
+  // withName: EXTRAS { container = '/hpc/opt/fungiforge/images/fungiforge-signalp6-<version>.sif' }
 }
 
 // heavier slots for the long stages on big nodes
