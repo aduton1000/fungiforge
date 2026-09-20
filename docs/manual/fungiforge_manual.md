@@ -584,7 +584,12 @@ partial assembly. `--kmer_profile false` disables the stage.
 **Long-read isolates (`assembly_mode == longread`)** are assembled with the chosen `--assembler`:
 **Flye `--nano-hq`** (default), Raven, or Canu (`genomeSize=35m`). When `--purge_dups true`
 (default), **purge_dups** collapses heterozygous haplotigs via a minimap2 self-alignment; if
-purge_dups is unavailable the raw assembly is kept.
+purge_dups is unavailable the raw assembly is kept. Organelle contigs are then put back:
+purge_dups judges contigs by read depth against the nuclear peak, a mitochondrial genome sits far
+above it, and it is duly discarded as collapsed duplication. `protect_organelle.py` restores only
+contigs carrying at least two core mitochondrial genes within the length and GC bounds, the same
+evidence Stage 04 uses, so genuine haplotigs stay purged. `purge.json` records
+`n_organelle_restored`.
 
 **Illumina-only isolates (`assembly_mode == shortread`)** are assembled by **Stage 02b** with
 `--sr_assembler`: **SPAdes `--isolate`** (default; built-in read error-correction) or **MEGAHIT**.
