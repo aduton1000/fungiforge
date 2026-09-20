@@ -119,3 +119,51 @@ def test_cli_with_canned_outputs_and_without_tools(tmp_path, helpers):
     d2 = json.load(open(out2))
     assert d2["cazymes"] is None and d2["secretome"] is None and d2["virulence"] is None and d2["mating_type"] == "undetermined"
     assert set(d2["skipped"]) == {"dbcan", "signalp6", "phibase", "mating_hmm", "nquire"}
+
+
+# ── nQuire ploidy confidence ─────────────────────────────────────────────────
+# A real CEA10 run gave 2,491 biallelic sites over 30 Mb and nQuire's best fit was tetraploid,
+# for a haploid organism whose k-mer profile said haploid. Density, not fit, decides.
+
+class _FakeRun:
+    """Stands in for extras.run(): nQuire create/denoise/view/lrdmodel."""
+    def __init__(self, n_sites, tmp):
+        self.n_sites, self.tmp = n_sites, tmp
+
+    def __call__(self, cmd, log=None):
+        import subprocess
+        sub = cmd[1] if len(cmd) > 1 else ""
+        if sub == "create":
+            open(cmd[cmd.index("-o") + 1] + ".bin", "w").write("x")
+        elif sub == "denoise":
+            open(cmd[cmd.index("-o") + 1] + ".bin", "w").write("x")
+        out = ""
+        if sub == "view":
+            out = "\n".join("site%d" % i for i in range(self.n_sites))
+        elif sub == "lrdmodel":
+            out = ("file\tfree\tdip\ttri\ttet\td_dip\td_tri\td_tet\n"
+                   "x.bin\t4066.7\t-731.8\t190.1\t3181.0\t4798.5\t3876.6\t885.7\n")
+        return subprocess.CompletedProcess(cmd, 0, out, "")
+
+
+def _ploidy(monkeypatch, tmp_path, n_sites, min_sites=10000):
+    monkeypatch.setattr(ex, "run", _FakeRun(n_sites, tmp_path))
+    monkeypatch.setattr(ex.shutil, "which", lambda _x: "/usr/bin/nQuire")
+    bam = tmp_path / "r.bam"; bam.write_text("bam")
+    return ex.ploidy_from_nquire(str(bam), str(tmp_path / "nq"), min_sites=min_sites)
+
+
+def test_sparse_sites_do_not_yield_a_polyploid_call(monkeypatch, tmp_path):
+    r = _ploidy(monkeypatch, tmp_path, 2491)
+    assert r["ploidy_call"] == 1 and r["ploidy_confidence"] == "low"
+    assert r["model_ploidy_call"] == 4 and r["model_best"] == "tet"   # raw fit preserved
+    assert "2491" in r["note"] and "tet" in r["note"]
+
+
+def test_dense_sites_report_the_model_call(monkeypatch, tmp_path):
+    r = _ploidy(monkeypatch, tmp_path, 50000)
+    assert r["ploidy_call"] == 4 and r["best_model"] == "tet" and r["ploidy_confidence"] == "ok"
+
+
+def test_the_threshold_is_configurable(monkeypatch, tmp_path):
+    assert _ploidy(monkeypatch, tmp_path, 2491, min_sites=1000)["ploidy_call"] == 4

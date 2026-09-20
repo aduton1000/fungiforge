@@ -508,6 +508,7 @@ the knobs you will touch most.
 | `--skip_eggnog` | `false` | remove Stage 07b eggNOG-mapper |
 | `--genemark_dir` | `null` | unpacked GeneMark-ES directory (licensed; bound into the container) |
 | `--ploidy` | `auto` | ploidy handling |
+| `--ploidy_min_sites` | `10000` | biallelic sites nQuire needs before its ploidy call is trusted (Stage 13) |
 | `--genemark_key` | `null` | path to the free-academic GeneMark licence key (with `--genemark_dir`). Its directory is bound into the container, so the key may sit beside the GeneMark directory rather than inside it |
 | `--af_panel` | bundled `af_resistance_panel.tsv` | curated resistance panel (Stage 09) |
 | `--skip_decontam` | `false` | skip Stage 04 decontamination |
@@ -821,6 +822,10 @@ of Stage 09; a missing tool or database leaves that block `null` with the reason
   both = homothallic or a heterozygous diploid.
 - **Ploidy** — nQuire on the read BAM (diploid / triploid / tetraploid likelihoods;
   `haploid_like` when too few biallelic sites remain), next to the k-mer hint of Stage 01b.
+  Density decides, not goodness of fit: below `--ploidy_min_sites` biallelic sites (10,000 by
+  default) the models cannot be separated, so the call is reported as haploid/homozygous at low
+  confidence and nQuire's own best fit is kept in the JSON under `model_best` for inspection. A
+  30 Mb haploid genome yielding 2,491 sites was otherwise reported as tetraploid.
 
 Emits `extras.json` (`mating_type`, `ploidy`, `n_secreted`, `n_effectors`, `n_cazymes`,
 `n_phibase_hits`, per-protein tables, `tools`, `skipped`).

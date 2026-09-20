@@ -259,9 +259,17 @@ def parse_nquire_lrdmodel(text):
             "delta_to_free": round(vals.get("free", 0) - models[best], 2) if "free" in vals else None}
 
 
-def ploidy_from_nquire(bam, prefix, min_sites=1000, log=None):
+def ploidy_from_nquire(bam, prefix, min_sites=10000, log=None):
     """nQuire create (denoised) -> lrdmodel; a haploid genome gives few heterozygous sites, which is
-    reported as such (nQuire cannot model ploidy 1: no biallelic sites)."""
+    reported as such (nQuire cannot model ploidy 1: no biallelic sites).
+
+    The site count matters more than the model fit. A real CEA10 run produced 2,491 biallelic sites
+    across 30 Mb — roughly one per 12 kb — and nQuire duly returned its best fit, tetraploid, for a
+    haploid organism whose k-mer profile said haploid. Below `min_sites` the models cannot be
+    separated, so the call is reported as haploid/homozygous at low confidence while the raw model
+    fits are kept in the document for inspection. The threshold is a heuristic and configurable
+    (--ploidy-min-sites / --ploidy_min_sites).
+    """
     if not bam or not os.path.exists(bam) or not shutil.which("nQuire"):
         return None
     p = run(["nQuire", "create", "-b", bam, "-o", prefix, "-q", "20", "-c", "10"], log)
@@ -271,16 +279,26 @@ def ploidy_from_nquire(bam, prefix, min_sites=1000, log=None):
     binfile = prefix + ".denoised.bin" if d.returncode == 0 and os.path.exists(prefix + ".denoised.bin") else prefix + ".bin"
     v = run(["nQuire", "view", binfile], log)
     n_sites = sum(1 for l in v.stdout.splitlines() if l.strip()) if v.returncode == 0 else None
-    res = {"n_sites": n_sites, "denoised": binfile.endswith("denoised.bin")}
-    if n_sites is not None and n_sites < min_sites:
-        res.update(ploidy_call=1, best_model="haploid_like", note=f"only {n_sites} biallelic sites after denoising: no heterozygosity signal (haploid or homozygous)")
-        return res
+    res = {"n_sites": n_sites, "denoised": binfile.endswith("denoised.bin"), "min_sites": min_sites}
     m = run(["nQuire", "lrdmodel", binfile], log)
     parsed = parse_nquire_lrdmodel(m.stdout) if m.returncode == 0 else None
+    if parsed:
+        # keep the raw fits whatever the verdict, so a low-confidence call can still be inspected
+        res["loglik"] = parsed["loglik"]
+        res["model_best"] = parsed["best_model"]
+        res["model_ploidy_call"] = parsed["ploidy_call"]
+        res["delta_to_free"] = parsed["delta_to_free"]
+    if n_sites is not None and n_sites < min_sites:
+        res.update(ploidy_call=1, best_model="haploid_like", ploidy_confidence="low",
+                   note="only %s biallelic sites after denoising (fewer than %s): too sparse to "
+                        "separate ploidy models, reported haploid/homozygous%s"
+                        % (n_sites, min_sites,
+                           "; nQuire's own best fit was %s" % parsed["best_model"] if parsed else ""))
+        return res
     if not parsed:
         res["error"] = "nQuire lrdmodel failed"
         return res
-    res.update(parsed)
+    res.update(ploidy_call=parsed["ploidy_call"], best_model=parsed["best_model"], ploidy_confidence="ok")
     return res
 
 
@@ -292,6 +310,9 @@ def main():
     ap.add_argument("--dbcan-hmm", default=None); ap.add_argument("--phibase", default=None); ap.add_argument("--effectorp-dir", default=None)
     ap.add_argument("--pfam-hmm", default=None, help="Pfam-A.hmm (default <data_dir>/funannotate/Pfam-A.hmm)")
     ap.add_argument("--threads", type=int, default=4); ap.add_argument("--workdir", default="extras_work")
+    ap.add_argument("--ploidy-min-sites", type=int, default=10000,
+                    help="biallelic sites nQuire needs before its ploidy call is trusted "
+                         "(below this the call is reported haploid/homozygous at low confidence)")
     ap.add_argument("--signalp-results", default=None, help="pre-computed signalp6 prediction_results.txt (tests)")
     ap.add_argument("--effectorp-results", default=None); ap.add_argument("--dbcan-domtbl", default=None); ap.add_argument("--pfam-domtbl", default=None)
     ap.add_argument("--phibase-hits", default=None)
@@ -408,7 +429,8 @@ def main():
 
     # ploidy
     if a.bam and os.path.exists(a.bam) and os.path.getsize(a.bam) > 0:
-        doc["ploidy_reads"] = ploidy_from_nquire(a.bam, os.path.join(a.workdir, "nquire"), log=log)
+        doc["ploidy_reads"] = ploidy_from_nquire(a.bam, os.path.join(a.workdir, "nquire"),
+                                                 min_sites=a.ploidy_min_sites, log=log)
         doc["tools"]["nquire"] = "ok" if doc["ploidy_reads"] and "error" not in doc["ploidy_reads"] else (doc["ploidy_reads"] or {}).get("error", "nQuire not in this image")
     else:
         doc["ploidy_reads"] = None; doc["tools"]["nquire"] = "no read BAM (stage 09 read genotyping off or failed)"
