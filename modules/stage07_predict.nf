@@ -91,10 +91,8 @@ process PREDICT {
   TRAINED=no
   if [ "${params.skip_rna_train}" = "true" ]; then
     ff_skip funannotate_train "disabled (--skip_rna_train true)"
-  elif [ "${meta.has_rna ? 'yes' : 'no'}" != "yes" ]; then
-    : # no RNA-seq for this isolate; ab-initio prediction, nothing to record
   elif [ ! -s ${rna1} ] || [ ! -s ${rna2} ]; then
-    ff_skip funannotate_train "rna_r1/rna_r2 are empty; ab-initio prediction"
+    : # no RNA-seq for this isolate (the NO_RNA sentinels are empty); ab-initio prediction
   elif ! command -v Trinity >/dev/null 2>&1 || [ -z "\${PASAHOME:-}" ]; then
     ff_skip funannotate_train "Trinity or PASA missing from this image (PASAHOME='\${PASAHOME:-}'); ab-initio prediction"
   else
