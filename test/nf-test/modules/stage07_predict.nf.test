@@ -10,7 +10,7 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = [[id:'S1', assembly_mode:'longread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/test/samplesheet.test.csv"), file("$baseDir/nf-test.config")]
+                input[0] = [[id:'S1', assembly_mode:'longread', has_rna:false, compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/test/samplesheet.test.csv"), file("$baseDir/nf-test.config"), file("$baseDir/assets/NO_RNA1"), file("$baseDir/assets/NO_RNA2")]
                 """
             }
         }
