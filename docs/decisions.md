@@ -25,3 +25,16 @@
 - **Databases fetched up front, never mid-run** (`bin/fetch_references.sh`, aria2c-resumable),
   staged on an external drive via `--data_dir` because they total ~150–250 GB.
 - **Organism-agnostic.** When the real fungal reads arrive, only inputs/params change — no code.
+- **Stay on funannotate v1 for now; funannotate2 is not a drop-in (decided 2026-09-20, W6.2).**
+  Evaluated against the released sources rather than the changelog. funannotate2 (v26.6.21,
+  2026-06-22) would *remove* four capabilities this pipeline depends on. It has **no Trinity/PASA
+  RNA-seq assembly path** — RNA enters `predict` only as an aligned BAM — so it cannot deliver
+  W6.2's own goal. It has **no `annotate_results/*.annotations.txt`**: functional results move to
+  three-column TSVs under `annotate_misc/`, which breaks `annotate_stats.py` and the four coverage
+  columns. It has **no `--eggnog` / `--iprscan`**, so stages 07b and 07c would need reworking into
+  its `-a/--annotations` format. And it drops `update` entirely, so there is no UTR/model
+  correction step. Packaging is also not ready: Docker Hub carries no tag for the current release
+  and the BioContainers build is Python-only, without Augustus or GeneMark. Neither project states
+  that v1 is deprecated, and v1's master branch is still developed. **Revisit when** funannotate2
+  gains a transcript-assembly path or a documented equivalent of the wide annotations table, and a
+  released, predictor-complete image exists. Until then v1.8.17 stays pinned by digest.

@@ -509,6 +509,9 @@ the knobs you will touch most.
 | `--dorado_duplex` | `false` | Dorado duplex basecalling |
 | `--busco_lineage` | `auto` | `auto` (order-specific after ID) \| `fungi_odb10` \| `<lineage>` |
 | `--genome_id` | `false` | Stage 08 genome-level sourmash gather (slow emulated; ITS is primary) |
+| `--skip_rna_train` | `false` | ignore the samplesheet RNA columns and predict *ab initio* |
+| `--rna_stranded` | `no` | `funannotate train --stranded`: `no`, `RF`, `FR`, `F`, `R` |
+| `--rna_max_intronlen` | `3000` | `funannotate train --max_intronlen` |
 | `--funannotate_seed` | `anidulans` | fallback Augustus species when the species map has no entry and when the training helper cannot run |
 | `--run_interproscan` | `false` | Stage 07c InterProScan in its own image (heavy; needs `--interproscan_data`) |
 | `--interproscan_data` | `null` | InterProScan data directory. Defaults to `<data_dir>/interproscan/data`, the stable symlink `fetch_references.sh interproscan` writes, so only a non-standard location needs this |
@@ -690,6 +693,16 @@ stage-08 species call selects the Augustus pre-trained seed species and the funa
 from `fungiforge/resources/annotation_training.tsv` (`annotation_training.py` uses a mapped
 choice only when it is staged, else `anidulans` / `dikarya`). Emits `predict_results/` and the
 predicted proteins.
+
+When the samplesheet gives `rna_r1`/`rna_r2`, prediction runs `funannotate train` first
+(Trinity, PASA and HISAT2, all present in the image) into the same output directory, which
+`funannotate predict` then picks up automatically, followed by `funannotate update` for UTRs and
+transcript-corrected models. The updated models replace `predict_results`, so stages 07b, 07c and
+07 see transcript-informed proteins rather than stale ones. `predict.json` records `rna_trained`
+and `models_from`. Expect this to be slow: PASA's SQLite backend is single-threaded whatever
+`--cpus` says. The stage probes for Trinity and PASA rather than assuming them, and degrades to
+*ab initio* prediction with a recorded reason if either is missing, if the FASTQ files are empty,
+or if training produces no PASA GFF3.
 
 **07b eggNOG-mapper** (`eggnog-mapper` image, eggNOG 5.0.2 data from `fetch_references.sh
 eggnog`, fungal taxonomic scope) and **07c InterProScan** (`interpro/interproscan` image with the
