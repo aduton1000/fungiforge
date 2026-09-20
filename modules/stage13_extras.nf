@@ -20,7 +20,8 @@ process EXTRAS {
   ff_version signalp6 -- bash -c "signalp6 --version 2>&1 | head -1"
   ff_version java -- bash -c "java -version 2>&1 | head -1"
   ff_run extras -- extras.py --sample "${meta.id}" --proteins ${proteins} --gbk ${gbk} ${bam_arg} \\
-      --data-dir "${params.data_dir ?: ''}" --threads ${task.cpus} --workdir extras_work --out ${meta.id}.extras.json
+      --data-dir "${params.data_dir ?: ''}" --threads ${task.cpus} --workdir extras_work \
+      --ploidy-min-sites ${params.ploidy_min_sites} --out ${meta.id}.extras.json
   ff_finalize
   """
   stub:
