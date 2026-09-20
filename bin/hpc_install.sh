@@ -169,6 +169,16 @@ PY
   log "sanity: tools inside the images"
   run "$RT" exec "$FF_SIF" bash -c 'ps --version | head -1; fungiforge version; ITSx -h 2>&1 | head -1; sourmash --version; nQuire 2>&1 | head -1; bigscape --version; multiqc --version; purge_dups 2>&1 | head -1'
   run "$RT" exec "$AS_SIF" bash -c 'ps --version | head -1; antismash --version'
+  # Verify the SignalP image even when the build was skipped: an image that exists is not an image
+  # that works, and a broken one shows up only as "signalp6: command not found" in a stage JSON
+  # after the extras stage has already run.
+  if [ -n "${SP_SIF:-}" ] && [ -s "${SP_SIF:-}" ]; then
+    if "$RT" exec "$SP_SIF" bash -c 'command -v signalp6 >/dev/null' 2>/dev/null; then
+      run "$RT" exec "$SP_SIF" bash -c 'signalp6 --version 2>&1 | head -1 || echo "signalp6 present"'
+    else
+      warn "$SP_SIF has no signalp6 on PATH — rebuild it with --signalp <tgz> --rebuild-images"
+    fi
+  fi
   log "pre-pull public images into the shared cache (funannotate ≈15 GB — be patient)"
   export FUNGIFORGE_DB="$DB" NXF_APPTAINER_CACHEDIR="$PREFIX/images/cache" NXF_SINGULARITY_CACHEDIR="$PREFIX/images/cache"
   if [ "$DRY" = 0 ]; then
