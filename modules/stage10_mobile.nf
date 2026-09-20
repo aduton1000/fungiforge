@@ -32,14 +32,17 @@ process MOBILE {
   # RVDB-prot mycovirus / EVE screen
   MYCO=""
   # RVDB-prot ships as .xz, but a release fetched from a mirror (or an older fetch step) can land
-  # as .gz or plain. Accepting only .xz made the stage report the database as "not staged" while
-  # a perfectly good rvdb.fasta.gz sat beside it and the manifest said present.
+  # as .gz or plain, and the name need not match the content. Accepting only .xz made the stage
+  # report the database as "not staged" while a usable rvdb.fasta.gz sat beside it.
   RVDB=""
   for _f in "${data}/rvdb/rvdb.fasta.xz" "${data}/rvdb/rvdb.fasta.gz" "${data}/rvdb/rvdb.fasta"; do
     if [ -s "\$_f" ]; then RVDB="\$_f"; break; fi
   done
   if [ -n "\$RVDB" ]; then
-    ff_run rvdb_makedb --optional -- bash -o pipefail -c "case '\$RVDB' in *.xz) xz -dc '\$RVDB';; *.gz) gzip -dc '\$RVDB';; *) cat '\$RVDB';; esac | diamond makedb --db rvdb --quiet --in -"
+    # smart_cat.sh picks the decompressor by magic bytes: the staged RVDB release was named
+    # rvdb.fasta.gz but carries an xz stream (its URL is .xz), and deciding by extension made
+    # `gzip -dc` fail with "not in gzip format" — the stage went partial and n_mycovirus stayed NA.
+    ff_run rvdb_makedb --optional -- bash -o pipefail -c "smart_cat.sh '\$RVDB' | diamond makedb --db rvdb --quiet --in -"
     if [ "\$FF_RC" -eq 0 ]; then
       ff_run rvdb_blastx --optional -- bash -c "diamond blastx -q all_contigs.fa -d rvdb -o rvdb_hits.tsv -p ${task.cpus} -e ${params.rvdb_evalue} -k 5 --quiet ${params.rvdb_sensitivity} --outfmt 6 qseqid sseqid pident length qstart qend sstart send evalue bitscore stitle"
       if [ "\$FF_RC" -eq 0 ]; then
