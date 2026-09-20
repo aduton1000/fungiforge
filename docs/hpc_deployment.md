@@ -132,6 +132,22 @@ the site environment, set `FUNGIFORGE_HOME` to the checkout or the helper subcom
 
 ## 3. Run (any user)
 
+Source the site environment once and the launchers are on `PATH`, so runs are typed without paths:
+
+```bash
+echo '[ -r <install_root>/fungiforge-env.sh ] && source <install_root>/fungiforge-env.sh' >> ~/.bashrc
+# then, from any writable directory:
+fungiforge-run --samplesheet samples.csv --outdir results -resume
+```
+
+`fungiforge-env.sh` also carries the site facts that would otherwise be retyped every run:
+`FUNGIFORGE_DB`, the SLURM partition and account, and `FUNGIFORGE_GENEMARK_DIR` /
+`FUNGIFORGE_GENEMARK_KEY`, which `fungiforge-run` passes as `--genemark_dir` / `--genemark_key`
+unless the command line gives its own. GeneMark has to travel as CLI parameters rather than
+`site.config` values, because the engine profiles read them at config-parse time to build the
+container binds, before a `-c` file is merged.
+
+
 ```bash
 mkdir -p ~/runs/batch1 && cd ~/runs/batch1               # run state lives in CWD
 fungiforge samplesheet --ont 'reads/*.fastq.gz' --compartment AIR --facility SITE_A --season WET -o samples.csv

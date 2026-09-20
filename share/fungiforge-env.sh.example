@@ -19,8 +19,11 @@ export FUNGIFORGE_ROOT="/hpc/opt/fungiforge"                          # [EDIT] i
 export FUNGIFORGE_HOME="$FUNGIFORGE_ROOT/repo"                        # repo checkout
 export FUNGIFORGE_DB="/hpc/data/fungiforge"                           # [EDIT] reference DBs (150–250 GB)
 
-# Per-user run scratch. This site has no separate /scratch; home is large ZFS.
-export FUNGIFORGE_WORK="${FUNGIFORGE_WORK:-$HOME/fungiforge_work}"
+# Per-user run scratch. Left UNSET on purpose: fungiforge-run then uses `work/` inside the
+# directory you launch from, so each project keeps its own cache and `-resume` works per project.
+# One shared work dir across projects mixes runs and quietly invalidates resumes when you switch.
+# Set it only to move scratch off the launch directory, and then set it per project, not globally.
+# export FUNGIFORGE_WORK="$HOME/fungiforge_work"
 
 # Container engine + SLURM routing. Empty partition = cluster default (sinfo shows it with *).
 export FUNGIFORGE_ENGINE="apptainer"                                  # apptainer | singularity
@@ -30,6 +33,11 @@ export FUNGIFORGE_ACCOUNT=""                                          # e.g. "pi
 # Site nextflow overrides (resource caps, .sif paths) and the shared image cache.
 export FUNGIFORGE_SITE_CONFIG="$FUNGIFORGE_ROOT/site.config"
 export FUNGIFORGE_IMAGE_CACHE="$FUNGIFORGE_ROOT/images/cache"
+
+# Licensed GeneMark-ES (Appendix A of the upgrade plan): staged by hand, fixed per cluster.
+# fungiforge-run passes these as --genemark_dir / --genemark_key unless the command line does.
+export FUNGIFORGE_GENEMARK_DIR=""                                     # [EDIT] e.g. /hpc/opt/licensed/genemark/gmes_linux_64_4
+export FUNGIFORGE_GENEMARK_KEY=""                                     # [EDIT] e.g. /hpc/opt/licensed/genemark/gm_key
 
 # Extra host roots to bind into task containers (DB + work dir are always bound).
 export FUNGIFORGE_BIND="/hpc"                                         # [EDIT or leave empty]
