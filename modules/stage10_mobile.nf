@@ -31,8 +31,15 @@ process MOBILE {
   fi
   # RVDB-prot mycovirus / EVE screen
   MYCO=""
-  if [ -s "${data}/rvdb/rvdb.fasta.xz" ] || [ -s "${data}/rvdb/rvdb.fasta" ]; then
-    ff_run rvdb_makedb --optional -- bash -o pipefail -c "if [ -s '${data}/rvdb/rvdb.fasta.xz' ]; then xz -dc '${data}/rvdb/rvdb.fasta.xz'; else cat '${data}/rvdb/rvdb.fasta'; fi | diamond makedb --db rvdb --quiet --in -"
+  # RVDB-prot ships as .xz, but a release fetched from a mirror (or an older fetch step) can land
+  # as .gz or plain. Accepting only .xz made the stage report the database as "not staged" while
+  # a perfectly good rvdb.fasta.gz sat beside it and the manifest said present.
+  RVDB=""
+  for _f in "${data}/rvdb/rvdb.fasta.xz" "${data}/rvdb/rvdb.fasta.gz" "${data}/rvdb/rvdb.fasta"; do
+    if [ -s "\$_f" ]; then RVDB="\$_f"; break; fi
+  done
+  if [ -n "\$RVDB" ]; then
+    ff_run rvdb_makedb --optional -- bash -o pipefail -c "case '\$RVDB' in *.xz) xz -dc '\$RVDB';; *.gz) gzip -dc '\$RVDB';; *) cat '\$RVDB';; esac | diamond makedb --db rvdb --quiet --in -"
     if [ "\$FF_RC" -eq 0 ]; then
       ff_run rvdb_blastx --optional -- bash -c "diamond blastx -q all_contigs.fa -d rvdb -o rvdb_hits.tsv -p ${task.cpus} -e ${params.rvdb_evalue} -k 5 --quiet ${params.rvdb_sensitivity} --outfmt 6 qseqid sseqid pident length qstart qend sstart send evalue bitscore stitle"
       if [ "\$FF_RC" -eq 0 ]; then
@@ -42,7 +49,7 @@ process MOBILE {
       fi
     fi
   else
-    ff_skip rvdb "RVDB-prot not staged under --data_dir/rvdb (bin/fetch_references.sh rvdb)"
+    ff_skip rvdb "RVDB-prot not staged: no rvdb.fasta{,.xz,.gz} under ${data}/rvdb (bin/fetch_references.sh rvdb)"
   fi
   # mitochondrial homing-endonuclease ORFs
   PFAM="${params.funannotate_db ?: data + '/funannotate'}/Pfam-A.hmm"
