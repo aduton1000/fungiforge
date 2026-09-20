@@ -40,6 +40,14 @@ Legend: `todo` · `in progress` · `built` (code + tests) · `validated` (real-d
 | W4.1 | Engineering hygiene and documentation pass | built | develop: `65a4efe` | 245 unit tests (samplesheet validation: ids, pairing, missing/empty files, metadata typos, header problems, path resolution, CLI and strict mode), nf-test (purge stage stub, DAG 68), duplicate-id rejection verified on a real stub run; CHANGELOG, CITATION 0.2.0, manual sweep |
 | W4.2 | Database fetch, installer and site config updates for new resources | built | develop: `37ebb4a` | the fetch steps landed with their items (markers, mlst, dbcan, phibase, effectorp, genomad, genomes, interproscan, multi-lineage busco, direct eggNOG); container-driven downloads now run under Apptainer/Singularity or Docker (L24), verified to degrade cleanly with no runtime; installer stages the SignalP image and pre-pulls the two new public images; deployment guide rewritten with the database table and the licensed resources |
 | W5.1 | Cluster upgrade to v0.2.0 and re-validation | todo | | |
+| W6.1 | Scheduled real-data regression on the cluster | todo | | v0.3 candidate |
+| W6.2 | RNA-seq evidence path; funannotate 2 decision | todo | | v0.3 candidate |
+| W6.3 | Resistance mechanisms beyond substitutions | todo | | v0.3 candidate |
+| W6.4 | Chromosome-scale assessment: scaffolding, telomeres | todo | | v0.3 candidate |
+| W6.5 | Typing resolution beyond seven loci | todo | | v0.3 candidate (size first) |
+| W6.6 | RNA mycovirus detection | todo | | v0.3 candidate (needs W6.2) |
+| W6.7 | External validation and publication | todo | | v0.3 candidate |
+| W6.8 | Small specified items (report, InterProScan default, lock push) | todo | | v0.3 candidate |
 
 ## Limitations captured (inventory)
 
@@ -187,6 +195,92 @@ Fetch script gains geNomad, reference genome set, marker-locus references, Inter
 #### W5.1 Cluster upgrade and re-validation
 After production runs complete: merge `develop` → `main`, tag `v0.2.0`, `hpc_install.sh --ref v0.2.0 --rebuild-images`, rerun CEA10, DF-005 and all controls, run `validate_run.py`, update the deployment document and `docs/validation.md`.
 
+### Phase 6 — v0.3 candidates (gaps identified by the 2026-09-20 assessment)
+
+Recorded, not started. Each is sized against what the v0.2 evidence actually shows; the ordering
+is by demonstrated value, not by interest. Nothing here blocks the v0.2 release.
+
+#### W6.1 Scheduled real-data regression *(highest value; process, not features)*
+**Evidence.** Ten result-affecting defects were found between 18 and 20 September by one person
+watching a six-hour run; six were silent (the run reported success while producing wrong or missing
+results). Unit tests and stub runs structurally cannot catch them: a stub never executes a task
+script, and a hosted runner cannot stage a 22 GB database. **Goal.** Catch this class within a week
+of a commit instead of at the next manual validation. **Design.** A downsampled CEA10 (≈ 20× ONT +
+10× Illumina, whole pipeline, ~1 h) run weekly on the cluster against `develop` from a cron or
+SLURM timer, ending in `validate_run.py --expected test/expected/AfumCEA10.subsampled.json` and a
+one-line pass/fail appended to a log the next session reads; a non-zero exit posts the failing
+stage JSON. Requires a new expected file with tolerances widened for the lower depth.
+**Validation.** Replay the four most recent silent defects against it (mitogenome purged, `CDS`-only
+annotation filter, RVDB extension, nQuire on a haploid) and confirm each fails the check.
+
+#### W6.2 RNA-seq evidence path, and the funannotate 2 decision
+**Evidence.** `L25` recorded the missing RNA-seq path. The comparison confirms every serious fungal
+annotator uses transcript evidence (FunGAP requires it; funannotate supports `train`/`update`), and
+that funannotate's v1 line has had no release since 2024-03-01 while `funannotate2` has released
+through 2026. **Goal.** Gene models from evidence, not `ab initio` alone, and a decision on the
+upstream line. **Design.** Optional `rna_r1`/`rna_r2` samplesheet columns; when present, stage 07a
+runs `funannotate train` (HISAT2/Trinity/PASA inside the existing image) and `funannotate update`
+after annotate. Evaluate `funannotate2` on CEA10 in parallel before committing to it — the v1 image
+stays pinned by digest either way. **Validation.** CEA10 and DF-005 gene counts, BUSCO protein
+completeness and UTR coverage with and without RNA-seq; a published *A. fumigatus* RNA-seq accession
+as the test input.
+
+#### W6.3 Resistance mechanisms beyond substitutions
+**Evidence.** FungAMR carries 35,792 entries including deletions, aneuploidy, overexpression and
+gene disruption; `fungamr_panel.py` derives 5,347 substitution entries from it. ChroQueTas, the
+reference FungAMR implementation, covers 8,285 substitutions and explicitly excludes CNV,
+aneuploidy, overexpression and disruption. **Goal.** Report the mechanisms the catalogue encodes
+that substitutions cannot express. **Design.** Aneuploidy from the per-contig depth already computed
+in stage 09 plus the nQuire result (whole-chromosome depth ratio against the genome median);
+gene amplification from the existing `copy_number` ratio, promoted from a flag to a reported call;
+gene disruption from premature stops and frameshifts already visible in the GenBank. Overexpression
+needs transcript evidence and therefore waits on W6.2. **Validation.** A known *C. albicans*
+aneuploid and a known *C. glabrata* amplification from public data; CEA10 and DF-005 stay negative.
+
+#### W6.4 Chromosome-scale assessment: scaffolding and telomeres
+**Evidence.** The other half of `L25`. CEA10 now assembles to 29 contigs at N50 2.47 Mb, close
+enough to chromosome scale that contig count alone understates it. **Goal.** A completeness
+statement rather than a contig count. **Design.** Telomere-motif counting at contig ends
+(`TTAGGG`-class repeats, species-configurable) in stage 05, and optional reference-guided
+scaffolding (RagTag) against the staged reference genome set behind `--scaffold true`, never
+overwriting the primary assembly. New master columns `n_telomeres`, `n_t2t_contigs`.
+**Validation.** CEA10 against the Af293 chromosome assembly; the scaffolded result must not change
+BUSCO completeness or gene counts.
+
+#### W6.5 Typing resolution beyond seven loci
+**Evidence.** MLST gives `afumigatus ST5` for CEA10, which is correct and coarse for outbreak work.
+Core-SNP clonality is already implemented within an ANI cluster (W3.1), so the gap is narrower than
+it looks. **Goal.** Discriminate isolates that share an ST. **Design.** Size it before building:
+compare the existing assembly-based core-SNP distances against a cgMLST scheme on the production
+batch, and only add a scheme if the SNP distances prove insufficient. If they do, a cgMLST allele
+caller against a published *A. fumigatus* scheme, reported as `cgmlst_profile` and used to refine
+`clonal_group`. **Validation.** Isolates known to share ST5 must separate on core SNPs or cgMLST.
+
+#### W6.6 RNA mycovirus detection
+**Evidence.** The screen is DNA-based and documented as such; RNA mycoviruses appear only as
+endogenous viral elements. The field's own tooling (DiscMycoVir, 2025) is transcriptome-only.
+**Goal.** Detect RNA mycoviruses where transcript data exist. **Design.** Reuse the RNA-seq input of
+W6.2: assemble unmapped reads, screen the contigs against RVDB-prot with the existing classifier.
+Strictly dependent on W6.2 and pointless without it. **Validation.** A published mycovirus-positive
+*A. fumigatus* transcriptome.
+
+#### W6.7 External validation and publication
+**Evidence.** Every comparator with users outside its own group has a paper; FungiForge has neither.
+The 2026-09-20 assessment found no published pipeline combining assembly, polishing, multi-locus
+identification, MLST, resistance genotyping, gene clusters, mycovirus screening, cohort phylogeny
+and a schema-validated master table. **Goal.** External scrutiny, which so far has been supplied
+entirely by running the pipeline on real data. **Design.** A methods description with the v0.2
+validation record, the limitation inventory as an honest limitations section, and the master-table
+schema as the contribution most reusable by others. **Validation.** A second site reproduces the
+CEA10 expected-results file from the deployment guide alone.
+
+#### W6.8 Small, cheap, already specified
+- Surface the cohort tree's four-isolate minimum in the report, not only in a JSON field.
+- Default `--interproscan_apps` to `Pfam,PANTHER,SUPERFAMILY`; the full seventeen member databases
+  dominate runtime for most users and the rest rarely change a conclusion.
+- Push the regenerated `env/base.linux-64.lock` from the cluster: the reproducibility artefact W0.2
+  exists to provide is currently one commit behind the images it describes.
+
 ## Appendix A — Licensed software
 
 **GeneMark-ES/ET/EP+** (Georgia Tech). Free for academic use. Request at `http://exon.gatech.edu/GeneMark/license_download.cgi`: choose "GeneMark-ES/ET/EP+" for LINUX 64, fill in name, institution and email, accept the licence; download `gm_key_64.gz`, then `gunzip gm_key_64.gz && cp gm_key_64 ~/.gm_key` on the machine that runs annotation, or point `--genemark_key` at it. Keys expire roughly yearly; renew the same way. **The GeneMark binaries are not in the funannotate image** (checked 2026-09-17): download `gmes_linux_64_4.tar.gz` from the same page, unpack it somewhere the containers can see (on the cluster, under `/hpc/opt/licensed/genemark/`), and pass `--genemark_dir <unpacked dir> --genemark_key <gm_key>`; the profiles bind the directory into the container and stage 07a exports `GENEMARK_PATH`. Its Perl prerequisites (YAML, Hash::Merge, Logger::Simple, Parallel::ForkManager, MCE) are present in the image.
@@ -195,6 +289,7 @@ After production runs complete: merge `develop` → `main`, tag `v0.2.0`, `hpc_i
 
 ## Change log of this document
 
+- 2026-09-20 — assessment of where v0.2 stands, recorded as Phase 6. Thirty of the thirty-one catalogued limitations are closed; `L25` was out of scope from the start. A verified survey of the published landscape found no pipeline combining assembly, polishing, multi-locus identification, MLST, resistance genotyping, gene clusters, mycovirus screening, cohort phylogeny and a schema-validated master table; the closest, rMAP-Candida and FunFlux (both 2026), each cover about half, and no tool found does TR34/TR46 promoter detection from whole-genome data. Eight v0.3 candidates added (W6.1–W6.8), led by a scheduled downsampled real-data run: ten result-affecting defects in three days, six of them silent, were all found by a person watching a six-hour run, which is the one class of failure unit tests and stub runs cannot reach.
 - 2026-09-20 — every mitochondrial column on the CEA10 run was NA, and the cause was the W4.1 purge_dups fix. purge_dups scores contigs by read depth against the nuclear peak; a mitogenome sits far above it and is dropped as collapsed duplication. It removed nine of the ten organelle-shaped contigs, including the 30,662 bp / 25.5 % GC mitogenome, so stage 04 had nothing to separate and stage 04b, the HEG scan and five master columns were all empty. This was invisible before because purge_dups exited 127 and purged nothing (L30). New `bin/protect_organelle.py` reclassifies the PRE-purge assembly with the same tblastn core-gene evidence stage 04 uses and restores only contigs that meet it; stage 02c runs it after get_seqs and records `n_organelle_restored`. Six unit tests cover restoration, the `_1` rename get_seqs applies, a haplotig without core genes, a single-gene hit, and a long high-GC NUMT that must not drag a chromosome back. Separately, the mycovirus screen was skipped because the stage accepted only `rvdb.fasta.xz` while the staged file was `rvdb.fasta.gz`; all three forms are now accepted and the fetch step keeps the release's own compression in the name.
 - 2026-09-20 — CEA10's master row reported `ploidy 4` for a haploid organism. nQuire had 2,491 biallelic sites over 30 Mb (about one per 12 kb) and returned its best fit, tetraploid, while the k-mer profile of stage 01b said haploid. The guard existed but sat at 1,000 sites. Density now decides: below `--ploidy_min_sites` (10,000 by default, configurable) the call is reported haploid/homozygous at low confidence with nQuire's own best fit kept in the JSON, and `ploidy_confidence` records which applies. Also confirmed from the run: `n_secreted` and `n_effectors` are NA because the SignalP 6 site image was never built (`signalp6: command not found`), which needs `hpc_install.sh --signalp <tgz> --rebuild-images` on the dev deployment.
 - 2026-09-19 — root cause of the NA annotation-coverage columns: `annotate_stats.py` kept only rows whose `Feature` column reads `CDS`, but funannotate 1.8.17 writes `mRNA` (the table is per transcript). Every row of the real 9,844-gene table was discarded, `n_annotated` was 0, and pct_pfam / pct_go / pct_eggnog / pct_interpro all came out NA even though eggNOG and InterProScan had run. The filter now excludes the non-coding types instead of whitelisting one label. The unit fixture had hard-coded `Feature: CDS`, which is why the tests passed while real data failed; it now writes `mRNA` and the label handling is tested in both directions. Also confirmed from the run: the master table is exactly 61 fields on header and row, so there was no ragged-row defect.
