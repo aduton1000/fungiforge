@@ -22,6 +22,8 @@
 #   FUNGIFORGE_IMAGE_CACHE  shared .sif cache (NXF_APPTAINER_CACHEDIR / NXF_SINGULARITY_CACHEDIR)
 #   FUNGIFORGE_BIND         extra host paths to bind into task containers (comma-separated)
 #   FUNGIFORGE_RUNDIR       where run state (.nextflow/, log, work/) goes (default: $PWD)
+#   FUNGIFORGE_GENEMARK_DIR unpacked GeneMark-ES directory  -> --genemark_dir (site fact, not per-run)
+#   FUNGIFORGE_GENEMARK_KEY GeneMark licence key            -> --genemark_key
 set -euo pipefail
 
 _self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -53,6 +55,8 @@ fungiforge-run — shared HPC launcher (forwards to: nextflow run \$FUNGIFORGE_H
   FUNGIFORGE_SITE_CONFIG = ${FUNGIFORGE_SITE_CONFIG:-<none>}
   FUNGIFORGE_IMAGE_CACHE = ${FUNGIFORGE_IMAGE_CACHE:-<nextflow default>}
   FUNGIFORGE_BIND        = ${FUNGIFORGE_BIND:-<none>}
+  FUNGIFORGE_GENEMARK_DIR= ${FUNGIFORGE_GENEMARK_DIR:-<none>}
+  FUNGIFORGE_GENEMARK_KEY= ${FUNGIFORGE_GENEMARK_KEY:-<none>}
 
 usage: fungiforge-run --samplesheet samples.csv [--outdir results] [-resume] [nextflow args]
 Run from a WRITABLE directory (run state goes there). Pass -profile to override the
@@ -88,10 +92,13 @@ export SINGULARITY_BIND="${SINGULARITY_BIND:+$SINGULARITY_BIND,}$_bind"
 # --- assemble the command ----------------------------------------------------
 pre=(); post=()
 _have_profile=0; _have_log=0; _have_work=0
+_have_gm=0; _have_gmkey=0
 for _a in "$@"; do case "$_a" in
   -profile|-profile=*)              _have_profile=1 ;;
   -log|-log=*)                      _have_log=1 ;;
   -w|-work-dir|-work-dir=*)         _have_work=1 ;;
+  --genemark_dir|--genemark_dir=*)  _have_gm=1 ;;
+  --genemark_key|--genemark_key=*)  _have_gmkey=1 ;;
 esac; done
 [[ $_have_log  -eq 0 ]] && pre+=("-log" "${RUNDIR}/.nextflow.log")
 [[ $_have_profile -eq 0 ]] && post+=("-profile" "$PROFILE")
@@ -100,6 +107,12 @@ esac; done
 post+=("--data_dir" "$FUNGIFORGE_DB")
 [[ -n "${FUNGIFORGE_PARTITION:-}" ]] && post+=("--slurm_partition" "$FUNGIFORGE_PARTITION")
 [[ -n "${FUNGIFORGE_ACCOUNT:-}"   ]] && post+=("--slurm_account"   "$FUNGIFORGE_ACCOUNT")
+# Licensed GeneMark lives at a fixed place on a given cluster: a site fact, not a per-run choice.
+# They must be CLI params, not site.config: conf/base.config and the engine profiles read
+# params.genemark_* at config-parse time, before a -c file is merged, so the container bind for
+# the key and the binaries would never be added. An explicit flag on the command line still wins.
+[[ $_have_gm    -eq 0 && -n "${FUNGIFORGE_GENEMARK_DIR:-}" ]] && post+=("--genemark_dir" "$FUNGIFORGE_GENEMARK_DIR")
+[[ $_have_gmkey -eq 0 && -n "${FUNGIFORGE_GENEMARK_KEY:-}" ]] && post+=("--genemark_key" "$FUNGIFORGE_GENEMARK_KEY")
 
 NF="${FUNGIFORGE_NEXTFLOW:-nextflow}"
 echo "[fungiforge-run] $NF ${pre[*]} run $FUNGIFORGE_HOME/main.nf ${post[*]} $*" >&2
