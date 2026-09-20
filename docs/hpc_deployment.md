@@ -140,6 +140,14 @@ echo '[ -r <install_root>/fungiforge-env.sh ] && source <install_root>/fungiforg
 fungiforge-run --samplesheet samples.csv --outdir results -resume
 ```
 
+If a site runs two installs (a production one hooked in through `/etc/profile.d` and a development
+one sourced from `~/.bashrc`), sourcing order decides which launchers are on `PATH`, and that order
+differs between login and interactive shells. The env file therefore removes any other fungiforge
+install's launchers before prepending its own, and clears `FUNGIFORGE_WORK` so a global scratch
+path cannot leak across: whichever env file is sourced last wins outright. Check with
+`which -a fungiforge-run`, and note that `fungiforge-run` always echoes the pipeline, config and
+work directory it resolved before doing any work.
+
 `fungiforge-env.sh` also carries the site facts that would otherwise be retyped every run:
 `FUNGIFORGE_DB`, the SLURM partition and account, and `FUNGIFORGE_GENEMARK_DIR` /
 `FUNGIFORGE_GENEMARK_KEY`, which `fungiforge-run` passes as `--genemark_dir` / `--genemark_key`
