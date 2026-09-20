@@ -108,9 +108,12 @@ def parse_row(row) {
     error "Sample '${row.sample}': needs ont_fastq OR both illumina_r1+illumina_r2 (got ont='${row.ont_fastq}', r1='${row.illumina_r1}', r2='${row.illumina_r2}')."
   if ((has_rna1 as boolean) != (has_rna2 as boolean))
     error "Sample '${row.sample}': RNA-seq must be PAIRED — provide both rna_r1 and rna_r2 (got rna_r1='${row.rna_r1}', rna_r2='${row.rna_r2}')."
+  // meta deliberately carries NO RNA flag. Every task's cache key includes meta, so one extra
+  // key silently invalidates every cached task of every existing run — it cost a validated CEA10
+  // run its whole cache. Stage 07a decides from the staged files instead: the NO_RNA sentinels
+  // are empty, so `[ -s <file> ]` is the same question without touching the key.
   def meta = [ id           : row.sample,
                assembly_mode: (has_ont ? 'longread' : 'shortread'),
-               has_rna      : ((has_rna1 && has_rna2) as boolean),
                compartment  : (row.compartment ?: 'NA'),
                facility     : (row.facility ?: 'NA'),
                season       : (row.season ?: 'NA') ]
