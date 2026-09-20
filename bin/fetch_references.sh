@@ -375,8 +375,15 @@ step_rvdb(){
   # https://rvdb-prot.pasteur.fr/ for newer versions.
   local RVDB_URL="${RVDB_URL:-https://rvdb-prot.pasteur.fr/files/U-RVDBv31.0-prot_unique.fasta.xz}"
   if [ -z "$RVDB_URL" ]; then fail rvdb "RVDB_URL not set — resolve current RVDB-prot release"; return; fi
-  ( cd "$DB/rvdb" && dl "$RVDB_URL" rvdb.fasta.xz ) >>"$LOGDIR/rvdb.log" 2>&1 \
-    && mark rvdb "$RVDB_URL" || fail rvdb "$RVDB_URL"
+  # Keep the release's own compression in the name: stage 10 accepts .xz, .gz or plain, and
+  # renaming a gzip stream to .xz would make it undecompressable.
+  local out="rvdb.fasta.xz"
+  case "$RVDB_URL" in *.gz) out="rvdb.fasta.gz";; *.fasta) out="rvdb.fasta";; esac
+  if [ -s "$DB/rvdb/rvdb.fasta.xz" ] || [ -s "$DB/rvdb/rvdb.fasta.gz" ] || [ -s "$DB/rvdb/rvdb.fasta" ]; then
+    log "have an RVDB-prot FASTA already — skip"; mark rvdb "$RVDB_URL"; return
+  fi
+  ( cd "$DB/rvdb" && dl "$RVDB_URL" "$out" ) >>"$LOGDIR/rvdb.log" 2>&1 \
+    && mark rvdb "$RVDB_URL -> $out" || fail rvdb "$RVDB_URL"
 }
 
 # ---- reference genomes for the assembly benchmarks (W1.1; small) -------------
