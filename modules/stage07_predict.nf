@@ -5,11 +5,16 @@
 // (fungiforge/resources/annotation_training.tsv; bin/annotation_training.py falls back to
 // anidulans / dikarya when a mapped choice is not staged). Emits predict_results/ for stage 07
 // (funannotate annotate) and the predicted proteins for the eggNOG / InterProScan stages.
+// W6.2: when the samplesheet carries paired RNA-seq, `funannotate train` runs first (Trinity +
+// PASA + HISAT2, all present in the image) into the SAME -o directory, which `predict` then picks
+// up automatically, and `funannotate update` adds UTRs and corrects models against the
+// transcripts. The updated models replace predict_results, so the eggNOG and InterProScan stages
+// and every downstream consumer see the transcript-informed proteins rather than stale ones.
 process PREDICT {
   tag { meta.id }
   label 'annotate'
   publishDir { "${params.outdir}/${meta.id}/07_annotate" }, mode: 'copy', pattern: "*.json"
-  input:  tuple val(meta), path(masked), path(species)
+  input:  tuple val(meta), path(masked), path(species), path(rna1), path(rna2)
   output: tuple val(meta), path("predict_results"),                 emit: results
           tuple val(meta), path("${meta.id}.predicted.proteins.faa"), emit: proteins
           tuple val(meta), path("${meta.id}.predict.json"),         emit: json
@@ -77,6 +82,33 @@ process PREDICT {
   # a description-stripping sed is the fallback.
   ff_run funannotate_sort --optional -- bash -c "funannotate sort -i ${masked} -o clean.fasta -b contig --minlen ${params.min_contig_len} 2>sort.log"
   if [ "\$FF_RC" -ne 0 ]; then sed '/^>/ s/[[:space:]].*//' ${masked} > clean.fasta; fi
+  # RNA-seq evidence (W6.2). `train` writes fun/training/, which `predict` consumes automatically
+  # when given the same -o directory; funannotate_train.pasa.gff3 is the file predict looks for, so
+  # it is also the honest test of whether training actually produced anything usable.
+  # Trinity and PASA ship in the funannotate image, but the stage probes for them rather than
+  # assuming: the image is pinned by digest and a future rebuild could move or drop them, and a
+  # missing tool must degrade to ab-initio prediction with a recorded reason, not fail an isolate.
+  TRAINED=no
+  if [ "${params.skip_rna_train}" = "true" ]; then
+    ff_skip funannotate_train "disabled (--skip_rna_train true)"
+  elif [ "${meta.has_rna ? 'yes' : 'no'}" != "yes" ]; then
+    : # no RNA-seq for this isolate; ab-initio prediction, nothing to record
+  elif [ ! -s ${rna1} ] || [ ! -s ${rna2} ]; then
+    ff_skip funannotate_train "rna_r1/rna_r2 are empty; ab-initio prediction"
+  elif ! command -v Trinity >/dev/null 2>&1 || [ -z "\${PASAHOME:-}" ]; then
+    ff_skip funannotate_train "Trinity or PASA missing from this image (PASAHOME='\${PASAHOME:-}'); ab-initio prediction"
+  else
+    # PASA's SQLite backend is single-threaded whatever --cpus says, so this step is long.
+    ff_run funannotate_train --optional -- funannotate train -i clean.fasta -o fun \\
+        -l ${rna1} -r ${rna2} --species "${meta.id}" --cpus ${task.cpus} \\
+        --memory ${task.memory.toGiga()}G --pasa_db sqlite --stranded ${params.rna_stranded} \\
+        --max_intronlen ${params.rna_max_intronlen} --no-progress
+    if [ "\$FF_RC" -eq 0 ] && [ -f fun/training/funannotate_train.pasa.gff3 ]; then
+      TRAINED=yes
+    else
+      ff_skip funannotate_train "training produced no fun/training/funannotate_train.pasa.gff3; ab-initio prediction"
+    fi
+  fi
   # One definition, used for the GeneMark attempt and for the fallback below.
   run_predict(){ funannotate predict -i clean.fasta -o fun -s "${meta.id}" \\
       --cpus ${task.cpus} --busco_db "\$BUSCO_DB" --busco_seed_species "\$AUGUSTUS_SPECIES" ${params.predict_extra ?: ''}; }
@@ -93,7 +125,20 @@ process PREDICT {
   else
     ff_run funannotate_predict -- run_predict
   fi
-  cp -r fun/predict_results predict_results
+  # UTRs and model correction from the transcripts. funannotate update reuses the train and
+  # predict output in the same folder, so it needs no read arguments. Its results replace
+  # predict_results, which is what stages 07b/07c and 07 consume, so nothing downstream sees
+  # models that the transcripts have already corrected.
+  RESULTS=fun/predict_results
+  if [ "\$TRAINED" = yes ]; then
+    ff_run funannotate_update --optional -- funannotate update -i fun --cpus ${task.cpus} --species "${meta.id}"
+    if [ "\$FF_RC" -eq 0 ] && ls fun/update_results/*.proteins.fa >/dev/null 2>&1; then
+      RESULTS=fun/update_results
+    else
+      ff_skip funannotate_update "update produced no proteins; keeping the predicted models"
+    fi
+  fi
+  cp -r "\$RESULTS" predict_results
   cp predict_results/*.proteins.fa ${meta.id}.predicted.proteins.faa
   NPROT=\$(grep -c '^>' ${meta.id}.predicted.proteins.faa || true)
   ff_run protein_count -- test "\${NPROT:-0}" -ge 1
@@ -104,6 +149,7 @@ process PREDICT {
       "augustus_species": "${params.funannotate_seed}", "busco_db": "${params.funannotate_busco}",
       "basis": "default (training helper did not run)", "notes": []}
   json.dump({"sample": "${meta.id}", "stage": "predict", "n_proteins": int("\${NPROT:-0}"), "genemark": "\$GENEMARK",
+             "rna_trained": "\$TRAINED", "models_from": os.path.basename("\$RESULTS"),
              "augustus_species": t["augustus_species"], "busco_db": t["busco_db"], "training_basis": t["basis"], "training_notes": t["notes"]},
             open("${meta.id}.predict.json", "w"), indent=2)
   PY

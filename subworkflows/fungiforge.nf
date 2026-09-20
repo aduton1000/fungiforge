@@ -41,6 +41,9 @@ workflow FUNGIFORGE {
     //     waits for it, so a missing database fails the run in seconds, not hours.
     DB_CHECK()
     reads0 = samples.combine(DB_CHECK.out.manifest).map { meta, f, _manifest -> tuple(meta, f.ont, f.r1, f.r2) }
+    // W6.2: the RNA-seq pair travels separately to stage 07a. It is not read before prediction,
+    // so it stays out of the read channel that the QC, assembly and polishing stages consume.
+    rna_ch = samples.map { meta, f -> tuple(meta, f.rna1, f.rna2) }
 
     // 0. optional Dorado basecalling (ont column = pod5 dir when --basecall).
     //    Only long-read isolates carry ONT/pod5; short-read-only rows pass through.
@@ -135,7 +138,7 @@ workflow FUNGIFORGE {
     IDENTIFY(nuclear_ok)
 
     // 7a. gene prediction (Funannotate predict; GeneMark-ES when licensed; species-aware training)
-    PREDICT(REPEATMASK.out.masked.join(IDENTIFY.out.species))
+    PREDICT(REPEATMASK.out.masked.join(IDENTIFY.out.species).join(rna_ch))
 
     // 7b/7c. eggNOG-mapper and InterProScan on the predicted proteins (separate images);
     //        off switches hand ANNOTATE an empty placeholder so funannotate runs without them.
