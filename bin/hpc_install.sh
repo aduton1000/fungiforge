@@ -243,9 +243,20 @@ if [ "$DRY" = 0 ]; then
       fi
     done
   fi
-  if [ -n "${SP_SIF:-}" ] && [ -s "${SP_SIF:-}" ] && ! grep -q "fungiforge-signalp6" "$PREFIX/site.config"; then
-    printf '\n// W2.6: the site-built SignalP 6 image (licensed package) runs the extras stage\nprocess { withLabel: extras { container = %s } }\n' "'$SP_SIF'" >> "$PREFIX/site.config"
-    echo "  site.config: extras label -> $SP_SIF"
+  # withName, not withLabel. The base-image override is a withLabel selector that also matches
+  # `extras`, and two label selectors on one process are ambiguous: the base image won, so the
+  # extras stage ran without SignalP and reported "signalp6: command not found" while a perfectly
+  # good SignalP image sat unused. withName takes documented priority over withLabel whatever the
+  # order, and leaving `extras` in the base list keeps it working when no SignalP image exists.
+  if [ -n "${SP_SIF:-}" ] && [ -s "${SP_SIF:-}" ]; then
+    if grep -q "withLabel: *extras *{ *container.*fungiforge-signalp6" "$PREFIX/site.config"; then
+      sed -E "s#withLabel: *extras *\{ *container#withName: EXTRAS { container#" \
+          "$PREFIX/site.config" > "$PREFIX/site.config.tmp" && mv "$PREFIX/site.config.tmp" "$PREFIX/site.config"
+      echo "  site.config: SignalP override migrated from withLabel:extras to withName:EXTRAS"
+    elif ! grep -q "fungiforge-signalp6" "$PREFIX/site.config"; then
+      printf '\n// W2.6: the site-built SignalP 6 image (licensed package) runs the extras stage.\n// withName beats the withLabel base-image override, which also matches this process.\nprocess { withName: EXTRAS { container = %s } }\n' "'$SP_SIF'" >> "$PREFIX/site.config"
+      echo "  site.config: EXTRAS -> $SP_SIF"
+    fi
   fi
   if [ ! -f "$PREFIX/fungiforge-env.sh" ]; then
     sed -e "s#^export FUNGIFORGE_ROOT=.*#export FUNGIFORGE_ROOT=\"$PREFIX\"#" \
