@@ -38,3 +38,8 @@
   that v1 is deprecated, and v1's master branch is still developed. **Revisit when** funannotate2
   gains a transcript-assembly path or a documented equivalent of the wide annotations table, and a
   released, predictor-complete image exists. Until then v1.8.17 stays pinned by digest.
+- **`meta` is a cache key, not a scratchpad (2026-09-20).** Every Nextflow task's signature includes the
+  per-sample `meta` map, so adding one key invalidates every cached task of every existing run. Adding
+  `has_rna` for W6.2 cost a completed CEA10 validation its entire cache and would have rerun ten hours of
+  work. Keep `meta` to `id`, `assembly_mode`, `compartment`, `facility`, `season`; express anything a single
+  stage needs through the files staged into that stage, which is where the pipeline already answers it.

@@ -138,3 +138,18 @@ def test_helper_falls_back_to_path_then_fails_loudly(monkeypatch, tmp_path):
         assert "FUNGIFORGE_HOME" in str(e.value)
     finally:
         _reload(monkeypatch, FUNGIFORGE_HOME=None)
+
+
+# ── the sample metadata is a cache key ───────────────────────────────────────
+
+def test_parse_row_meta_keys_are_stable():
+    """Every Nextflow task's cache key includes meta, so a new key silently invalidates every
+    cached task of every existing run. Adding one cost a validated CEA10 run its whole cache.
+    Per-sample facts that only one stage needs belong in the staged files, not in meta."""
+    import re
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    src = open(os.path.join(root, "main.nf")).read()
+    block = re.search(r"def meta = \[(.*?)\]\n", src, re.S)
+    assert block, "could not find the meta map in main.nf"
+    keys = re.findall(r"^\s*([a-z_]+)\s*:", block.group(1), re.M)
+    assert keys == ["id", "assembly_mode", "compartment", "facility", "season"], keys

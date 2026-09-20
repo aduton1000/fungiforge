@@ -142,7 +142,7 @@ nextflow_function {
         then {
             assert function.success
             def (meta, files) = function.result
-            assert meta.has_rna == false
+            assert !meta.containsKey('has_rna')   // meta is the cache key: no gratuitous keys
             assert files.rna1.toString().endsWith('assets/NO_RNA1')
             assert files.rna2.toString().endsWith('assets/NO_RNA2')
         }
@@ -161,7 +161,7 @@ nextflow_function {
         then {
             assert function.success
             def (meta, files) = function.result
-            assert meta.has_rna == true
+            assert !meta.containsKey('has_rna')
             assert files.rna1.toString().endsWith('test/reads/TESTFUN02_RNA_R1.fastq.gz')
             assert files.rna2.toString().endsWith('test/reads/TESTFUN02_RNA_R2.fastq.gz')
         }
