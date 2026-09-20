@@ -12,6 +12,7 @@ Subcommands:
 """
 from __future__ import annotations
 import argparse
+import textwrap
 import re
 import glob
 import os
@@ -158,54 +159,165 @@ def cmd_version(a):
     print(f"FungiForge v{__version__}")
 
 
-def build_parser():
-    p = argparse.ArgumentParser(prog="fungiforge", description="FungiForge — fungal ONT / Illumina / hybrid genomics")
-    sub = p.add_subparsers(dest="cmd", required=True)
+class _Help(argparse.RawDescriptionHelpFormatter):
+    """Keep hand-written sections verbatim, and drop argparse's `{a,b,c}` metavar line.
 
-    r = sub.add_parser("run", help="run the Nextflow pipeline")
-    r.add_argument("--samplesheet"); r.add_argument("--data_dir"); r.add_argument("--outdir")
-    r.add_argument("-profile", "--profile", dest="profile", default="local,docker")
-    r.add_argument("-resume", "--resume", action="store_true")
-    r.add_argument("extra", nargs=argparse.REMAINDER, help="extra args passed through to nextflow")
+    That brace list is the single ugliest thing in a default argparse CLI: it repeats every
+    command name in a line nobody reads, wraps badly once there are more than four, and pushes
+    the real descriptions down. The subcommand descriptions below it say the same thing properly.
+    """
+
+    def __init__(self, prog):
+        super().__init__(prog, max_help_position=30, width=88)
+
+    def add_argument(self, action):
+        super().add_argument(action)
+        # argparse sizes the description column from the longest invocation it has seen, which
+        # leaves the longest command name one character short of fitting and wraps it onto its
+        # own line. Reserve the room up front so the column is straight.
+        self._action_max_length = max(self._action_max_length, 18)
+
+    def _format_action(self, action):
+        text = super()._format_action(action)
+        if action.nargs == argparse.PARSER:
+            text = "".join(text.split("\n", 1)[1:])
+        return text
+
+
+def _d(text):
+    """Wrap a description to the help width.
+
+    The formatter keeps hand-written text verbatim so the examples below stay laid out, which
+    means descriptions have to arrive already wrapped or they run off the terminal.
+    """
+    return textwrap.fill(" ".join(text.split()), 86)
+
+
+EPILOG = """\
+examples
+  fungiforge samplesheet --ont 'reads/*.fastq.gz' -o samples.csv
+  fungiforge check --samplesheet samples.csv
+  fungiforge run --samplesheet samples.csv --outdir results -resume
+  fungiforge validate --results results --sample AfumCEA10
+
+on a cluster
+  Use the site launcher rather than `fungiforge run`: it resolves the profile,
+  databases, container cache and licensed paths from the site environment.
+      fungiforge-run --samplesheet samples.csv --outdir results -resume
+
+documentation
+  docs/manual/fungiforge_manual.md       full manual, stage by stage
+  docs/hpc_deployment.md                 install and database staging
+  fungiforge <command> --help            options for one command
+"""
+
+
+def build_parser():
+    p = argparse.ArgumentParser(
+        prog="fungiforge", formatter_class=_Help, epilog=EPILOG,
+        usage="fungiforge <command> [options]",
+        description="FungiForge %s — whole-genome analysis of fungal isolates from ONT,\n"
+                    "Illumina or hybrid reads: assembly, identification, antifungal\n"
+                    "resistance, gene clusters and cohort phylogenomics." % __version__)
+    p.add_argument("-V", "--version", action="version", version="FungiForge %s" % __version__,
+                   help="print the version and exit")
+    sub = p.add_subparsers(dest="cmd", required=True, title="commands", metavar="<command>",
+                           prog="fungiforge")
+
+    r = sub.add_parser("run", formatter_class=_Help, help="launch the Nextflow pipeline",
+                       description=_d("Run the pipeline. Every unrecognised argument is passed "
+                                   "through to `nextflow run` unchanged."),
+                       epilog="example\n  fungiforge run --samplesheet samples.csv "
+                              "--outdir results -resume\n")
+    r.add_argument("--samplesheet", metavar="FILE", help="sample sheet CSV (see the manual)")
+    r.add_argument("--data_dir", metavar="DIR", help="reference-database root")
+    r.add_argument("--outdir", metavar="DIR", help="where results are written")
+    r.add_argument("-profile", "--profile", dest="profile", default="local,docker", metavar="P",
+                   help="Nextflow profile(s) (default: %(default)s)")
+    r.add_argument("-resume", "--resume", action="store_true", help="reuse cached tasks")
+    r.add_argument("extra", nargs=argparse.REMAINDER, metavar="...",
+                   help="further arguments passed straight to nextflow")
     r.set_defaults(func=cmd_run)
 
-    s = sub.add_parser("samplesheet", help="build a samplesheet from read directories (ONT and/or Illumina)")
-    s.add_argument("--ont", nargs="*", help="ONT fastq files/globs (optional if Illumina given)")
-    s.add_argument("--illumina-r1", nargs="*", help="Illumina R1 fastq files/globs")
-    s.add_argument("--illumina-r2", nargs="*", help="Illumina R2 fastq files/globs")
-    s.add_argument("--compartment", default="NA"); s.add_argument("--facility", default="NA"); s.add_argument("--season", default="NA")
-    s.add_argument("-o", "--out")
+    s = sub.add_parser("samplesheet", formatter_class=_Help,
+                       help="build a sample sheet from directories of reads",
+                       description=_d("Build a sample sheet from read files or globs. Isolate ids "
+                                   "are taken from the file names; ONT-only, Illumina-only and "
+                                   "hybrid rows may be mixed."),
+                       epilog="example\n  fungiforge samplesheet --ont 'ont/*.fastq.gz' \\\n"
+                              "      --illumina-r1 'ill/*_R1.fastq.gz' --illumina-r2 'ill/*_R2.fastq.gz' \\\n"
+                              "      --compartment AIR --facility Abattoir_1 -o samples.csv\n")
+    s.add_argument("--ont", nargs="*", metavar="GLOB", help="ONT FASTQ files or globs")
+    s.add_argument("--illumina-r1", nargs="*", metavar="GLOB", help="Illumina R1 files or globs")
+    s.add_argument("--illumina-r2", nargs="*", metavar="GLOB", help="Illumina R2 files or globs")
+    s.add_argument("--compartment", default="NA", metavar="S", help="metadata column (default: %(default)s)")
+    s.add_argument("--facility", default="NA", metavar="S", help="metadata column (default: %(default)s)")
+    s.add_argument("--season", default="NA", metavar="S", help="metadata column (default: %(default)s)")
+    s.add_argument("-o", "--out", metavar="FILE", help="write here instead of standard output")
     s.set_defaults(func=cmd_samplesheet)
 
-    f = sub.add_parser("fetch-refs", help="print the reference-DB fetch command")
-    f.add_argument("--data_dir", required=True)
-    f.set_defaults(func=cmd_fetch_refs)
-
-    va = sub.add_parser("validate", help="compare a finished run with an expected-results file")
-    va.add_argument("--results", required=True, help="the run's --outdir")
-    va.add_argument("--sample", default=None, help="sample id (default: from the expected file)")
-    va.add_argument("--expected", default=None, help="expected JSON (default: test/expected/<sample>.json)")
-    va.add_argument("-o", "--out", default=None, help="write the check table as TSV")
-    va.set_defaults(func=cmd_validate)
-
-    c = sub.add_parser("check", help="validate a samplesheet before a run")
-    c.add_argument("--samplesheet", required=True)
-    c.add_argument("--json", default=None, help="write the report as JSON")
+    c = sub.add_parser("check", formatter_class=_Help,
+                       help="validate a sample sheet before a run",
+                       description=_d("Check a sample sheet before launching: duplicate or malformed "
+                                   "ids, unpaired reads, missing or empty files, metadata typos. "
+                                   "Catches at the sheet what would otherwise fail hours in."),
+                       epilog="example\n  fungiforge check --samplesheet samples.csv --strict\n")
+    c.add_argument("--samplesheet", required=True, metavar="FILE", help="the sheet to check")
+    c.add_argument("--json", default=None, metavar="FILE", help="write the report as JSON")
     c.add_argument("--strict", action="store_true", help="treat warnings as errors")
-    c.add_argument("--no-check-files", action="store_true", help="do not open the read files (headers and ids only)")
+    c.add_argument("--no-check-files", action="store_true",
+                   help="check ids and pairing only, do not open the read files")
     c.set_defaults(func=cmd_check)
 
-    cm = sub.add_parser("check-master", help="validate a master table against the schema")
-    cm.add_argument("--master", required=True, help="master_fungi.tsv or a per-isolate *.master.tsv")
-    cm.add_argument("--json", default=None); cm.add_argument("--strict", action="store_true")
+    va = sub.add_parser("validate", formatter_class=_Help,
+                        help="compare a finished run against expected results",
+                        description=_d("Compare a completed run with a recorded expectation "
+                                    "(assembly size, contiguity, completeness, species, "
+                                    "resistance, cluster count) and report each check."),
+                        epilog="example\n  fungiforge validate --results results --sample AfumCEA10\n")
+    va.add_argument("--results", required=True, metavar="DIR", help="the run's --outdir")
+    va.add_argument("--sample", default=None, metavar="ID", help="isolate id (default: from the expected file)")
+    va.add_argument("--expected", default=None, metavar="FILE",
+                    help="expectation JSON (default: test/expected/<sample>.json)")
+    va.add_argument("-o", "--out", default=None, metavar="FILE", help="write the check table as TSV")
+    va.set_defaults(func=cmd_validate)
+
+    cm = sub.add_parser("check-master", formatter_class=_Help,
+                        help="validate a master table against the schema",
+                        description=_d("Validate a master table against the published schema: column "
+                                    "presence and order, types, enumerations, duplicate isolates "
+                                    "and ragged rows."),
+                        epilog="example\n  fungiforge check-master --master results/04_summary/master_fungi.tsv\n")
+    cm.add_argument("--master", required=True, metavar="FILE",
+                    help="master_fungi.tsv or a per-isolate *.master.tsv")
+    cm.add_argument("--json", default=None, metavar="FILE", help="write the report as JSON")
+    cm.add_argument("--strict", action="store_true", help="treat warnings as errors")
     cm.set_defaults(func=cmd_check_master)
 
-    v = sub.add_parser("version"); v.set_defaults(func=cmd_version)
+    f = sub.add_parser("fetch-refs", formatter_class=_Help,
+                       help="print the reference-database fetch command",
+                       description=_d("Print the command that stages the reference databases. It is "
+                                   "printed rather than run: it takes hours and belongs in a "
+                                   "session you can detach from."),
+                       epilog="example\n  fungiforge fetch-refs --data_dir /data/fungiforge\n")
+    f.add_argument("--data_dir", required=True, metavar="DIR", help="where the databases go")
+    f.set_defaults(func=cmd_fetch_refs)
+
+    v = sub.add_parser("version", formatter_class=_Help, help="print the version",
+                       description=_d("Print the FungiForge version."))
+    v.set_defaults(func=cmd_version)
     return p
 
 
 def main(argv=None):
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    given = sys.argv[1:] if argv is None else list(argv)
+    if not given:
+        # A bare `fungiforge` should teach, not scold. argparse's "the following arguments are
+        # required" tells a first-time user nothing about what the tool does.
+        parser.print_help()
+        return 2
+    args = parser.parse_args(given)
     return args.func(args)
 
 

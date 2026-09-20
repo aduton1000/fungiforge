@@ -153,3 +153,48 @@ def test_parse_row_meta_keys_are_stable():
     assert block, "could not find the meta map in main.nf"
     keys = re.findall(r"^\s*([a-z_]+)\s*:", block.group(1), re.M)
     assert keys == ["id", "assembly_mode", "compartment", "facility", "season"], keys
+
+
+# ── help output is part of the product ───────────────────────────────────────
+
+def test_top_level_help_is_grouped_and_carries_examples(capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["--help"])
+    out = capsys.readouterr().out
+    assert "commands:" in out and "examples" in out and "documentation" in out
+    # every command appears exactly once in the listing, each on its own line
+    listing = out.split("commands:")[1].split("examples")[0]
+    for name in ("run", "samplesheet", "check", "validate", "check-master", "fetch-refs", "version"):
+        assert sum(1 for l in listing.splitlines() if l.strip().startswith(name + " ")) == 1, name
+    # argparse's brace metavar line is suppressed; it repeats the names and wraps badly
+    assert "{run," not in out and "<command>" not in listing
+
+
+def test_help_lines_fit_a_terminal(capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["--help"])
+    long = [l for l in capsys.readouterr().out.splitlines() if len(l) > 90]
+    assert not long, long
+
+
+def test_every_command_help_has_a_description_and_an_example(capsys):
+    for name in ("run", "samplesheet", "check", "validate", "check-master", "fetch-refs"):
+        with pytest.raises(SystemExit):
+            cli.main([name, "--help"])
+        out = capsys.readouterr().out
+        assert out.startswith("usage: fungiforge %s " % name), out.splitlines()[0]
+        assert "example" in out, name
+        assert not [l for l in out.splitlines() if len(l) > 90], name
+
+
+def test_version_flag(capsys):
+    with pytest.raises(SystemExit) as e:
+        cli.main(["--version"])
+    assert e.value.code == 0
+    assert capsys.readouterr().out.startswith("FungiForge ")
+
+
+def test_bare_invocation_prints_help_rather_than_an_error(capsys):
+    assert cli.main([]) == 2
+    out = capsys.readouterr().out
+    assert "commands:" in out and "error" not in out
