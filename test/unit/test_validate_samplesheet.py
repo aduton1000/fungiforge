@@ -103,3 +103,60 @@ def test_cli_and_strict_mode(tmp_path, helpers):
 def test_bundled_test_samplesheet_is_valid(helpers):
     rep = vs.validate(os.path.join(helpers["ROOT"], "test", "samplesheet.test.csv"))
     assert rep["valid"] and rep["modes"] == {"longread": 1, "hybrid": 1, "shortread": 1}
+
+
+# ── optional RNA-seq evidence columns (W6.2) ─────────────────────────────────
+# rna_r1 / rna_r2 feed gene prediction. They are optional and paired: a sheet without them must
+# stay valid, so every samplesheet written before this change keeps working untouched.
+
+RNA_HEADER = "sample,ont_fastq,illumina_r1,illumina_r2,rna_r1,rna_r2,compartment,facility,season\n"
+
+
+def test_a_sheet_without_rna_columns_is_unchanged(tmp_path):
+    reads(tmp_path, "a.ont.fastq.gz")
+    rep = vs.validate(sheet(tmp_path, ["A,a.ont.fastq.gz,,,AIR,F1,Dry\n"]))
+    assert rep["valid"] and rep["n_with_rna"] == 0
+
+
+def test_paired_rna_is_accepted_and_counted(tmp_path):
+    reads(tmp_path, "a.ont.fastq.gz", "a_rna_R1.fastq.gz", "a_rna_R2.fastq.gz")
+    s = sheet(tmp_path, ["A,a.ont.fastq.gz,,,a_rna_R1.fastq.gz,a_rna_R2.fastq.gz,AIR,F1,Dry\n"],
+              header=RNA_HEADER)
+    rep = vs.validate(s)
+    assert rep["valid"], rep["errors"]
+    assert rep["n_with_rna"] == 1
+
+
+def test_unpaired_rna_is_refused(tmp_path):
+    reads(tmp_path, "a.ont.fastq.gz", "a_rna_R1.fastq.gz")
+    s = sheet(tmp_path, ["A,a.ont.fastq.gz,,,a_rna_R1.fastq.gz,,AIR,F1,Dry\n"], header=RNA_HEADER)
+    rep = vs.validate(s)
+    assert not rep["valid"]
+    assert any("RNA-seq must be paired" in e for e in rep["errors"])
+
+
+def test_the_same_file_twice_is_refused(tmp_path):
+    reads(tmp_path, "a.ont.fastq.gz", "a_rna_R1.fastq.gz")
+    s = sheet(tmp_path, ["A,a.ont.fastq.gz,,,a_rna_R1.fastq.gz,a_rna_R1.fastq.gz,AIR,F1,Dry\n"],
+              header=RNA_HEADER)
+    rep = vs.validate(s)
+    assert not rep["valid"]
+    assert any("same file" in e for e in rep["errors"])
+
+
+def test_a_missing_rna_file_is_caught_at_the_sheet(tmp_path):
+    """The point of the pre-flight: fail here, not four hours later inside prediction."""
+    reads(tmp_path, "a.ont.fastq.gz", "a_rna_R1.fastq.gz")
+    s = sheet(tmp_path, ["A,a.ont.fastq.gz,,,a_rna_R1.fastq.gz,gone_R2.fastq.gz,AIR,F1,Dry\n"],
+              header=RNA_HEADER)
+    rep = vs.validate(s)
+    assert not rep["valid"]
+    assert any("rna_r2 not found" in e for e in rep["errors"])
+
+
+def test_rna_columns_are_not_reported_as_unknown(tmp_path):
+    reads(tmp_path, "a.ont.fastq.gz", "a_rna_R1.fastq.gz", "a_rna_R2.fastq.gz")
+    s = sheet(tmp_path, ["A,a.ont.fastq.gz,,,a_rna_R1.fastq.gz,a_rna_R2.fastq.gz,AIR,F1,Dry\n"],
+              header=RNA_HEADER)
+    rep = vs.validate(s)
+    assert not any("unknown" in w.lower() for w in rep["warnings"]), rep["warnings"]
