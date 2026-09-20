@@ -271,6 +271,38 @@ if [ "$DRY" = 0 ]; then
         -e "s#^export FUNGIFORGE_BIND=.*#export FUNGIFORGE_BIND=\"$BIND\"#" \
         "$REPO_DIR/share/fungiforge-env.sh.example" > "$PREFIX/fungiforge-env.sh"
   else echo "  keeping existing $PREFIX/fungiforge-env.sh"; fi
+  # An env file written before the PATH fix lets another install's launchers win by accident of
+  # sourcing order. Inject the prune block rather than overwriting the user's edits.
+  if ! grep -q "_ff_prune_path" "$PREFIX/fungiforge-env.sh"; then
+    python3 - "$PREFIX/fungiforge-env.sh" <<'PY'
+import sys
+p = sys.argv[1]; s = open(p).read()
+needle = 'export PATH="$FUNGIFORGE_ROOT/bin:'
+i = s.find(needle)
+if i < 0:
+    print("  NOTE could not find the PATH line in the env file; left untouched"); raise SystemExit(0)
+block = (
+ '# Drop any OTHER fungiforge install\'s launchers first: with two on PATH, `fungiforge-run`\n'
+ '# resolves by accident of sourcing order, which differs between login and interactive shells.\n'
+ '_ff_prune_path() {\n'
+ '  local _out="" _p _old_ifs="$IFS"\n'
+ '  IFS=:; set -- $PATH; IFS="$_old_ifs"\n'
+ '  for _p in "$@"; do\n'
+ '    case "$_p" in\n'
+ '      */fungiforge*/bin) continue ;;\n'
+ '    esac\n'
+ '    _out="${_out:+$_out:}$_p"\n'
+ '  done\n'
+ '  PATH="$_out"\n'
+ '}\n'
+ '_ff_prune_path; unset -f _ff_prune_path\n'
+ '# Another install may have exported a global scratch path; clear it so the launcher uses\n'
+ '# work/ inside the directory the run is started from.\n'
+ 'unset FUNGIFORGE_WORK\n')
+open(p, "w").write(s[:i] + block + s[i:])
+print("  fungiforge-env.sh: PATH prune + FUNGIFORGE_WORK reset injected")
+PY
+  fi
 
   cat > "$PREFIX/bin/fungiforge-run" <<EOF
 #!/usr/bin/env bash

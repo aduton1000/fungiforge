@@ -23,6 +23,10 @@ export FUNGIFORGE_DB="/hpc/data/fungiforge"                           # [EDIT] r
 # directory you launch from, so each project keeps its own cache and `-resume` works per project.
 # One shared work dir across projects mixes runs and quietly invalidates resumes when you switch.
 # Set it only to move scratch off the launch directory, and then set it per project, not globally.
+# Unset explicitly, not merely left unassigned: another install's env file may already have
+# exported a global value, and it would survive into this one. It did — a development run wrote
+# its work directory into the production scratch path.
+unset FUNGIFORGE_WORK
 # export FUNGIFORGE_WORK="$HOME/fungiforge_work"
 
 # Container engine + SLURM routing. Empty partition = cluster default (sinfo shows it with *).
@@ -43,6 +47,23 @@ export FUNGIFORGE_GENEMARK_KEY=""                                     # [EDIT] e
 export FUNGIFORGE_BIND="/hpc"                                         # [EDIT or leave empty]
 
 # PATH: wrappers first, then repo helpers (preflight_qc.sh, fetch_references.sh, *.py).
+# Drop any OTHER fungiforge install's launchers first. A site can carry two (a production install
+# hooked in through /etc/profile.d and a development one sourced from ~/.bashrc), and with both on
+# PATH `fungiforge-run` resolves by accident of sourcing order, which differs between login and
+# interactive shells. That silently ran a development command against the production pipeline,
+# config and work directory. Whichever env file is sourced LAST now wins outright.
+_ff_prune_path() {
+  local _out="" _p _old_ifs="$IFS"
+  IFS=:; set -- $PATH; IFS="$_old_ifs"
+  for _p in "$@"; do
+    case "$_p" in
+      */fungiforge*/bin) continue ;;   # covers <root>/bin and <root>/repo/{share/,}bin
+    esac
+    _out="${_out:+$_out:}$_p"
+  done
+  PATH="$_out"
+}
+_ff_prune_path; unset -f _ff_prune_path
 export PATH="$FUNGIFORGE_ROOT/bin:$FUNGIFORGE_HOME/share/bin:$FUNGIFORGE_HOME/bin:$PATH"
 
 # Nextflow's own state stays per-user (the shared install is read-only).
