@@ -41,7 +41,7 @@ Legend: `todo` · `in progress` · `built` (code + tests) · `validated` (real-d
 | W4.2 | Database fetch, installer and site config updates for new resources | built | develop: `37ebb4a` | the fetch steps landed with their items (markers, mlst, dbcan, phibase, effectorp, genomad, genomes, interproscan, multi-lineage busco, direct eggNOG); container-driven downloads now run under Apptainer/Singularity or Docker (L24), verified to degrade cleanly with no runtime; installer stages the SignalP image and pre-pulls the two new public images; deployment guide rewritten with the database table and the licensed resources |
 | W5.1 | Cluster upgrade to v0.2.0 and re-validation | todo | | |
 | W6.1 | Scheduled real-data regression on the cluster | todo | | v0.3 candidate |
-| W6.2 | RNA-seq evidence path; funannotate 2 decision | todo | | v0.3 candidate |
+| W6.2 | RNA-seq evidence path; funannotate 2 decision | built | develop: `9b784ab`, `9065d1e` | samplesheet + stage tests; image capability verified on the cluster 2026-09-20; real-data run pending |
 | W6.3 | Resistance mechanisms beyond substitutions | todo | | v0.3 candidate |
 | W6.4 | Chromosome-scale assessment: scaffolding, telomeres | todo | | v0.3 candidate |
 | W6.5 | Typing resolution beyond seven loci | todo | | v0.3 candidate (size first) |
@@ -224,6 +224,25 @@ after annotate. Evaluate `funannotate2` on CEA10 in parallel before committing t
 stays pinned by digest either way. **Validation.** CEA10 and DF-005 gene counts, BUSCO protein
 completeness and UTR coverage with and without RNA-seq; a published *A. fumigatus* RNA-seq accession
 as the test input.
+
+**As built (2026-09-20).** Samplesheet gained optional paired `rna_r1`/`rna_r2` (sentinels
+`assets/NO_RNA1`/`NO_RNA2`, `meta.has_rna`); `validate_samplesheet.py` checks and counts them.
+Stage 07a runs `funannotate train -i clean.fasta -o fun -l <r1> -r <r2> --pasa_db sqlite` before
+`predict` — verified from the v1.8.17 sources that `predict` auto-consumes `<out>/training/` and
+that the file it looks for is `funannotate_train.pasa.gff3`, which is therefore the skip test —
+then `funannotate update -i fun`, whose results replace `predict_results` so stages 07b/07c/07 see
+transcript-corrected models. `predict.json` records `rna_trained` and `models_from`. New params
+`--skip_rna_train`, `--rna_stranded`, `--rna_max_intronlen`. The stage probes for Trinity and PASA
+rather than assuming them and degrades to ab-initio prediction with a reason.
+**Image capability verified on the cluster 2026-09-20** against the pinned digest
+(`funannotate v1.8.17.dev197+g456b08d`): `PASAHOME=/venv/opt/pasa-2.4.1`,
+`TRINITYHOME=/venv/opt/trinity-2.8.5`, and Trinity, hisat2, minimap2, kallisto, salmon, samtools
+and stringtie all resolve — so no image rebuild is needed to enable the path.
+**funannotate2 evaluated and rejected** (docs/decisions.md): no Trinity/PASA path, no wide
+annotations table, no `--eggnog`/`--iprscan`, no `update`, no released Docker tag, Python-only
+BioContainers build. **Pending for `validated`:** a public *A. fumigatus* RNA-seq accession through
+the dev deployment, comparing gene counts, BUSCO protein completeness and UTR coverage with and
+without transcripts. Cost note: PASA's SQLite backend is single-threaded whatever `--cpus` says.
 
 #### W6.3 Resistance mechanisms beyond substitutions
 **Evidence.** FungAMR carries 35,792 entries including deletions, aneuploidy, overexpression and
