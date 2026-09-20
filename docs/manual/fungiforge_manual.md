@@ -430,8 +430,11 @@ The only per-run input is a **CSV sample sheet** (`--samplesheet`), with this ex
 (parsed in `main.nf`):
 
 ```text
-sample,ont_fastq,illumina_r1,illumina_r2,compartment,facility,season
+sample,ont_fastq,illumina_r1,illumina_r2,rna_r1,rna_r2,compartment,facility,season
 ```
+
+The two RNA columns are optional and may be omitted entirely; a sheet written before they existed
+is still valid.
 
 - **`sample`** — unique isolate id (becomes the output directory and every filename).
 - **`ont_fastq`** — the ONT FASTQ. **Optional** — required only when the isolate has no Illumina
@@ -441,6 +444,10 @@ sample,ont_fastq,illumina_r1,illumina_r2,compartment,facility,season
   runs (under `--hybrid auto`). Without ONT → the isolate is **Illumina-only** and is assembled by
   SPAdes (Stage 02b). Missing reads are substituted with the `assets/NO_ONT` / `NO_R1` / `NO_R2`
   sentinels so the channel plumbing stays well-typed.
+- **`rna_r1`, `rna_r2`** — paired RNA-seq for this isolate, used as gene-prediction evidence
+  (Stage 07a). **Optional**, but paired like the Illumina columns. Without them prediction stays
+  *ab initio*; with them the models are trained on transcripts. Missing values are substituted with
+  the `assets/NO_RNA1` / `NO_RNA2` sentinels, and `meta.has_rna` records which applies.
 - **`compartment`, `facility`, `season`** — the One Health metadata carried untouched to the
   master table and consumed by Layer 2 (e.g. `AIR` / `HUMAN` / `SURFACE`; a facility label; a
   season). Default to `NA` when absent.

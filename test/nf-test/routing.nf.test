@@ -125,4 +125,61 @@ nextflow_function {
             assert function.result.toString() == '/absolute/somewhere/reads.fastq.gz'
         }
     }
+
+    // ── W6.2: optional RNA-seq evidence ─────────────────────────────────────
+    // Absent columns must behave exactly as before, so every existing samplesheet keeps working.
+
+    test("no RNA columns -> has_rna false, placeholders staged") {
+        function "parse_row"
+        when {
+            params { samplesheet = "$baseDir/test/samplesheet.test.csv" }
+            function {
+                """
+                input[0] = [sample:'R0', ont_fastq:'reads/TESTFUN01.ont.fastq.gz', illumina_r1:'', illumina_r2:'', compartment:'AIR', facility:'F1', season:'Dry']
+                """
+            }
+        }
+        then {
+            assert function.success
+            def (meta, files) = function.result
+            assert meta.has_rna == false
+            assert files.rna1.toString().endsWith('assets/NO_RNA1')
+            assert files.rna2.toString().endsWith('assets/NO_RNA2')
+        }
+    }
+
+    test("paired RNA-seq -> has_rna true, both resolved") {
+        function "parse_row"
+        when {
+            params { samplesheet = "$baseDir/test/samplesheet.test.csv" }
+            function {
+                """
+                input[0] = [sample:'R1', ont_fastq:'reads/TESTFUN01.ont.fastq.gz', illumina_r1:'', illumina_r2:'', rna_r1:'reads/TESTFUN02_RNA_R1.fastq.gz', rna_r2:'reads/TESTFUN02_RNA_R2.fastq.gz', compartment:'AIR', facility:'F1', season:'Dry']
+                """
+            }
+        }
+        then {
+            assert function.success
+            def (meta, files) = function.result
+            assert meta.has_rna == true
+            assert files.rna1.toString().endsWith('test/reads/TESTFUN02_RNA_R1.fastq.gz')
+            assert files.rna2.toString().endsWith('test/reads/TESTFUN02_RNA_R2.fastq.gz')
+        }
+    }
+
+    test("unpaired RNA-seq is refused") {
+        function "parse_row"
+        when {
+            params { samplesheet = "$baseDir/test/samplesheet.test.csv" }
+            function {
+                """
+                input[0] = [sample:'R2', ont_fastq:'reads/TESTFUN01.ont.fastq.gz', illumina_r1:'', illumina_r2:'', rna_r1:'reads/TESTFUN02_RNA_R1.fastq.gz', rna_r2:'', compartment:'AIR', facility:'F1', season:'Dry']
+                """
+            }
+        }
+        then {
+            assert function.failed
+            assert function.stdout.any { it.contains("RNA-seq must be PAIRED") }
+        }
+    }
 }

@@ -3,6 +3,9 @@
 
   validate_samplesheet.py --samplesheet samples.csv [--json report.json] [--strict] [--no-check-files]
 
+Columns: sample, ont_fastq, illumina_r1, illumina_r2 (reads); rna_r1, rna_r2 (optional paired
+RNA-seq used as gene-prediction evidence, W6.2); compartment, facility, season (metadata).
+
 Checks, with one clear message per problem (all problems at once, not the first):
   * required header `sample`, and at least one of the read columns
   * sample ids: present, unique, and safe for file names and tool arguments
@@ -17,6 +20,9 @@ import argparse, csv, json, os, re, sys
 
 REQUIRED = ["sample"]
 READ_COLS = ["ont_fastq", "illumina_r1", "illumina_r2"]
+# W6.2: optional RNA-seq evidence for gene prediction. Paired Illumina only; a row without them
+# is predicted ab initio exactly as before, so existing samplesheets stay valid.
+RNA_COLS = ["rna_r1", "rna_r2"]
 META_COLS = ["compartment", "facility", "season"]
 SAFE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 FASTQ_SUFFIX = (".fastq", ".fq", ".fastq.gz", ".fq.gz", ".fastq.bz2", ".fq.bz2")
@@ -51,7 +57,7 @@ def validate(sheet, check_files=True, allow_pod5=True):
             errors.append(f"header: required column '{c}' is missing (found: {', '.join(header) or 'nothing'})")
     if not any(c in header for c in READ_COLS):
         errors.append(f"header: none of the read columns {READ_COLS} is present")
-    unknown = [h for h in header if h not in REQUIRED + READ_COLS + META_COLS]
+    unknown = [h for h in header if h not in REQUIRED + READ_COLS + RNA_COLS + META_COLS]
     if unknown:
         warnings.append(f"header: columns fungiforge ignores: {', '.join(unknown)}")
     if not rows:
@@ -77,7 +83,12 @@ def validate(sheet, check_files=True, allow_pod5=True):
         mode = "longread" if ont else "shortread"
         if ont and r1 and r2:
             mode = "hybrid"
-        for col, raw in zip(READ_COLS, (ont, r1, r2)):
+        rna1, rna2 = (r.get(c, "") for c in RNA_COLS)
+        if bool(rna1) != bool(rna2):
+            errors.append(f"line {i} ({sid}): RNA-seq must be paired — got rna_r1='{rna1}', rna_r2='{rna2}'")
+        if rna1 and rna2 and rna1 == rna2:
+            errors.append(f"line {i} ({sid}): rna_r1 and rna_r2 are the same file")
+        for col, raw in zip(READ_COLS + RNA_COLS, (ont, r1, r2, rna1, rna2)):
             if not raw:
                 continue
             p = resolve(raw, sheet_dir)
@@ -90,7 +101,8 @@ def validate(sheet, check_files=True, allow_pod5=True):
                 errors.append(f"line {i} ({sid}): {col} is empty: '{raw}'")
             elif not p.lower().endswith(FASTQ_SUFFIX) and not (col == "ont_fastq" and os.path.isdir(p)):
                 warnings.append(f"line {i} ({sid}): {col} does not look like a FASTQ ('{os.path.basename(raw)}')")
-        rows_out.append({"sample": sid, "assembly_mode": mode, **{c: r.get(c, "") for c in META_COLS}})
+        rows_out.append({"sample": sid, "assembly_mode": mode, "has_rna": bool(rna1 and rna2),
+                         **{c: r.get(c, "") for c in META_COLS}})
     meta_summary = {c: sorted({(r.get(c) or "") for r in rows_out if r.get(c)}) for c in META_COLS}
     for c, vals in meta_summary.items():
         lowered = {}
@@ -105,8 +117,10 @@ def validate(sheet, check_files=True, allow_pod5=True):
     modes = {}
     for r in rows_out:
         modes[r["assembly_mode"]] = modes.get(r["assembly_mode"], 0) + 1
+    n_rna = sum(1 for r in rows_out if r.get("has_rna"))
     return {"samplesheet": os.path.abspath(sheet), "n_samples": len(rows_out), "modes": modes,
-            "metadata_values": meta_summary, "errors": errors, "warnings": warnings, "valid": not errors}
+            "n_with_rna": n_rna, "metadata_values": meta_summary,
+            "errors": errors, "warnings": warnings, "valid": not errors}
 
 
 def main():
@@ -124,7 +138,8 @@ def main():
     for e in rep["errors"]:
         print(f"[validate_samplesheet] ERROR {e}", file=sys.stderr)
     modes = ", ".join(f"{v} {k}" for k, v in sorted(rep["modes"].items())) or "none"
-    print(f"[validate_samplesheet] {rep['n_samples']} isolates ({modes}): "
+    rna = f", {rep['n_with_rna']} with RNA-seq" if rep.get("n_with_rna") else ""
+    print(f"[validate_samplesheet] {rep['n_samples']} isolates ({modes}{rna}): "
           f"{'valid' if rep['valid'] else str(len(rep['errors'])) + ' error(s)'}"
           f"{'' if not rep['warnings'] else ', ' + str(len(rep['warnings'])) + ' warning(s)'}")
     sys.exit(1 if rep["errors"] or (a.strict and rep["warnings"]) else 0)
