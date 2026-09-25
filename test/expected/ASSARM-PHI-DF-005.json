@@ -3,25 +3,95 @@
   "description": "Aspergillus flavus study isolate, Illumina-only (151 bp paired, ~13 M pairs). Reference for the short-read path (SPAdes). Study data, not public.",
   "source": {
     "recorded_from": "production run on the shared cluster, fungiforge v0.1.0 (pilot 2), 2026-09-14",
-    "values": "37.8 Mb, 70 contigs, N50 1.04 Mb, BUSCO 99.7 %, 12,473 proteins, 102 BGC product calls, decontamination removed 6 human contigs, ITS Aspergillus flavus",
-    "tolerances": "assembly length ±2 %, contigs ≤ 100, N50 ≥ 0.8 Mb, BUSCO ≥ 98 %, proteins ±5 %, BGC ±15 %; ITS cannot separate A. flavus from A. oryzae, so the species check is genus-level"
+    "values": "37.8 Mb, 70 contigs, N50 1.04 Mb, BUSCO 99.7 %, 12,473 proteins, 102 BGC product calls, decontamination removed 6 human contigs, ITS Aspergillus flavus; 2026-09-25: species must resolve to A. flavus (CaM flavus/oryzae tie, RPB2 section Flavi tie, genome A. flavus), no known resistance mutation with a same-species reference",
+    "tolerances": "assembly length \u00b12 %, contigs \u2264 100, N50 \u2265 0.8 Mb, BUSCO \u2265 98 %, proteins \u00b15 %, BGC \u00b115 %; ITS cannot separate A. flavus from A. oryzae, so the species check is genus-level"
   },
   "checks": {
-    "stages_all_ok":      {"from": "master.stages_failed",        "equals": "none"},
-    "verdict":            {"from": "decontam.verdict",            "one_of": ["fungal", "likely_fungal"]},
-    "contam_removed_pct": {"from": "decontam.dropped_bp_pct",     "max": 1.0},
-    "assembly_len":       {"from": "assembly_qc.assembly_len",    "expected": 37800000, "rel_tol": 0.02},
-    "n_contigs":          {"from": "assembly_qc.n_contigs",       "max": 100},
-    "n50":                {"from": "assembly_qc.n50",             "min": 800000},
-    "busco_complete":     {"from": "assembly_qc.busco_complete",  "min": 98.0},
-    "qc_pass":            {"from": "assembly_qc.qc_pass",         "equals": true},
-    "polish_mode":        {"from": "polish.mode",                 "equals": "illumina_only"},
-    "n_proteins":         {"from": "annotate.n_proteins",         "expected": 12473, "rel_tol": 0.05},
-    "species_genus":      {"from": "identify.species",            "regex": "^Aspergillus (flavus|oryzae)"},
-    "its_present":        {"from": "identify.its_present",        "equals": true},
-    "resistant_classes":  {"from": "master.resistant_classes",    "equals": "none"},
-    "bgc_status":         {"from": "bgc.status",                  "equals": "ok"},
-    "n_bgc":              {"from": "bgc.n_clusters",              "expected": 102, "rel_tol": 0.15},
-    "provenance_samples": {"from": "provenance.n_samples",        "min": 1, "optional": true}
+    "stages_all_ok": {
+      "from": "master.stages_failed",
+      "equals": "none"
+    },
+    "verdict": {
+      "from": "decontam.verdict",
+      "one_of": [
+        "fungal",
+        "likely_fungal"
+      ]
+    },
+    "contam_removed_pct": {
+      "from": "decontam.dropped_bp_pct",
+      "max": 1.0
+    },
+    "assembly_len": {
+      "from": "assembly_qc.assembly_len",
+      "expected": 37800000,
+      "rel_tol": 0.02
+    },
+    "n_contigs": {
+      "from": "assembly_qc.n_contigs",
+      "max": 100
+    },
+    "n50": {
+      "from": "assembly_qc.n50",
+      "min": 800000
+    },
+    "busco_complete": {
+      "from": "assembly_qc.busco_complete",
+      "min": 98.0
+    },
+    "qc_pass": {
+      "from": "assembly_qc.qc_pass",
+      "equals": true
+    },
+    "polish_mode": {
+      "from": "polish.mode",
+      "equals": "illumina_only"
+    },
+    "n_proteins": {
+      "from": "annotate.n_proteins",
+      "expected": 12473,
+      "rel_tol": 0.05
+    },
+    "species_genus": {
+      "from": "identify.species",
+      "regex": "^Aspergillus (flavus|oryzae)"
+    },
+    "species_confidence": {
+      "from": "identify.confidence",
+      "one_of": [
+        "high",
+        "medium"
+      ]
+    },
+    "its_present": {
+      "from": "identify.its_present",
+      "equals": true
+    },
+    "resistant_classes": {
+      "from": "master.resistant_classes",
+      "equals": "none"
+    },
+    "n_known_mutations": {
+      "from": "resistance.summary.n_known_mutations",
+      "equals": 0
+    },
+    "resistance_species_resolved": {
+      "from": "resistance.summary.species_resolved",
+      "equals": true
+    },
+    "bgc_status": {
+      "from": "bgc.status",
+      "equals": "ok"
+    },
+    "n_bgc": {
+      "from": "bgc.n_clusters",
+      "expected": 102,
+      "rel_tol": 0.15
+    },
+    "provenance_samples": {
+      "from": "provenance.n_samples",
+      "min": 1,
+      "optional": true
+    }
   }
 }

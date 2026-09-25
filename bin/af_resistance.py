@@ -185,14 +185,17 @@ def panel_positions(row):
 
 
 def evidence_for(evidence, gene, species, change):
-    """FungAMR tier/classes for a change, trying the species, then any species of the genus."""
+    """FungAMR tier/classes for a change, trying the species, then any species of the genus.
+    The returned dict carries `species`: the organism the entry was recorded in. Residue numbering
+    is species-specific, so an entry from ANOTHER species of the genus is association at best and
+    call_substitutions never counts it as a known mutation."""
     key = (gene.lower(), (species or "").lower(), change)
     if key in evidence:
-        return evidence[key]
+        return dict(evidence[key], species=species)
     genus = (species or "").split()[0].lower() if species else ""
     for (g, sp, ch), v in evidence.items():
         if g == gene.lower() and ch == change and sp.split()[0] == genus:
-            return v
+            return dict(v, species=sp)
     return None
 
 
@@ -219,6 +222,12 @@ def call_substitutions(gene, refseq, aln, row, evidence=None, species=None, cura
         if is_known and tier == 8:
             c["class"], c["known"] = "associated_unvalidated", False
             c["note"] = "FungAMR tier 8: seen in a resistant isolate without validation — association only"
+        if ev and species and ev.get("species") and ev["species"].lower() != species.lower() and tier != "curated":
+            # the only evidence is an entry recorded in another species of the genus: the residue
+            # numbering is that species', so this is at most an association, never a known mutation
+            c["class"], c["known"] = "associated_other_species", False
+            c["evidence_species"] = ev["species"]
+            c["note"] = f"evidence recorded in {ev['species']}, not in this species — association only"
         if ev and ev.get("classes"):
             c["evidence_classes"] = ev["classes"]
         calls.append(c)
@@ -377,15 +386,23 @@ def main():
     # ("Candida spp." — the genus match covers it), or "*" / "Fungi" for a pan-fungal row.
     # (A bare "spp." must NOT make a row apply to every genus — caught by the unit tests.)
     genus = species.split()[0] if species and species != "unknown" else ""
+    species_resolved = bool(genus) and not re.search(r"\s(sp|spp)\.?$", species)
     def relevant(row):
         org = (row.get("organism_regex", "") or "").strip()
         if not genus:
             return False
         if not row.get("curated", True):          # FungAMR-derived: exact species (or synonym) only
-            return re.search(org, species, re.I) is not None
-        return (re.search(re.escape(species), org, re.I) is not None or
-                re.search(r"\b" + re.escape(genus) + r"\b", org, re.I) is not None or
-                org in ("*", "Fungi", "any"))
+            return species_resolved and re.search(org, species, re.I) is not None
+        if org in ("*", "Fungi", "any"):
+            return True
+        # A genus-level row ("Candida spp.", "Aspergillus") covers every species of the genus. A row
+        # that names a species applies to THAT species only: its hotspot numbering and known
+        # mutations are that species' (found on DF-005, 2026-09-21: the A. fumigatus cyp51A and
+        # hmg1 rows were scanned in an A. flavus isolate through the genus match, and interspecies
+        # differences came back as azole resistance). An unresolved "Genus sp." gets genus rows only.
+        if re.fullmatch(r"[A-Z][a-z]+(\s+spp?\.?)?", org):
+            return re.search(r"\b" + re.escape(genus) + r"\b", org, re.I) is not None
+        return species_resolved and re.search(re.escape(species), org, re.I) is not None
 
     calls, searched = [], []
     for row in panel:
@@ -405,11 +422,23 @@ def main():
         # Pick a reference from the isolate's SPECIES (headers are GENE__ACC__Species). The
         # panel's hotspot numbering is species-specific, so a wrong-species reference would
         # misnumber every residue. Fall back to genus, then to the longest available.
-        toks = [t for t in re.split(r"\s+", species.lower()) if len(t) > 2]
-        sp_refs = [s for (h, _, s) in refs if toks and all(t in h.lower() for t in toks)]
+        # Which reference was used is recorded (`reference`, `reference_match`): a reference from
+        # another species carries that species' numbering, so every residue-level result against it
+        # is a SCREEN (class cross_species_screen, never counted as resistance), and an unresolved
+        # "Genus sp." can only ever be screened. DF-005 (A. flavus, 2026-09-21) was numbered against
+        # A. fumigatus cyp51A (77.7 % identity) and hmg1 (85.9 %), and four interspecies differences
+        # were reported as azole-resistance calls.
+        toks = [t for t in re.split(r"\s+", species.lower()) if len(t) > 2 and t not in ("sp.", "spp.")]
+        sp_refs = [(h, s) for (h, _, s) in refs if species_resolved and toks and all(t in h.lower() for t in toks)]
+        ref_match = "species"
         if not sp_refs and toks:
-            sp_refs = [s for (h, _, s) in refs if toks[0] in h.lower()]
-        refseq = max(sp_refs, key=len) if sp_refs else max((s for _, _, s in refs), key=len)
+            sp_refs = [(h, s) for (h, _, s) in refs if toks[0] in h.lower()]
+            ref_match = "genus" if sp_refs else "other"
+        if not sp_refs:
+            sp_refs = [(h, s) for (h, _, s) in refs]
+            ref_match = "other"
+        ref_header, refseq = max(sp_refs, key=lambda hs: len(hs[1]))
+        cross_species = ref_match != "species"
         orth = best_ortholog(refseq, proteins) if proteins else None
         if not orth:
             calls.append({"gene": gene, "drug_class": row.get("drug_class"), "mechanism": mech,
@@ -418,7 +447,12 @@ def main():
         name, qseq, pid, aln = orth
         base = {"gene": gene, "drug_class": row.get("drug_class"), "drugs": row.get("drugs"),
                 "mechanism": mech, "ortholog": name, "identity": round(pid, 3),
-                "confidence": conf, "source": row.get("source", "")}
+                "confidence": conf, "source": row.get("source", ""),
+                "reference": ref_header, "reference_match": ref_match}
+        if cross_species:
+            base["screen_only"] = True
+            base["note"] = (f"reference {ref_header} is not from {species}; residue numbering is species-specific, "
+                            "so this is a screen, not a resistance call")
         cds = read_genotype.cds_codon_coords(a.gbk, name, qseq) if (reads is not None and a.gbk and os.path.exists(a.gbk)) else None
         if cds and mech in ("substitution", "overexpression", "GOF") and a.bam and os.path.exists(a.bam):
             lo = min(p for t in cds["codons"] for p in t); hi = max(p for t in cds["codons"] for p in t)
@@ -434,11 +468,15 @@ def main():
                     sup = dict(sup, agrees=(sup["major"] == c["obs"]) if sup["call"] != "insufficient" else None)
                     c["read_support"] = sup
                 c["confidence"] = combined_confidence(a.polish_mode, c.get("read_support"), c.get("evidence_tier"))
+                if cross_species:
+                    c.update({"class": "cross_species_screen", "known": False, "confidence": "screen_only"})
+                    c.pop("note", None)
                 calls.append({**base, "status": "variant", **c})
-            # known alleles present in the reads but absent from the assembly (minor / heterozygous)
+            # known alleles present in the reads but absent from the assembly (minor / heterozygous);
+            # meaningless against another species' numbering, so only with a same-species reference
             known, _ = panel_positions(row)
             called_pos = {c["ref_pos"] for c in subs}
-            for pos, sup in rs.items():
+            for pos, sup in ({} if cross_species else rs).items():
                 if pos in called_pos or sup["call"] == "insufficient":
                     continue
                 wt_res = refseq[pos - 1]
@@ -471,7 +509,7 @@ def main():
         elif mech == "GOF":
             subs = call_substitutions(gene, refseq, aln, row)
             calls.append({**base, "status": "present",
-                          "gof_variants": [c["change"] for c in subs if c["known"]],
+                          "gof_variants": [] if cross_species else [c["change"] for c in subs if c["known"]],
                           "note": "regulator; gain-of-function inferred from known residues (confirm with expression/phenotype)"})
         elif mech == "overexpression":
             calls.append({**base, "status": "present",
@@ -503,7 +541,8 @@ def main():
                           "note": f"reads carry a {L}-bp insertion at the cyp51A TR site that the assembly lacks (tandem repeat missed by assembly)"})
 
     resistant_classes = sorted({c.get("drug_class") for c in calls
-                                if c.get("known") or c.get("status") in ("loss_of_function", "resistance")
+                                if not c.get("screen_only")
+                                and (c.get("known") or c.get("status") in ("loss_of_function", "resistance"))
                                 and c.get("drug_class")})
     supports = [c["read_support"] for c in calls if isinstance(c.get("read_support"), dict)]
     rs_summary = {"mode": "reads" if reads is not None else "assembly_only",
@@ -521,6 +560,10 @@ def main():
            "summary": {"resistant_drug_classes": [c for c in resistant_classes if c],
                        "n_known_mutations": sum(1 for c in calls if c.get("known")),
                        "n_associated_unvalidated": sum(1 for c in calls if c.get("class") == "associated_unvalidated"),
+                       "n_associated_other_species": sum(1 for c in calls if c.get("class") == "associated_other_species"),
+                       "n_cross_species_screen": sum(1 for c in calls if c.get("class") == "cross_species_screen"),
+                       "reference_match": {c["gene"]: c["reference_match"] for c in calls if c.get("reference_match")},
+                       "species_resolved": species_resolved,
                        "reference_available": bool(refidx),
                        "read_support": rs_summary, "copy_number_flags": cn_flags}}
     json.dump(out, open(a.out, "w"), indent=2)

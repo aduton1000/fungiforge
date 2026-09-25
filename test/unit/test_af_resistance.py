@@ -350,3 +350,78 @@ def test_tr34_in_reads_but_not_in_assembly_and_the_reverse(tmp_path, helpers):
     assert d_ok["cyp51A_TR"]["tr_type"] == "TR34" and d_ok["cyp51A_TR"]["reads"]["call"] == "agrees_with_assembly" and by_gene(d_ok, "cyp51A_promoter")[0]["confidence"] == "high"
     d_bad, _ = run_reads(helpers, tmp_path, s, reads_from(seq2, u2 - 300, u2 + 500, n=40, dele=(u2 + 34, 34)), asm2, gbk2, polish="hybrid")
     assert d_bad["cyp51A_TR"]["reads"]["call"] == "reads_lack_copy" and by_gene(d_bad, "cyp51A_promoter")[0]["confidence"] == "discordant"
+
+
+# ---------------------------------------------------------------- DF-005 regression (2026-09-25)
+GENUS_PANEL = """# genus-level row + species-named rows
+gene\torganism_regex\tdrug_class\tdrugs\tmechanism\thotspot_aa\tknown_mutations\tnote\tsource
+cyp51A\tAspergillus spp.\tazole\titraconazole\tsubstitution\t54,98,121\tG54W,L98H,Y121F\t-\ttest
+hmg1\tAspergillus fumigatus\tazole\titraconazole\tsubstitution\t995\tV995I\t-\ttest
+"""
+
+
+def test_species_named_row_applies_to_that_species_only(tmp_path, helpers):
+    """DF-005: the A. fumigatus cyp51A/hmg1 rows were scanned in an A. flavus isolate through the genus
+    match and interspecies differences became azole-resistance calls. A species-named row is for
+    that species; a genus row ('Aspergillus spp.') covers the genus; 'Aspergillus sp.' gets genus rows only."""
+    ref = make_ref(helpers)
+    for species, expected in (("Aspergillus flavus", ["cyp51A"]), ("Aspergillus sp.", ["cyp51A"]),
+                              ("Aspergillus fumigatus", ["cyp51A", "hmg1"])):
+        d = sub(tmp_path, species.replace(" ", "_").replace(".", ""))
+        s = setup(d, helpers, ortholog=ref, species=species)
+        (d / "panel.tsv").write_text(GENUS_PANEL)
+        doc, _ = run(helpers, d, s)
+        assert doc["genes_searched"] == expected, (species, doc["genes_searched"])
+
+
+def test_other_species_reference_makes_every_residue_call_a_screen(tmp_path, helpers):
+    """Only an A. fumigatus cyp51A reference is staged and the isolate is A. flavus (genus row applies):
+    the L98H-shaped difference is reported, but as a cross-species screen — not known, not counted."""
+    ref = make_ref(helpers)
+    s = setup(tmp_path, helpers, ortholog=ref[:97] + "H" + ref[98:], species="Aspergillus flavus")
+    (tmp_path / "panel.tsv").write_text(GENUS_PANEL)
+    doc, r = run(helpers, tmp_path, s)
+    c = by_gene(doc, "cyp51A")
+    assert len(c) == 1 and c[0]["change"] == "L98H" and c[0]["known"] is False
+    assert c[0]["class"] == "cross_species_screen" and c[0]["confidence"] == "screen_only" and c[0]["screen_only"] is True
+    assert c[0]["reference"] == "cyp51A__Q4WNT5__Aspergillus_fumigatus" and c[0]["reference_match"] == "genus"
+    assert "not from Aspergillus flavus" in c[0]["note"]
+    assert doc["summary"]["resistant_drug_classes"] == [] and doc["summary"]["n_known_mutations"] == 0
+    assert doc["summary"]["n_cross_species_screen"] == 1 and doc["summary"]["reference_match"] == {"cyp51A": "genus"}
+    assert doc["summary"]["species_resolved"] is True and "known=0" in r.stdout
+
+
+def test_same_species_reference_is_a_real_call_and_is_recorded(tmp_path, helpers):
+    ref = make_ref(helpers)
+    s = setup(tmp_path, helpers, ortholog=ref[:97] + "H" + ref[98:])
+    doc, _ = run(helpers, tmp_path, s)
+    c = by_gene(doc, "cyp51A")[0]
+    assert c["known"] is True and c["reference_match"] == "species" and "screen_only" not in c
+    assert c["reference"] == "cyp51A__Q4WNT5__Aspergillus_fumigatus" and doc["summary"]["resistant_drug_classes"] == ["azole"]
+
+
+def test_unresolved_genus_only_species_is_screened_never_called(tmp_path, helpers):
+    ref = make_ref(helpers)
+    s = setup(tmp_path, helpers, ortholog=ref[:97] + "H" + ref[98:], species="Aspergillus sp.")
+    (tmp_path / "panel.tsv").write_text(GENUS_PANEL)
+    doc, _ = run(helpers, tmp_path, s)
+    c = by_gene(doc, "cyp51A")
+    assert c and all(x["class"] == "cross_species_screen" for x in c) and doc["summary"]["species_resolved"] is False
+    assert doc["summary"]["resistant_drug_classes"] == [] and doc["summary"]["reference_match"]["cyp51A"] == "genus"
+
+
+def test_evidence_from_another_species_of_the_genus_is_an_association_only():
+    ev = {("hmg1", "aspergillus fumigatus", "V995I"): {"tier": 1, "classes": ["azole"]}}
+    row = {"gene": "hmg1", "hotspot_aa": "995", "known_mutations": "V995I", "curated": False}
+    ref = "MKLVSTQEWRYPGA" * 71 + "V" + "MKLVS"          # 1000 aa, V at 995
+    qry = ref[:994] + "I" + ref[995:]
+    calls = afr.call_substitutions("hmg1", ref, _aln(ref, qry), row, evidence=ev, species="Aspergillus flavus", curated=False)
+    assert len(calls) == 1 and calls[0]["class"] == "associated_other_species" and calls[0]["known"] is False
+    assert calls[0]["evidence_species"] == "aspergillus fumigatus"
+    same = afr.call_substitutions("hmg1", ref, _aln(ref, qry), row, evidence=ev, species="Aspergillus fumigatus", curated=False)
+    assert same[0]["class"] == "known_resistance_mutation" and same[0]["known"] is True
+
+
+def _aln(ref, qry):
+    """The alignment object call_substitutions expects, built the way best_ortholog builds it."""
+    return afr.best_ortholog(ref, {"q": qry})[3]
