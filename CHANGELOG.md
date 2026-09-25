@@ -52,6 +52,11 @@ DF-005 (Illumina-only) and a bacterial study isolate; see `docs/validation.md`.
   existence and metadata consistency before a run; duplicate ids now fail at launch.
 
 ### Fixed
+- Illumina-only (and ONT-only) isolates no longer report `polish:skipped` in `stages_failed`: the
+  polish stage's passthrough is its job for those isolates, so its Polypolish skip is recorded as
+  not applicable (`ff_skip --not-applicable`, listed under `not_applicable` in the stage JSON) and
+  the status stays `ok`. A stage that ran no tool because a database was absent still reads
+  `skipped`. A static test now rejects any module branch that plain-skips without running a tool.
 - Haplotig purging ran in an image without `purge_dups`, so it exited 127 on every long-read
   isolate and left the assembly stage `partial`; it is now its own stage in the base image (L30).
 - Stage 05's QUAST call could never succeed and made every run's QC `partial` (L29).
