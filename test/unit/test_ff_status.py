@@ -140,6 +140,20 @@ def test_bash_skip_is_recorded(tmp_path):
     assert doc["skipped_tools"]["genomad"] == "database not staged"
 
 
+def test_bash_not_applicable_skip_alone_is_ok(tmp_path):
+    """The exact shape of stage 03b for a short-read isolate: one not-applicable skip, a copy, no tool."""
+    rc, doc, err = run_bash(tmp_path, "ff_skip --not-applicable polypolish 'Illumina-only assembly'\ncp t.sh out.fa")
+    assert rc == 0 and doc["status"] == "ok"
+    assert doc["skipped_tools"] == {"polypolish": "Illumina-only assembly"}
+    assert doc["not_applicable"] == {"polypolish": "Illumina-only assembly"}
+    assert "not applicable" in err and "not applicable" in doc["note"]
+
+
+def test_bash_plain_skip_alone_stays_skipped_and_is_not_marked_not_applicable(tmp_path):
+    rc, doc, _ = run_bash(tmp_path, "ff_skip genomad 'database not staged'")
+    assert rc == 0 and doc["status"] == "skipped" and doc["not_applicable"] == {}
+
+
 def test_bash_skip_alongside_real_work_stays_ok(tmp_path):
     """The stage did its job; the skipped extra is recorded without downgrading the status."""
     rc, doc, _ = run_bash(tmp_path, "ff_skip genemark 'no licence key'\nff_run echo -- echo hi")
@@ -187,6 +201,28 @@ def test_a_stage_that_only_skipped_reports_skipped():
     status, note = ff_status.compute_status({}, skips={"interproscan": "data not mounted"})
     assert status == "skipped"
     assert "interproscan" in note and "data not mounted" in note
+
+
+def test_a_stage_whose_only_skip_is_not_applicable_is_ok():
+    """DF-005 (2026-09-21): an Illumina-only isolate has nothing to polish; the polish stage skipped
+    Polypolish, ran no tool, and the master table listed `polish:skipped` in stages_failed for a
+    stage that had done its whole job (the passthrough). A not-applicable skip is not an omission."""
+    status, note = ff_status.compute_status({}, skips={"polypolish": "Illumina-only"}, not_applicable={"polypolish"})
+    assert status == "ok" and "polypolish" in note and "not applicable" in note
+
+
+def test_a_real_omission_next_to_a_not_applicable_skip_is_still_skipped():
+    skips = {"polypolish": "Illumina-only", "genomad": "database not staged"}
+    status, note = ff_status.compute_status({}, skips=skips, not_applicable={"polypolish"})
+    assert status == "skipped" and "genomad" in note and "polypolish" not in note
+
+
+def test_read_skips_separates_the_not_applicable_column(tmp_path):
+    f = tmp_path / "s.tsv"
+    f.write_text("genomad\tdatabase not staged\t\npolypolish\tIllumina-only\tna\nold\tlegacy two-column line\n")
+    skips, na = ff_status.read_skips(str(f))
+    assert skips == {"genomad": "database not staged", "polypolish": "Illumina-only", "old": "legacy two-column line"}
+    assert na == {"polypolish"}
 
 
 def test_a_skipped_extra_alongside_real_work_is_still_ok():

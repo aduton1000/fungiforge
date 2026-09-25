@@ -1015,14 +1015,17 @@ and a `tools` block, written by `bin/ff_status.sh` / `bin/ff_status.py` at the e
 | `ok` | every tool that ran exited 0 |
 | `partial` | an optional step failed and the documented fallback was used (e.g. Polypolish failed, the medaka assembly was carried forward, resistance confidence dropped to provisional) |
 | `failed` | a required tool failed. The task exits non-zero and the run stops after pending tasks, except for the best-effort stages (BGC, extras), which record `failed` and let the run continue |
-| `skipped` | the stage was deliberately not run |
+| `skipped` | the stage was deliberately not run, or it ran no tool at all because something it needed was absent (a database not staged) |
 
 `tools` records each tool's exit code, wall time and (via `ff_version`) the version string the tool
 reports; `versions` lists every version recorded in the task, including tools that were probed but not
 run; `skipped_tools` records steps not run and why (a missing database, not applicable to this isolate). The master table summarises this per isolate in
 `stages_failed` (`stage:status;…` or `none`), so a row with results is never mistaken for a clean run.
 A stage that ran no tool at all because its database was absent records `skipped` and appears there
-too: an empty eggNOG or InterProScan table is a gap in the row, not a success.
+too: an empty eggNOG or InterProScan table is a gap in the row, not a success. A step that does not
+apply to the isolate by design is different: the polish stage of an Illumina-only assembly has
+nothing to polish and passes the assembly through, which is its whole job, so it records the skip
+under `not_applicable` as well as `skipped_tools` and stays `ok`.
 The assembly and medaka steps, which have no scientific JSON of their own, emit small status JSONs
 (`<sample>.assemble.json`, `<sample>.medaka.json`) for the same reason. `|| true` is not used
 anywhere in the task scripts. The `gate` column (Stage 05b) is `pass`, or `skipped(<reason>)`
