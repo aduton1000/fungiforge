@@ -1,0 +1,15 @@
+# Species names that INSDC type-material records still carry but that current taxonomy has reduced
+# to synonymy. id_classify.py folds a locus hit's species into the accepted name before the
+# concordance rule runs, so a retired name cannot contradict the ITS call. Only names with a
+# published, cited synonymy belong here; NCBI Taxonomy may still list the retired name as a taxon
+# (A. kambarensis is taxid 41059 with type material CBS 542.69), which is exactly why the table
+# exists. Columns: name<TAB>accepted<TAB>basis.
+#
+# Section Flavi: Frisvad JC et al. (2019) Taxonomy of Aspergillus section Flavi and their
+# production of aflatoxins, ochratoxins and other mycotoxins. Stud Mycol 93:1-63, Table 1
+# (ex-type strains of the four names listed under A. flavus; A. flavus neotype CBS 100927 = NRRL 1957).
+name	accepted	basis
+Aspergillus kambarensis	Aspergillus flavus	Frisvad et al. 2019 Stud Mycol 93 Table 1 (ex-type CBS 542.69 = NRRL 3751)
+Aspergillus thomii	Aspergillus flavus	Frisvad et al. 2019 Stud Mycol 93 Table 1 (ex-type CBS 120.51)
+Aspergillus fasciculatus	Aspergillus flavus	Frisvad et al. 2019 Stud Mycol 93 Table 1
+Aspergillus subolivaceus	Aspergillus flavus	Frisvad et al. 2019 Stud Mycol 93 Table 1 (ex-neotype)

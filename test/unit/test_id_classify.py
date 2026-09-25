@@ -210,3 +210,95 @@ def test_bundled_lineage_map_is_well_formed():
     assert all(len(r) == 3 and r[1].endswith("_odb10") and r[2] in ("genus", "species") for r in rows[1:])
     assert len({r[0] for r in rows[1:]}) == len(rows) - 1
     assert idc.choose_lineage("Candida auris", "Candida", LINEAGE_MAP)[0] == "saccharomycetes_odb10"
+
+
+# ---------------------------------------------------------------- DF-005 regression (2026-09-25)
+# The real CaM and RPB2 BLAST tables of ASSARM-PHI-DF-005 on the dev deployment (results_v020):
+# (accession, pident, title, alen, slen). Bitscore in the fixture scales with alen, as in the run.
+DF005_CAM = [
+    ("LC589316.1", 99.464, "Aspergillus flavus NRRL 1957 CaM gene for calmodulin, partial cds", 746, 745),
+    ("EF661506.1", 99.456, "Aspergillus oryzae isolate NRRL 447 calmodulin gene, partial cds", 735, 734),
+    ("EF661508.1", 99.456, "Aspergillus flavus isolate NRRL 1957 calmodulin gene, partial cds", 735, 734),
+    ("EF661516.1", 97.693, "Aspergillus parasiticus isolate NRRL 502 calmodulin gene, partial cds", 737, 736),
+    ("KJ175550.1", 97.531, "Aspergillus sojae isolate CBS 100928 calmodulin (cmdA) gene, partial cds", 729, 737),
+    ("EF202069.1", 99.811, "Aspergillus kambarensis strain CBS 542.69 calmodulin gene, partial cds", 530, 531),
+    ("MN987053.1", 99.668, "Aspergillus agricola isolate NRRL 66869 calmodulin (cmdA) gene, partial cds", 602, 1861),
+    ("EF202070.1", 99.435, "Aspergillus thomii strain CBS 120.51 calmodulin gene, partial cds", 531, 531),
+]
+DF005_RPB2 = [
+    ("XM_032043900.1", 89.103, "Aspergillus alliaceus DNA-directed RNA polymerase II core subunit RPB2 (BDW43DRAFT_294059), mRNA", 3845, 4449),
+    ("MT211766.1", 86.872, "Aspergillus hancockii strain FRR 3425 RPB2 (RPB2) gene, complete cds", 3839, 3829),
+    ("MG517799.1", 99.396, "Aspergillus minisclerotigenes strain DTO 009-F7 RNA polymerase II second largest subunit (RPB2) gene, partial cds", 993, 993),
+    ("MG517884.1", 99.392, "Aspergillus cerealis strain DTO 228-E7 RNA polymerase II second largest subunit (RPB2) gene, partial cds", 987, 987),
+    ("MG517893.1", 99.296, "Aspergillus austwickii strain DTO 228-F7 RNA polymerase II second largest subunit (RPB2) gene, partial cds", 995, 995),
+]
+SYNONYMS = "name\taccepted\tbasis\nAspergillus kambarensis\tAspergillus flavus\tFrisvad 2019\nAspergillus thomii\tAspergillus flavus\tFrisvad 2019\n"
+
+
+def synonyms_file(tmp_path):
+    p = tmp_path / "syn.tsv"; p.write_text(SYNONYMS); return str(p)
+
+
+def test_df005_cam_short_high_identity_record_widens_to_a_tie_not_a_new_species(tmp_path):
+    """The 531-bp A. kambarensis record (99.81 %) beat the 746-bp A. flavus neotype (99.46 %) on identity
+    alone and became the ONLY candidate, so the locus contradicted ITS. The anchor is the longest
+    species-level alignment; the short record can only join the candidates."""
+    call = idc.parse_locus_b6(locus_b6(tmp_path, "CaM", DF005_CAM), "CaM")
+    assert call["best_accession"] == "LC589316.1" and call["best_species"] == "Aspergillus flavus"
+    assert call["pident"] == 99.46 and call["top_pident"] == 99.81
+    assert call["level"] == "tie" and "Aspergillus flavus" in call["candidates"] and "Aspergillus kambarensis" in call["candidates"]
+    assert "Aspergillus agricola" not in call["candidates"]          # 602/1861 bp: below the subject-coverage floor
+
+
+def test_df005_cam_synonyms_fold_retired_names_into_the_accepted_species(tmp_path):
+    syn = idc.load_synonyms(synonyms_file(tmp_path))
+    call = idc.parse_locus_b6(locus_b6(tmp_path, "CaM", DF005_CAM), "CaM", synonyms=syn)
+    assert call["candidates"] == ["Aspergillus flavus", "Aspergillus oryzae"] and call["level"] == "tie"
+    assert "Aspergillus kambarensis->Aspergillus flavus" in call["synonyms_applied"]
+    assert "Aspergillus thomii->Aspergillus flavus" in call["synonyms_applied"]
+
+
+def test_df005_rpb2_long_distant_mrna_does_not_outrank_type_material_fragments(tmp_path):
+    """A 3.8-kb genome mRNA of A. alliaceus at 89 % has the top bitscore; the 1-kb section Flavi type
+    records at 99.4 % carry the species signal. Anchoring on bitscore over ALL hits would call the
+    locus genus-level; anchoring within the species-threshold band keeps the tie."""
+    call = idc.parse_locus_b6(locus_b6(tmp_path, "RPB2", DF005_RPB2), "RPB2")
+    assert call["level"] == "tie" and call["best_accession"].startswith("MG517") and call["pident"] >= 99.29
+    assert set(call["candidates"]) == {"Aspergillus minisclerotigenes", "Aspergillus cerealis", "Aspergillus austwickii"}
+
+
+def test_below_threshold_locus_still_reports_genus_from_the_highest_identity(tmp_path):
+    rows = [("X1.1", 90.4, "Aspergillus hancockii strain FRR 3425 beta-tubulin (benA) gene, complete cds", 1597, 1926),
+            ("X2.1", 96.6, "Aspergillus brasiliensis CBS 101740 beta-tubulin (ASPBRDRAFT_41588), mRNA", 900, 1758)]
+    call = idc.parse_locus_b6(locus_b6(tmp_path, "BenA", rows), "BenA")
+    assert call["level"] == "genus" and call["genus"] == "Aspergillus" and call["species"] is None
+
+
+def test_df005_end_to_end_is_a_flavus_with_high_confidence(tmp_path, helpers):
+    """ITS 100 % A. flavus, genome A. flavus, CaM a flavus/oryzae tie, RPB2 a section Flavi tie: the
+    run reported `Aspergillus sp.` (low, discordant CaM=A. kambarensis). It must be A. flavus."""
+    flavus = "Aspergillus_flavus|X|SH1264429.10FU|refs|k__Fungi;g__Aspergillus;s__Aspergillus_flavus"
+    gather = tmp_path / "gather.csv"
+    gather.write_text("intersect_bp,f_orig_query,f_match,f_unique_to_query,f_unique_weighted,average_abund,median_abund,std_abund,name,filename,md5\n"
+                      "30000000,0.9,0.9,0.9,0.9,1,1,0,\"GCA_002217635.1 Aspergillus flavus strain=NRRL 21882, ASM221763v1\",x,y\n")
+    loci = {"CaM": locus_b6(tmp_path, "CaM", DF005_CAM), "RPB2": locus_b6(tmp_path, "RPB2", DF005_RPB2)}
+    cmd_extra = ["--synonyms", synonyms_file(tmp_path)]
+    its = tmp_path / "its.fa"; its.write_text(">its1\nACGT\n")
+    cmd = [sys.executable, os.path.join(helpers["BIN"], "id_classify.py"), "--sample", "DF005", "--its", str(its),
+           "--unite-b6", b6(tmp_path, [(flavus, 100.0)]), "--gather", str(gather),
+           "--out-species", str(tmp_path / "sp.txt"), "--out-json", str(tmp_path / "id.json"), *cmd_extra]
+    for name, path in loci.items():
+        cmd += ["--locus-b6", f"{name}={path}"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    doc = json.load(open(tmp_path / "id.json"))
+    assert doc["species"] == "Aspergillus flavus" and doc["confidence"] == "high"
+    assert doc["concordance"]["secondary_disagree"] == [] and "CaM" in doc["concordance"]["ties_including_its"]
+    assert not any(f.startswith("discordant") for f in doc["flags"])
+    assert "tie:CaM=Aspergillus flavus/Aspergillus oryzae" in doc["flags"]
+
+
+def test_load_synonyms_tolerates_comments_header_and_absence(tmp_path):
+    p = tmp_path / "s.tsv"; p.write_text("# c\nname\taccepted\tbasis\nA b\tA c\tref\n\n")
+    assert idc.load_synonyms(str(p)) == {"a b": "A c"} and idc.load_synonyms(None) == {} and idc.load_synonyms(str(tmp_path / "no")) == {}
+    assert idc.accepted_name("A b", {"a b": "A c"}) == "A c" and idc.accepted_name("Z z", {}) == "Z z" and idc.accepted_name(None, {}) is None
