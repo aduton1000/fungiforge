@@ -17,6 +17,13 @@ Concordance rule (GCPSR-style, the rule the plan calls "true concordance"):
   low     genus only (ITS below species threshold and no secondary species), or the secondary
           lines contradict ITS (reported as "Genus sp." with a `discordant` flag)
   none    nothing classified
+A locus call is anchored on the longest alignment (top bitscore) among the hits that reach the
+locus's species threshold; the candidates are every species whose hit reaches the anchor's identity
+minus --tie-margin, which includes SHORTER records of higher identity. A short record can therefore
+widen a call into a tie but never replace the full-length anchor on its own: on DF-005 a 531-bp
+A. kambarensis CaM record at 99.8 % outscored the 746-bp A. flavus neotype at 99.5 % on identity
+alone and was reported as a discordant species. Retired names are folded into their accepted species
+first (--synonyms, fungiforge/resources/species_synonyms.tsv; A. kambarensis is a synonym of A. flavus).
 A tie is when reference species within --tie-margin % identity of the best hit differ; a tied
 locus never confirms a species on its own (A. flavus / A. oryzae on CaM and BenA is the
 canonical case) but is reported with its candidates.
@@ -98,7 +105,29 @@ def species_from_title(title):
     return f"{genus} {epithet}", genus
 
 
-def parse_locus_b6(path, locus, tie_margin=0.3, min_scov=0.5):
+def load_synonyms(path):
+    """name -> accepted species from a 3-column TSV (comments and a header line allowed); {} if absent."""
+    syn = {}
+    if not path or not os.path.exists(path):
+        return syn
+    with open(path) as fh:
+        for line in fh:
+            if line.startswith("#") or not line.strip():
+                continue
+            f = line.rstrip("\n").split("\t")
+            if len(f) >= 2 and f[0].strip() and f[0].strip().lower() != "name":
+                syn[f[0].strip().lower()] = f[1].strip()
+    return syn
+
+
+def accepted_name(species, synonyms):
+    """The accepted species for a name (itself when no synonym is recorded)."""
+    if not species:
+        return species
+    return (synonyms or {}).get(species.lower(), species)
+
+
+def parse_locus_b6(path, locus, tie_margin=0.3, min_scov=0.5, synonyms=None):
     """Best hits of one extracted locus vs its type-material set.
     outfmt "6 qseqid sseqid pident length qstart qend sstart send evalue bitscore qlen slen stitle".
     Returns None when the file is absent/empty; otherwise a locus call with tie handling."""
@@ -116,28 +145,49 @@ def parse_locus_b6(path, locus, tie_margin=0.3, min_scov=0.5):
                 continue
             scov = alen / slen if slen else 0.0
             sp, ge = species_from_title(f[12])
+            acc_sp = accepted_name(sp, synonyms)
             hits.append({"accession": f[1], "pident": pid, "alen": alen, "bitscore": bits, "scov": round(scov, 3),
-                         "species": sp, "genus": ge, "title": f[12][:100]})
+                         "species": acc_sp, "genus": ge, "title": f[12][:100],
+                         "synonym_of": sp if acc_sp != sp else None})
     hits = [h for h in hits if h["scov"] >= min_scov] or hits
     if not hits:
         return None
     hits.sort(key=lambda h: (-h["bitscore"], -h["pident"]))
-    best = hits[0]
     thr = LOCUS_SPECIES.get(locus, 99.0)   # None: genus-level marker
-    # species named within tie_margin of the best identity (species-level hits only)
     top_pid = max(h["pident"] for h in hits)
-    cands = []
-    for h in hits:
-        if h["species"] and h["pident"] >= top_pid - tie_margin and h["species"] not in cands:
+    # The call is anchored on the longest alignment (top bitscore) AMONG the hits that reach the
+    # species threshold; its identity is the locus identity. Candidates are every species reaching
+    # that identity minus the margin, so a shorter record of higher identity joins the candidate
+    # list (a tie) rather than replacing the full-length anchor — the DF-005 CaM shape (531-bp
+    # A. kambarensis at 99.8 % vs the 746-bp A. flavus neotype at 99.5 %), where ranking by
+    # identity alone reported a wrong, discordant species. Anchoring on the top bitscore over ALL
+    # hits would fail the other way: on RPB2 a 3.8-kb genome mRNA of a distant species at 89 %
+    # outscores 1-kb type-material fragments at 99.4 %. Below the threshold the genus decision
+    # uses the highest identity, as before.
+    species_hits = [h for h in hits if thr is not None and h["pident"] >= thr]
+    # a genus-level marker (LSU) has no species band: its candidates are listed for information
+    band = species_hits if thr is not None else hits
+    anchor = band[0] if band else hits[0]
+    ref_pid = anchor["pident"]
+    cands, synonyms_applied = [], []
+    for h in band:
+        if h["species"] and h["pident"] >= ref_pid - tie_margin and h["species"] not in cands:
             cands.append(h["species"])
-    call = {"locus": locus, "pident": round(top_pid, 2), "best_accession": best["accession"], "best_title": best["title"],
-            "scov": best["scov"], "n_hits": len(hits), "candidates": cands, "species": None, "genus": best["genus"], "level": "none"}
-    if thr is not None and top_pid >= thr and cands:
+        if h["synonym_of"] and h["pident"] >= ref_pid - tie_margin:
+            tag = f"{h['synonym_of']}->{h['species']}"
+            if tag not in synonyms_applied:
+                synonyms_applied.append(tag)
+    call = {"locus": locus, "pident": round(ref_pid, 2), "top_pident": round(top_pid, 2),
+            "best_accession": anchor["accession"], "best_title": anchor["title"], "best_species": anchor["species"],
+            "scov": anchor["scov"], "n_hits": len(hits), "candidates": cands, "synonyms_applied": synonyms_applied,
+            "species": None, "genus": anchor["genus"], "level": "none"}
+    if species_hits and cands:
         if len(cands) == 1:
             call["species"], call["level"] = cands[0], "species"
         else:
             call["level"] = "tie"
-    elif top_pid >= LOCUS_GENUS and best["genus"]:
+    elif top_pid >= LOCUS_GENUS and hits[0]["genus"]:
+        call["genus"] = hits[0]["genus"]
         call["level"] = "genus"
     return call
 
@@ -271,6 +321,7 @@ def main():
                     help="blastn outfmt-6(+qlen slen stitle) of one extracted locus vs its reference set (repeatable)")
     ap.add_argument("--mlst")                 # mlst TSV output
     ap.add_argument("--lineage-map")          # fungiforge/resources/busco_lineages.tsv
+    ap.add_argument("--synonyms")             # fungiforge/resources/species_synonyms.tsv (retired name -> accepted)
     ap.add_argument("--tie-margin", type=float, default=0.3)
     ap.add_argument("--out-species", required=True)
     ap.add_argument("--out-json", required=True)
@@ -278,8 +329,13 @@ def main():
     a = ap.parse_args()
 
     its_present = bool(a.its and os.path.exists(a.its) and os.path.getsize(a.its) > 0)
+    synonyms = load_synonyms(a.synonyms)
     unite = parse_unite_b6(a.unite_b6)
+    if unite and unite.get("species"):
+        unite["species"] = accepted_name(unite["species"], synonyms)
     gather = top_gather(a.gather)
+    if gather and gather.get("species"):
+        gather["species"] = accepted_name(gather["species"], synonyms)
     extracted = {}
     if a.markers_json and os.path.exists(a.markers_json):
         try:
@@ -291,7 +347,7 @@ def main():
         if "=" not in kv:
             continue
         name, path = kv.split("=", 1)
-        loci[name] = parse_locus_b6(path, name, a.tie_margin)
+        loci[name] = parse_locus_b6(path, name, a.tie_margin, synonyms=synonyms)
     mlst = parse_mlst(a.mlst)
 
     species, conf, method, flags, evidence = concordance(unite, loci, gather)
