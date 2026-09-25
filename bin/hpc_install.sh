@@ -313,6 +313,15 @@ open(p, "w").write(s[:i] + block + s[i:])
 print("  fungiforge-env.sh: PATH prune + FUNGIFORGE_WORK reset injected")
 PY
   fi
+  # An env file written before 2026-09-25 does not mark itself loaded, so fungiforge-run sourced it
+  # again and its FUNGIFORGE_WORK reset discarded a work dir set on the command line.
+  if ! grep -q "FUNGIFORGE_ENV_LOADED" "$PREFIX/fungiforge-env.sh"; then
+    printf '%s\n' '# Record that this file is loaded, so fungiforge-run does not source it a second time and undo a' \
+      '# FUNGIFORGE_WORK (or any other variable) set on the command line for one run.' \
+      'FUNGIFORGE_ENV_LOADED="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"; export FUNGIFORGE_ENV_LOADED' \
+      >> "$PREFIX/fungiforge-env.sh"
+    echo "  fungiforge-env.sh: FUNGIFORGE_ENV_LOADED marker appended"
+  fi
 
   cat > "$PREFIX/bin/fungiforge-run" <<EOF
 #!/usr/bin/env bash
