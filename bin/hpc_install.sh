@@ -84,9 +84,19 @@ log "layout under $PREFIX (group $GROUP)"
 run mkdir -p "$PREFIX/images/cache" "$PREFIX/bin" "$DB"
 if [ -d "$PREFIX/repo/.git" ]; then
   log "updating repo -> $REF"
-  run git -C "$PREFIX/repo" fetch --tags origin
-  run git -C "$PREFIX/repo" checkout -q "$REF"
-  git -C "$PREFIX/repo" symbolic-ref -q HEAD >/dev/null 2>&1 && run git -C "$PREFIX/repo" pull -q --ff-only || true
+  # Two silent failures lived here: a checkout edited by hand (a regenerated lock) was overwritten
+  # or left half-updated without a word, and `pull --ff-only || true` left a rewritten branch at
+  # its OLD commit while the install carried on and deployed stale code. Refuse the first, and
+  # make a branch ref mean "exactly what origin has now".
+  dirty="$(git -C "$PREFIX/repo" status --porcelain --untracked-files=no)"
+  [ -z "$dirty" ] || die "$PREFIX/repo has local modifications — commit them upstream or discard them (git -C $PREFIX/repo checkout -- .) and rerun:
+$dirty"
+  run git -C "$PREFIX/repo" fetch -q --tags --force origin
+  if git -C "$PREFIX/repo" show-ref -q --verify "refs/remotes/origin/$REF"; then
+    run git -C "$PREFIX/repo" checkout -q -B "$REF" "origin/$REF"
+  else
+    run git -C "$PREFIX/repo" checkout -q "$REF"
+  fi
 else
   log "cloning $REPO -> $PREFIX/repo"
   run git clone -q "$REPO" "$PREFIX/repo"

@@ -52,6 +52,19 @@ DF-005 (Illumina-only) and a bacterial study isolate; see `docs/validation.md`.
   existence and metadata consistency before a run; duplicate ids now fail at launch.
 
 ### Fixed
+- Identification: a locus call is anchored on the longest alignment among hits that reach the
+  species threshold; a shorter type-material record of higher identity can widen it into a tie
+  but no longer replaces it (DF-005: a 531-bp *A. kambarensis* CaM record had displaced the
+  *A. flavus* neotype and the isolate was reported *Aspergillus* sp.). Retired names are folded
+  into accepted species through `fungiforge/resources/species_synonyms.tsv` (cited rows).
+- Resistance: a curated panel row that names a species applies to that species only (genus rows
+  still cover the genus); every call records the reference used, and residue calls against a
+  reference from another species are reported as a cross-species screen and never counted as
+  resistance (DF-005, *A. flavus*, had four *A. fumigatus*-numbered interspecies differences
+  reported as azole resistance). FungAMR evidence from another species of the genus is an
+  association, not a known mutation.
+- `hpc_install.sh` refuses to update a checkout with local modifications and no longer hides a
+  failed fast-forward behind `|| true`; a branch ref now deploys exactly what origin has.
 - Illumina-only (and ONT-only) isolates no longer report `polish:skipped` in `stages_failed`: the
   polish stage's passthrough is its job for those isolates, so its Polypolish skip is recorded as
   not applicable (`ff_skip --not-applicable`, listed under `not_applicable` in the stage JSON) and
