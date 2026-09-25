@@ -4,7 +4,7 @@
 #   source ff_status.sh          # bin/ is on PATH inside every task
 #   ff_init  <stage> <sample> <stage.json> [--best-effort]
 #   ff_run   <label> [--optional] -- <command ...>      # run a tool, record its exit code (in $FF_RC)
-#   ff_skip  <label> <reason>                            # record a tool deliberately not run
+#   ff_skip  [--not-applicable] <label> <reason>         # record a tool deliberately not run
 #   ff_version <label> -- <command printing a version>   # record the tool's version string
 #   ff_finalize                                           # write status into <stage.json>; exit code
 #
@@ -16,8 +16,12 @@
 #     (the module must have a documented fallback for that step). ff_run itself always returns
 #     0 in that case — task scripts run under `bash -ue`, so a non-zero return from a bare
 #     ff_run statement would abort the task. Test $FF_RC to branch on the tool's outcome.
-#   * ff_skip records a tool that was not run and why (missing database, not applicable);
-#     it does not change the status.
+#   * ff_skip records a tool that was not run and why. A stage that ran NO tool and only skipped
+#     reports `skipped` (it did no work: a missing database must not read as success). The
+#     exception is --not-applicable: the step does not apply to this isolate by design (nothing to
+#     polish in an Illumina-only assembly) and the stage's remaining work (a passthrough) is its
+#     whole job, so a stage whose only skips are not-applicable reports `ok`. Reasons of both
+#     kinds land in "skipped_tools"; not-applicable labels are listed again under "not_applicable".
 #   * Every tool's exit code and wall time land in the stage JSON under "tools", so nothing
 #     that ran is invisible in the results. `|| true` is never needed and must not be used.
 #   * ff_version runs a cheap version command and records the first line that looks like a
@@ -83,8 +87,10 @@ ff_run() {
 }
 
 ff_skip() {
-  printf '%s\t%s\n' "$1" "$2" >> "$FF_SKIPS"
-  echo "[ff:$FF_STAGE] $1 skipped: $2" >&2
+  local na=""
+  if [ "${1:-}" = "--not-applicable" ]; then na="na"; shift; fi
+  printf '%s\t%s\t%s\n' "$1" "$2" "$na" >> "$FF_SKIPS"
+  echo "[ff:$FF_STAGE] $1 ${na:+not applicable}${na:-skipped}: $2" >&2
 }
 
 ff_finalize() {

@@ -10,7 +10,9 @@
 // Short-read-only isolates (assembly_mode == 'shortread') arrive here with a SPAdes
 // assembly already built from the Illumina reads: there is nothing to hybrid-polish
 // and no homopolymer-indel problem, so the assembly passes through unchanged with
-// mode='illumina_only' and resistance_confidence='high'.
+// mode='illumina_only' and resistance_confidence='high'. That passthrough IS the stage's job,
+// so the skip is recorded as not-applicable and the status stays `ok` (a plain skip with no tool
+// run reads as `skipped`, which the master table counts in stages_failed — DF-005, 2026-09-21).
 process SRPOLISH {
   tag { meta.id }
   label 'srpolish'
@@ -25,7 +27,7 @@ process SRPOLISH {
   if (is_shortread)
     """
     source ff_status.sh; ff_init polish "${meta.id}" ${meta.id}.polish.json
-    ff_skip polypolish "Illumina-only assembly: short-read base accuracy needs no polishing"
+    ff_skip --not-applicable polypolish "Illumina-only assembly: short-read base accuracy needs no polishing"
     cp ${medaka} ${meta.id}.polished.fasta
     printf '{"sample":"%s","stage":"polish","mode":"illumina_only","short_read_polisher":"none","assembler":"%s","polypolish_bp_changed":"NA","resistance_confidence":"high"}\\n' \\
       "${meta.id}" "${params.sr_assembler}" > ${meta.id}.polish.json
@@ -63,7 +65,7 @@ process SRPOLISH {
   else
     """
     source ff_status.sh; ff_init polish "${meta.id}" ${meta.id}.polish.json
-    ff_skip polypolish "no Illumina reads for this isolate (ONT-only)"
+    ff_skip --not-applicable polypolish "no Illumina reads for this isolate (ONT-only)"
     cp ${medaka} ${meta.id}.polished.fasta
     printf '{"sample":"%s","stage":"polish","mode":"ont_only","short_read_polisher":"none","polypolish_bp_changed":"NA","resistance_confidence":"provisional_ont_only"}\\n' \\
       "${meta.id}" > ${meta.id}.polish.json

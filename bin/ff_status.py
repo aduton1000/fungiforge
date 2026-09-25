@@ -4,14 +4,18 @@
 Every stage's JSON carries:
   "status": ok | partial | failed | skipped
   "tools":  {label: {"exit": int, "optional": bool, "seconds": int}}
-  "skipped_tools": {label: reason}
+  "skipped_tools": {label: reason}      (every ff_skip, whatever its kind)
+  "not_applicable": {label: reason}     (the ff_skip --not-applicable subset)
   "versions": {label: version string}   (ff_version; also copied onto tools[label]["version"])
   "note":   free text (set on failure/partial)
 
   ok       every tool that ran exited 0
   partial  an --optional tool failed and the module used its documented fallback
   failed   a required tool failed (the task exits non-zero unless the stage is best-effort)
-  skipped  the stage was deliberately not run (--stage-skipped REASON)
+  skipped  the stage was deliberately not run (--stage-skipped REASON), or no tool ran and
+           at least one skip was a real omission (a database not staged, a tool absent)
+  A stage that ran no tool and whose only skips are --not-applicable is `ok`: the step does not
+  apply to this isolate by design and the stage's passthrough is its whole job.
 
 Sub-commands
   finalize  --stage S --sample X --json F --tools T.tsv [--skips S.tsv] [--versions V.tsv]
@@ -34,13 +38,16 @@ def read_tools(path):
 
 
 def read_skips(path):
-    skips = {}
+    """Every skip as {label: reason}, plus the labels flagged --not-applicable (third column)."""
+    skips, not_applicable = {}, set()
     if path and os.path.exists(path):
         for line in open(path):
             f = line.rstrip("\n").split("\t")
             if len(f) >= 2 and f[0]:
                 skips[f[0]] = f[1]
-    return skips
+                if len(f) >= 3 and f[2] == "na":
+                    not_applicable.add(f[0])
+    return skips, not_applicable
 
 
 def read_versions(path):
@@ -53,7 +60,7 @@ def read_versions(path):
     return versions
 
 
-def compute_status(tools, stage_skipped=None, skips=None):
+def compute_status(tools, stage_skipped=None, skips=None, not_applicable=None):
     if stage_skipped:
         return "skipped", f"stage skipped: {stage_skipped}"
     failed = [k for k, v in tools.items() if v["exit"] != 0 and not v["optional"]]
@@ -66,17 +73,24 @@ def compute_status(tools, stage_skipped=None, skips=None):
     # InterProScan and eggNOG claim success for writing an empty table when their data were absent.
     # (A stage that did run its tools and skipped an optional extra is still `ok`; the skip is
     # recorded in skipped_tools.)
+    # A step that does not apply to this isolate (nothing to polish in an Illumina-only assembly)
+    # is not an omission: the stage's passthrough is its whole job and the status stays `ok`.
+    # Seen on DF-005 (2026-09-21): `polish:skipped` in stages_failed for every short-read isolate.
     if not tools and skips:
-        return "skipped", "no tool ran: " + "; ".join(f"{k}: {v}" for k, v in skips.items())
+        omitted = {k: v for k, v in skips.items() if k not in (not_applicable or set())}
+        if omitted:
+            return "skipped", "no tool ran: " + "; ".join(f"{k}: {v}" for k, v in omitted.items())
+        return "ok", "not applicable: " + "; ".join(f"{k}: {v}" for k, v in skips.items())
     return "ok", ""
 
 
 def cmd_finalize(a):
-    tools, skips, versions = read_tools(a.tools), read_skips(a.skips), read_versions(a.versions)
+    tools, versions = read_tools(a.tools), read_versions(a.versions)
+    skips, not_applicable = read_skips(a.skips)
     for label, v in versions.items():
         if label in tools:
             tools[label]["version"] = v
-    status, note = compute_status(tools, a.stage_skipped, skips)
+    status, note = compute_status(tools, a.stage_skipped, skips, not_applicable)
     doc = {}
     if os.path.exists(a.json):
         try:
@@ -91,6 +105,7 @@ def cmd_finalize(a):
     doc["status"] = status
     doc["tools"] = tools
     doc["skipped_tools"] = skips
+    doc["not_applicable"] = {k: v for k, v in skips.items() if k in not_applicable}
     doc["versions"] = versions
     if note:
         doc["note"] = (doc.get("note") + " | " if doc.get("note") else "") + note
