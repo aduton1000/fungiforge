@@ -741,8 +741,18 @@ genome-level ANI.
 secondary line (locus or genome match) with none contradicting; **medium** is ITS alone
 (flag `secondary_loci_unavailable` when no reference set is staged), secondary-only, ITS at
 94–98.5 %, or ties that include the ITS species; **low** is genus-only or a discordance (the call
-becomes *Genus* sp. with `discordant:<locus>=<species>` in `flags`). A locus is a *tie* when
-reference species within 0.3 % identity of the best hit differ (e.g. *A. flavus* vs *A. oryzae* on
+becomes *Genus* sp. with `discordant:<locus>=<species>` in `flags`). A locus call is anchored on
+the **longest alignment among the hits that reach the locus's species threshold** (its identity is
+the reported `pident`; `top_pident` is the highest identity of any hit); the candidates are every
+species reaching that identity minus 0.3 %, so a shorter type-material record of higher identity
+widens the call into a *tie* but cannot replace the full-length anchor by itself (on DF-005 a
+531-bp *A. kambarensis* CaM record at 99.8 % had displaced the 746-bp *A. flavus* neotype at
+99.5 % and contradicted ITS). Retired names are folded into their accepted species first
+(`fungiforge/resources/species_synonyms.tsv`, `--species_synonyms`; each row cites its source, e.g.
+*A. kambarensis*, *A. thomii*, *A. fasciculatus*, *A. subolivaceus* → *A. flavus* after Frisvad
+et al. 2019; NCBI Taxonomy still lists the retired names, which is why the table exists), and the
+names applied are recorded per locus in `synonyms_applied`. A locus is a *tie* when
+reference species within 0.3 % identity of the anchor differ (e.g. *A. flavus* vs *A. oryzae* on
 CaM and BenA): it is reported with its candidates and never confirms a species by itself. The
 species-aware BUSCO lineage is chosen from `fungiforge/resources/busco_lineages.tsv` (species row,
 then genus, else `fungi_odb10`) and written to `*.busco_lineage.txt`. Emits `*.species.txt`,
@@ -910,14 +920,25 @@ hotspot_aa, known_mutations, note, source`. It covers the clinically important a
 - **Pyrimidines (5-FC):** **FUR1** (R101C) and loss-of-function of **FCY1/FCY2**.
 - **Polyenes:** loss-of-function of **ERG3/ERG6/ERG2**.
 
-**2 — Species-relevance filter.** Only rows whose `organism_regex` matches the isolate's species
-(or genus, or `spp.`) are searched — so *A. fumigatus* isolates are not mis-tested against
-*Candida* ERG11 numbering.
+**2 — Species-relevance filter.** A row whose `organism_regex` names a species applies to
+**that species only**; a genus-level row (`Aspergillus spp.`, `Candida spp.`) covers every species
+of the genus; `*` / `Fungi` rows apply to all. FungAMR-derived rows match the exact species. An
+isolate identified only to genus (*Aspergillus* sp.) gets genus-level rows only. So *A. fumigatus*
+isolates are not tested against *Candida* ERG11 numbering, and an *A. flavus* isolate is not
+tested against the *A. fumigatus* cyp51A and hmg1 hotspots (which happened on DF-005 through a
+genus match: interspecies differences came back as azole-resistance calls).
 
 **3 — Ortholog detection and residue mapping.** For each relevant gene the caller pulls the
 matching **FungAMR reference from the isolate's own species** (headers are `GENE__ACC__Species`;
 species-matched, else genus, else longest), because the panel's hotspot numbering is
-species-specific and a wrong-species reference would misnumber every residue. It finds the
+species-specific and a wrong-species reference would misnumber every residue. The reference used
+is recorded on every call (`reference`, `reference_match` = `species` / `genus` / `other`). When
+it is **not** from the isolate's species, every residue-level result against it is a **screen**:
+class `cross_species_screen`, `screen_only: true`, confidence `screen_only`, never `known`, never
+counted in `resistant_drug_classes` or `n_known_mutations` (the summary reports
+`n_cross_species_screen`, `reference_match` per gene and `species_resolved`). Likewise, a known
+mutation whose only FungAMR evidence was recorded in another species of the genus is reported as
+`associated_other_species`, not as a known mutation. It finds the
 isolate ortholog among the Funannotate proteins with a **k-mer prefilter → BLOSUM62 global
 pairwise alignment** (≥55% identity), then reads the residue in the isolate frame aligned to each
 1-based reference hotspot.
