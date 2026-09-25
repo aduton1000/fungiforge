@@ -69,7 +69,7 @@ process IDENTIFY {
   fi
   ff_run id_classify -- id_classify.py --sample "${meta.id}" --its its.fasta \\
       --unite-b6 unite.b6 --gather gather.csv --markers-json markers_extracted.json \$LOCUS_ARGS \$MLST_ARG \\
-      --lineage-map "${params.busco_lineage_map}" \\
+      --lineage-map "${params.busco_lineage_map}" --synonyms "${params.species_synonyms}" \\
       --out-species ${meta.id}.species.txt --out-json ${meta.id}.identify.json --out-lineage ${meta.id}.busco_lineage.txt
   ff_finalize
   """
