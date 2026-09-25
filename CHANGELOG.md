@@ -52,6 +52,10 @@ DF-005 (Illumina-only) and a bacterial study isolate; see `docs/validation.md`.
   existence and metadata consistency before a run; duplicate ids now fail at launch.
 
 ### Fixed
+- `fungiforge-run` no longer re-sources the site env file in a shell that has already loaded it
+  (the file marks itself in `FUNGIFORGE_ENV_LOADED`), so a `FUNGIFORGE_WORK` set on the command
+  line for one run is honoured instead of being reset; `-work-dir` passes through as before.
+  The installer appends the marker to an existing env file.
 - Identification: a locus call is anchored on the longest alignment among hits that reach the
   species threshold; a shorter type-material record of higher identity can widen it into a tie
   but no longer replaces it (DF-005: a 531-bp *A. kambarensis* CaM record had displaced the

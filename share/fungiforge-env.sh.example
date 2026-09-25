@@ -28,6 +28,9 @@ export FUNGIFORGE_DB="/hpc/data/fungiforge"                           # [EDIT] r
 # its work directory into the production scratch path.
 unset FUNGIFORGE_WORK
 # export FUNGIFORGE_WORK="$HOME/fungiforge_work"
+# Record that this file is loaded, so fungiforge-run does not source it a second time and undo a
+# FUNGIFORGE_WORK (or any other variable) set on the command line for one run.
+FUNGIFORGE_ENV_LOADED="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"; export FUNGIFORGE_ENV_LOADED
 
 # Container engine + SLURM routing. Empty partition = cluster default (sinfo shows it with *).
 export FUNGIFORGE_ENGINE="apptainer"                                  # apptainer | singularity
