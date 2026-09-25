@@ -26,7 +26,7 @@ fungiforge validate --results ~/runs/dev/cea10/results --sample AfumCEA10
 fungiforge validate --results ~/runs/dev/df005/results --sample ASSARM-PHI-DF-005
 ```
 
-Status (2026-09-17, first runs of the `develop` code on the dev deployment, checkout `cc534dc`,
+Status (2026-09-17, first runs of the `develop` code on the dev deployment, checkout `6e88323`,
 i.e. W0.1–W0.3 + the /tmp fix, before W1.1/W2.x):
 
 | Check | CEA10 (hybrid) | DF-005 (Illumina-only) |
@@ -45,7 +45,7 @@ Validator result with the fixed lookup: CEA10 20/21, DF-005 15/16 — the single
 `stages_all_ok`, i.e. the `partial` stages listed above, all from code that has since changed except
 purge_dups (L30). Every scientific check passes within tolerance on both isolates. The first pass of the validator
 reported the assembly-QC metrics as missing because it looked the stage JSON up by stage name
-(`assembly_qc`) while the file is `<sample>.assemblyqc.json`; fixed (`6f8fd55`), a real bug the
+(`assembly_qc`) while the file is `<sample>.assemblyqc.json`; fixed (`405da83`), a real bug the
 first real run exposed. CEA10 wall time 2 h 09 m on the production run; on the dev install the
 rerun after the node fixes reused 12 cached tasks. DF-005: 9 h 09 m, 215 CPU-h (annotation).
 
@@ -56,7 +56,7 @@ removed, so `stages_failed` is `none` only for runs of the current code.
 ### 1.1 Gate on a bacterial study isolate (W2.1 / W2.2)
 
 DF-003 (Illumina-only; the plate's read triage had flagged it bacterial) on the dev deployment with
-the W2.2 code (`8b0571e`), 2026-09-17: read QC → read triage → gate → report → provenance, 6 tasks,
+the W2.2 code (`f87b314`), 2026-09-17: read QC → read triage → gate → report → provenance, 6 tasks,
 7 min 10 s, 0.4 CPU-h; triage on 200,000 of 11.2 M read pairs: 93.5 % bacterial, 3.8 % unclassified,
 top taxon *Staphylococcus aureus* (17.3 %); master row present with `stages_failed = gate:skipped`,
 `gate = skipped(read_triage:non_fungal)`; no assembly, annotation or downstream task ran. On the
