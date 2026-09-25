@@ -30,10 +30,24 @@ _self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _default_home="$(cd "${_self_dir}/../.." && pwd)"
 
 # --- site env ---------------------------------------------------------------
+# The env file is sourced ONCE per shell. It records itself in FUNGIFORGE_ENV_LOADED, and when the
+# shell that starts this launcher has already loaded the same file, it is not sourced again: the
+# file resets FUNGIFORGE_WORK (to drop another install's global scratch path), and re-sourcing it
+# here silently discarded a work dir the user had just set on the command line
+# (`FUNGIFORGE_WORK=... fungiforge-run ... -resume` resumed nothing, 2026-09-25). A file from a
+# DIFFERENT install (production's profile.d in a login shell) is still replaced by this one.
+_norm() { readlink -f "$1" 2>/dev/null || echo "$1"; }
 for _env in "${FUNGIFORGE_ENV:-}" "$HOME/.fungiforge-env.sh" \
             "${_default_home}/../fungiforge-env.sh" "${_default_home}/share/fungiforge-env.sh"; do
-  # shellcheck disable=SC1090  # site environment file, located at run time
-  if [[ -n "$_env" && -f "$_env" ]]; then source "$_env"; break; fi
+  if [[ -n "$_env" && -f "$_env" ]]; then
+    if [[ -n "${FUNGIFORGE_ENV_LOADED:-}" && "$(_norm "$FUNGIFORGE_ENV_LOADED")" == "$(_norm "$_env")" ]]; then
+      echo "[fungiforge-run] site env already loaded in this shell: $_env" >&2
+    else
+      # shellcheck disable=SC1090  # site environment file, located at run time
+      source "$_env"
+    fi
+    break
+  fi
 done
 FUNGIFORGE_HOME="${FUNGIFORGE_HOME:-$_default_home}"
 
