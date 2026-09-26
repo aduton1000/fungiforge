@@ -213,5 +213,9 @@ grep -Rh "Automatic-Reboot" /etc/apt/apt.conf.d/ ; ls /var/run/reboot-required 2
 ```
 
 Recommendation for a shared cluster: set `Automatic-Reboot "false"` on every node and reboot in a
-maintenance window when `/var/run/reboot-required` appears. Until runs resume themselves (W6.9),
-do not start a multi-day batch on a day a reboot is pending.
+maintenance window when `/var/run/reboot-required` appears. Where the policy stays, start long
+runs with `fungiforge-run --submit ...`: the head process then runs as a requeueable SLURM job
+whose command carries `-resume`, so after a reboot SLURM requeues the job and the run continues
+from its cache by itself (state in `.fungiforge-head.{sbatch,log,jobid}` in the run directory;
+`squeue -u $USER` shows the head job as `ff-head-<rundir>`; `scancel <jobid>` stops it).
+Tasks that were running at the reboot are repeated; everything finished is kept.
