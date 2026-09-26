@@ -196,3 +196,22 @@ Existing `site.config` / `fungiforge-env.sh` are kept; images are rebuilt only w
 - `--run_interproscan true` and `--genome_id true` are on in the site config (native speed).
 - Apptainer auto-mounts `$HOME`, `/tmp`, CWD only — anything else referenced in place
   must be in `FUNGIFORGE_BIND` (default `/hpc`).
+
+## Automatic reboots
+
+A run's head process (the `nextflow` started by `fungiforge-run`) lives on the node you launch
+from, and every SLURM task lives on a node. Ubuntu's `unattended-upgrades` with
+`Unattended-Upgrade::Automatic-Reboot "true"` reboots a node at `Automatic-Reboot-Time` whenever a
+kernel update has been installed; with the HWE kernel that is roughly weekly, and on a cluster
+where every node has the same setting all of them reboot the same morning. A run in flight is
+killed (`Session aborted -- Cause: SIGTERM` in `.nextflow.log`; `last -x reboot shutdown` shows
+the reboot) and must be resumed by hand with the same command plus `-resume`; completed stages are
+kept. Check the policy with:
+
+```
+grep -Rh "Automatic-Reboot" /etc/apt/apt.conf.d/ ; ls /var/run/reboot-required 2>/dev/null
+```
+
+Recommendation for a shared cluster: set `Automatic-Reboot "false"` on every node and reboot in a
+maintenance window when `/var/run/reboot-required` appears. Until runs resume themselves (W6.9),
+do not start a multi-day batch on a day a reboot is pending.
