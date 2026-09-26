@@ -48,7 +48,7 @@ Legend: `todo` · `in progress` · `built` (code + tests) · `validated` (real-d
 | W6.6 | RNA mycovirus detection | todo | | v0.3 candidate (needs W6.2) |
 | W6.7 | External validation and publication | todo | | v0.3 candidate |
 | W6.8 | Small specified items (report, InterProScan default, lock push) | todo | | v0.3 candidate |
-| W6.9 | Head process as a SLURM job (`fungiforge-run --submit`), so a login-node reboot cannot kill a run; reboot-policy note for the admins | todo | | found 2026-09-26; wanted before the 77-isolate batch |
+| W6.9 | Self-resuming runs: `fungiforge-run --submit` runs the head process as a requeueable SLURM job whose command already carries `-resume`, so a cluster reboot ends with the run continuing by itself. Cause established 2026-09-26: `Unattended-Upgrade::Automatic-Reboot "true"` at 05:00 on every node (all four are compute nodes), kernel updates roughly weekly (reboots 6, 12, 21, 25 September) — a multi-day batch will meet one. Site recommendation recorded in docs/hpc_deployment.md: disable the automatic reboot and reboot in a maintenance window when `/var/run/reboot-required` appears | todo | | wanted before the 77-isolate batch |
 
 ## Limitations captured (inventory)
 
