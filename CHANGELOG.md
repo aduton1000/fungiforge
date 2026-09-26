@@ -13,6 +13,9 @@ manual says, or records why it could not. Validated on *A. fumigatus* CEA10 (hyb
 DF-005 (Illumina-only) and a bacterial study isolate; see `docs/validation.md`.
 
 ### Added
+- `fungiforge-run --submit`: the Nextflow head process as a requeueable SLURM job that carries
+  `-resume`, so a node reboot (this cluster reboots at 05:00 after kernel updates) ends with the
+  run continuing by itself instead of dying with the login shell.
 - **Status contract and provenance** (W0.1, W0.2): every stage writes `status`, per-tool exit
   codes and versions; `DB_CHECK` fails a run in seconds when a database is missing;
   `provenance.json` records commit, parameters, container digests and every tool version.

@@ -4,7 +4,15 @@
 # relative defaults. Forwards every extra argument straight to `nextflow run`.
 #
 #   fungiforge-run --samplesheet samples.csv [--outdir results] [-resume] [nextflow args...]
+#   fungiforge-run --submit --samplesheet samples.csv ...   # head process as a SLURM job (see below)
 #   fungiforge-run --help
+#
+# --submit runs the Nextflow head process itself as a requeueable SLURM job instead of in the
+#   calling shell. The job's command carries -resume, so when a node reboot (this cluster reboots
+#   at 05:00 after every kernel update) kills the head process, SLURM requeues the job and the run
+#   continues from its cache without anyone typing anything. State: <rundir>/.fungiforge-head.sbatch
+#   (the script), .fungiforge-head.log (Nextflow's console output, appended across requeues),
+#   .fungiforge-head.jobid. Check with `squeue -u $USER`; stop with `scancel <jobid>`.
 #
 # Site env (sourced, first found): $FUNGIFORGE_ENV, ~/.fungiforge-env.sh,
 #   <install_root>/fungiforge-env.sh, <repo>/share/fungiforge-env.sh
@@ -57,6 +65,9 @@ PROFILE="${FUNGIFORGE_PROFILE:-hpc_slurm,${ENGINE}}"
 RUNDIR="${FUNGIFORGE_RUNDIR:-$PWD}"
 WORK="${FUNGIFORGE_WORK:-$RUNDIR/work}"
 
+SUBMIT=0
+if [[ "${1:-}" == "--submit" ]]; then SUBMIT=1; shift; fi
+
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || $# -eq 0 ]]; then
   cat <<EOF
 fungiforge-run — shared HPC launcher (forwards to: nextflow run \$FUNGIFORGE_HOME/main.nf)
@@ -72,9 +83,11 @@ fungiforge-run — shared HPC launcher (forwards to: nextflow run \$FUNGIFORGE_H
   FUNGIFORGE_GENEMARK_DIR= ${FUNGIFORGE_GENEMARK_DIR:-<none>}
   FUNGIFORGE_GENEMARK_KEY= ${FUNGIFORGE_GENEMARK_KEY:-<none>}
 
-usage: fungiforge-run --samplesheet samples.csv [--outdir results] [-resume] [nextflow args]
+usage: fungiforge-run [--submit] --samplesheet samples.csv [--outdir results] [-resume] [nextflow args]
 Run from a WRITABLE directory (run state goes there). Pass -profile to override the
 site profile entirely (e.g. -profile test,hpc_slurm,apptainer -stub-run).
+--submit runs the head process as a requeueable SLURM job that resumes itself after a node
+reboot (state in .fungiforge-head.{sbatch,log,jobid} in the run directory).
 EOF
   [[ $# -eq 0 ]] && exit 1 || exit 0
 fi
@@ -129,5 +142,53 @@ post+=("--data_dir" "$FUNGIFORGE_DB")
 [[ $_have_gmkey -eq 0 && -n "${FUNGIFORGE_GENEMARK_KEY:-}" ]] && post+=("--genemark_key" "$FUNGIFORGE_GENEMARK_KEY")
 
 NF="${FUNGIFORGE_NEXTFLOW:-nextflow}"
-echo "[fungiforge-run] $NF ${pre[*]} run $FUNGIFORGE_HOME/main.nf ${post[*]} $*" >&2
-exec "$NF" "${pre[@]}" run "$FUNGIFORGE_HOME/main.nf" "${post[@]}" "$@"
+if [[ $SUBMIT -eq 0 ]]; then
+  echo "[fungiforge-run] $NF ${pre[*]} run $FUNGIFORGE_HOME/main.nf ${post[*]} $*" >&2
+  exec "$NF" "${pre[@]}" run "$FUNGIFORGE_HOME/main.nf" "${post[@]}" "$@"
+fi
+
+# --- submit: the head process as a self-resuming SLURM job ------------------
+# -resume is added when absent: a requeued job must continue, and on a brand-new run Nextflow
+# only notes that there is nothing to resume. The command is written with every argument
+# quoted, so paths with spaces and Nextflow's own flags survive the round trip through sbatch.
+_have_resume=0
+for _a in "$@"; do [[ "$_a" == "-resume" || "$_a" == -resume=* ]] && _have_resume=1; done
+[[ $_have_resume -eq 0 ]] && post+=("-resume")
+_name="ff-head-$(basename "$RUNDIR")"
+_script="$RUNDIR/.fungiforge-head.sbatch"
+_env_line=""
+[[ -n "${FUNGIFORGE_ENV_LOADED:-}" && -f "${FUNGIFORGE_ENV_LOADED}" ]] && _env_line="source $(printf '%q' "$FUNGIFORGE_ENV_LOADED")"
+{
+  echo '#!/bin/bash'
+  echo "#SBATCH --job-name=$_name"
+  echo "#SBATCH --requeue"
+  echo "#SBATCH --cpus-per-task=2"
+  echo "#SBATCH --mem=8G"
+  echo "#SBATCH --open-mode=append"
+  echo "#SBATCH --output=$RUNDIR/.fungiforge-head.log"
+  [[ -n "${FUNGIFORGE_PARTITION:-}" ]] && echo "#SBATCH --partition=$FUNGIFORGE_PARTITION"
+  [[ -n "${FUNGIFORGE_ACCOUNT:-}"   ]] && echo "#SBATCH --account=$FUNGIFORGE_ACCOUNT"
+  echo "# written by fungiforge-run --submit on $(date -u +%FT%TZ); requeued by SLURM after a node failure,"
+  echo "# and -resume makes the requeued job continue the same run from its cache."
+  echo "set -euo pipefail"
+  [[ -n "$_env_line" ]] && echo "$_env_line"
+  echo "export NXF_ANSI_LOG=false"
+  echo "export APPTAINER_BIND=$(printf '%q' "$APPTAINER_BIND")"
+  echo "export SINGULARITY_BIND=$(printf '%q' "$SINGULARITY_BIND")"
+  [[ -n "${NXF_APPTAINER_CACHEDIR:-}" ]] && echo "export NXF_APPTAINER_CACHEDIR=$(printf '%q' "$NXF_APPTAINER_CACHEDIR") NXF_SINGULARITY_CACHEDIR=$(printf '%q' "$NXF_SINGULARITY_CACHEDIR")"
+  echo "export NXF_HOME=$(printf '%q' "$NXF_HOME")"
+  echo "cd $(printf '%q' "$RUNDIR")"
+  echo "echo \"[fungiforge-head] \$(date -u +%FT%TZ) job \${SLURM_JOB_ID:-?} restart \${SLURM_RESTART_COUNT:-0} on \$(hostname)\""
+  printf 'exec %q' "$NF"
+  for _a in "${pre[@]}"; do printf ' %q' "$_a"; done
+  printf ' run %q' "$FUNGIFORGE_HOME/main.nf"
+  for _a in "${post[@]}" "$@"; do printf ' %q' "$_a"; done
+  echo
+} > "$_script"
+SB="${FUNGIFORGE_SBATCH:-sbatch}"
+_out="$("$SB" --parsable "$_script")" || { echo "[fungiforge-run] ERROR: sbatch failed" >&2; exit 2; }
+_jobid="${_out%%;*}"
+echo "$_jobid" > "$RUNDIR/.fungiforge-head.jobid"
+echo "[fungiforge-run] submitted head job $_jobid ($_name); console -> $RUNDIR/.fungiforge-head.log" >&2
+echo "[fungiforge-run] follow: tail -f $RUNDIR/.fungiforge-head.log   status: squeue -j $_jobid   stop: scancel $_jobid" >&2
+echo "$_jobid"
