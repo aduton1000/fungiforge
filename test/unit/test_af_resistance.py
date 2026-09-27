@@ -76,6 +76,16 @@ def test_reference_index_indexes_every_gene_keyword_in_a_header(tmp_path, helper
     assert idx["cyp51a"][0][2] == "MAA" and idx["cyp51"][0][2] == "MCC"
 
 
+def test_reference_index_reads_every_gene_name_from_the_header_not_a_keyword_list(tmp_path, helpers):
+    """DF-005 (2026-09-26): Cyp51C__B8NUK6__Aspergillus_flavus, Mdr2 and Mfs1 were staged but reported
+    no_reference because the index only knew a fixed keyword list."""
+    faa = helpers["write_fasta"](tmp_path / "r.faa", {"Cyp51C__B8NUK6__Aspergillus_flavus": "MCC", "Mdr2__X__Aspergillus_flavus": "MDD",
+                                                      "Mfs1_Erg11__Y__Aspergillus_flavus": "MFF", "SomeNewGene__Z__Sp": "MNN"})
+    idx = afr.load_reference_index("", faa, None)
+    assert idx["cyp51c"][0][2] == "MCC" and idx["mdr2"][0][2] == "MDD"
+    assert idx["mfs1"][0][2] == "MFF" and idx["erg11"][0][2] == "MFF" and idx["somenewgene"][0][2] == "MNN"
+
+
 def test_best_ortholog_and_residue_mapping(helpers):
     ref = make_ref(helpers)
     q = ref[:97] + "H" + ref[98:]

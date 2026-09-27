@@ -55,6 +55,9 @@ DF-005 (Illumina-only) and a bacterial study isolate; see `docs/validation.md`.
   existence and metadata consistency before a run; duplicate ids now fail at launch.
 
 ### Fixed
+- Resistance reference index: every gene name in a FungAMR header (`GENE1_GENE2__ACC__Species`) is
+  indexed, not only a fixed keyword list; *A. flavus* Cyp51C, Mdr2 and Mfs1 were staged yet
+  reported `no_reference`.
 - `fungiforge-run` no longer re-sources the site env file in a shell that has already loaded it
   (the file marks itself in `FUNGIFORGE_ENV_LOADED`), so a `FUNGIFORGE_WORK` set on the command
   line for one run is honoured instead of being reset; `-work-dir` passes through as before.
