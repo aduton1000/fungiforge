@@ -86,14 +86,20 @@ def load_reference_index(data_dir, ref_faa, bundled):
         faas += glob.glob(os.path.join(data_dir, "fungamr", "**", "*.f*a*"), recursive=True)
     if bundled and os.path.exists(bundled):
         faas.append(bundled)
-    gene_kw = re.compile(r"(cyp51[ab]?|erg1?1|erg[236]|fks[12]|fur1|fcy[12]|hmg1|tac1|mrr1|upc2|pdr1|cdr[12]|mdr1|atrf)", re.I)
+    gene_kw = re.compile(r"(cyp51[abc]?|erg1?1|erg[236]|fks[12]|fur1|fcy[12]|hmg1|tac1|mrr1|upc2|pdr1|cdr[12]|mdr[12]|mfs1|atrf)", re.I)
     for fa in faas:
         try:
             for h, s in read_fasta(fa).items():
-                # a FungAMR reference header can carry several gene names (e.g.
-                # "Cdr1_Erg11_Fcy1_Fks1__ACC__Species") — index under EVERY gene keyword,
-                # not just the first, or the ERG11 reference would be missed on an ERG11 query.
+                # A FungAMR reference header is "GENE1_GENE2__ACC__Species": every gene name before
+                # the first "__" is a name the reference serves, so index under each of them. A fixed
+                # keyword list did this before and silently missed any gene not on it — Cyp51C, Mdr2
+                # and Mfs1 of A. flavus were staged yet reported "no_reference" (DF-005, 2026-09-26),
+                # and cyp51C is the azole target that matters in A. flavus. The keyword scan remains
+                # for headers without that layout (bundled references).
                 genes = set()
+                head = h.split()[0]
+                if "__" in head:
+                    genes |= {g.lower() for g in head.split("__", 1)[0].split("_") if g}
                 for m in gene_kw.finditer(h):
                     g = m.group(1).lower()
                     if g == "cyp51":
