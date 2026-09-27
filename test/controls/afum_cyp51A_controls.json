@@ -1,0 +1,51 @@
+{
+ "locus": "afum_cyp51A_wt_locus.fa",
+ "description": "Aspergillus fumigatus cyp51A wild-type locus (AF338659 gene structure; 1.85 kb promoter from the published C87 assembly GCA_949125185 with one TR34 unit removed and L98H reverted). ATG at 1-based 1853; exon1 1853-2053, intron 2054-2124, exon2 2125-3471.",
+ "checks": [
+  {
+   "name": "TR34",
+   "type": "insertion",
+   "window": [
+    1531,
+    1564
+   ],
+   "min_len": 30,
+   "max_len": 40
+  },
+  {
+   "name": "TR46",
+   "type": "insertion",
+   "window": [
+    1531,
+    1564
+   ],
+   "min_len": 42,
+   "max_len": 52
+  },
+  {
+   "name": "L98H",
+   "type": "snv",
+   "pos": 2216,
+   "ref": "T",
+   "alt": "A"
+  }
+ ],
+ "controls": {
+  "TR34_L98H": {
+   "expect": {
+    "TR34": true,
+    "TR46": false,
+    "L98H": true
+   },
+   "note": "poultry-farm isolates 160CME3/226BB2/229AB2/269AB3 (PRJNA1494181, ONT); published C87 assembly GCA_949125185"
+  },
+  "wild_type": {
+   "expect": {
+    "TR34": false,
+    "TR46": false,
+    "L98H": false
+   },
+   "note": "CEA10 (SRR28036069 + SRR13127874); poultry-farm 157DB3/245AB1/268BB3; ENA reads deposited as C87 (ERR10820709 + ERR9791656)"
+  }
+ }
+}

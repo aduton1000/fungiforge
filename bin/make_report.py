@@ -8,10 +8,12 @@ bacterial `master_results` table. Missing stages -> NA (never a hard failure).
 """
 from __future__ import annotations
 import argparse
+import datetime
 import glob
 import html
 import json
 import os
+import sys
 
 # Fixed master-table columns (the Layer-2 contract). Keep additions append-only.
 MASTER_COLS = [
@@ -24,6 +26,28 @@ MASTER_COLS = [
     "polish_mode",
     # appended 0.1.1: Stage 04 Kraken2 verdict (fungal | likely_fungal | non_fungal | human | mixed | not_run)
     "sample_verdict", "contam_removed_pct", "top_taxon",
+    # appended 0.2.0: stage status contract — any stage not "ok" as stage:status (or "none")
+    "stages_failed",
+    # appended 0.2.0 (W2.1): "pass", or "skipped(<reason>)" when a gate stopped the isolate (read
+    # triage: verdict non_fungal/human before assembly; assembly QC: verdict or qc_pass false)
+    "gate",
+    # appended 0.2.0 (W2.2): read-level triage verdict and the k-mer profile
+    "read_verdict", "genome_size_est", "heterozygosity_pct", "ploidy_hint", "coverage",
+    # appended 0.2.0 (W2.3): identification evidence — secondary loci that agree with ITS, flags
+    # (tie/discordant/unavailable), MLST scheme:ST, species-aware BUSCO lineage and completeness
+    "id_loci_agree", "id_flags", "mlst_st", "busco_lineage_specific", "busco_complete_specific",
+    # appended 0.2.0 (W2.4): read-level support of the resistance calls and copy-number flags
+    "resistance_read_support", "copy_number_flags",
+    # appended 0.2.0 (W2.5): annotation size/quality and how the prediction was trained
+    "n_proteins", "pct_pfam", "pct_go", "pct_eggnog", "pct_interpro", "annotation_training",
+    # appended 0.2.0 (W2.6): extras counts (ploidy and mating_type above are now nQuire / Pfam-based)
+    "n_secreted", "n_effectors", "n_cazymes", "n_phibase_hits",
+    # appended 0.2.0 (W2.7): mitochondrial genome
+    "mito_size_kb", "mito_core_genes", "mito_circular", "mito_copy_ratio", "mito_heteroplasmic_sites",
+    # appended 0.2.0 (W2.8): mobile elements (te_percent and n_mycovirus above are now populated by stage 10)
+    "te_ltr_pct", "n_genomad_virus", "n_genomad_plasmid", "n_mito_heg",
+    # appended 0.2.0 (W3.2): known mycotoxin / bioactive clusters (KnownClusterBlast vs MIBiG)
+    "mycotoxin_clusters", "bioactive_clusters", "n_bgc_mibig_hits",
 ]
 
 
@@ -49,6 +73,16 @@ def g(d, *keys, default="NA"):
     return cur if cur not in (None, "", []) else default
 
 
+def read_support_summary(res):
+    """confirmed:N;discordant:M;reads_only:K;insufficient:J, or assembly_only / NA."""
+    rs = g(res, "summary", "read_support", default=None)
+    if not isinstance(rs, dict):
+        return "NA"
+    if rs.get("mode") != "reads":
+        return "assembly_only"
+    return ";".join(f"{k}:{rs.get(k, 0)}" for k in ("confirmed", "discordant", "reads_only", "insufficient"))
+
+
 def build_row(sample, compartment, facility, season, S):
     ident = S.get("identify", {})
     qc = S.get("assembly_qc", {})
@@ -56,11 +90,23 @@ def build_row(sample, compartment, facility, season, S):
     bgc = S.get("bgc", {})
     nov = S.get("novelty", {})
     ext = S.get("extras", {})
+    ann = S.get("annotate", {})
+    org = S.get("organelle", {})
+    prd = S.get("predict", {})
     mob = S.get("mobile", {})
     pol = S.get("polish", {})
     dc  = S.get("decontam", {})
+    tri = S.get("triage", {})
+    km  = S.get("kmer", {})
+    bl  = S.get("busco_lineage", {})
+    ml  = g(ident, "mlst", default={})
+    agree = g(ident, "concordance", "secondary_agree", default=[])
+    flags = g(ident, "flags", default=[])
     tops = g(dc, "top_species", default=[])
-    top_taxon = f"{tops[0]['name']} ({tops[0]['pct']}%)" if isinstance(tops, list) and tops else "NA"
+    if not (isinstance(tops, list) and tops):
+        tops = g(tri, "top_species", default=[])          # isolate stopped at read triage: use the read-level taxon
+    top_taxon = (f"{tops[0].get('name', '?')} ({tops[0].get('pct', 'NA')}%)"
+                 if isinstance(tops, list) and tops and isinstance(tops[0], dict) else "NA")
     rc = g(res, "summary", "resistant_drug_classes", default=[])
     tr = g(res, "cyp51A_TR", "tr_type", default="NA")
     row = {
@@ -82,37 +128,108 @@ def build_row(sample, compartment, facility, season, S):
         "sample_verdict": g(dc, "verdict", default="NA"),
         "contam_removed_pct": g(dc, "dropped_bp_pct", default="NA"),
         "top_taxon": top_taxon,
+        "stages_failed": ";".join(f"{st}:{d.get('status')}" for st, d in sorted(S.items())
+                                  if d.get("status") not in (None, "ok")) or "none",
+        "gate": f"skipped({S['gate'].get('reason', '?')})" if isinstance(S.get("gate"), dict) else "pass",
+        "read_verdict": g(tri, "verdict", default="NA"),
+        "genome_size_est": g(km, "genome_size_est", default="NA"),
+        "heterozygosity_pct": g(km, "heterozygosity_pct", default="NA"),
+        "ploidy_hint": g(km, "ploidy_hint", default="NA"),
+        "coverage": g(km, "coverage_from_kmers", default=g(km, "coverage_from_read_bases", default="NA")),
+        "id_loci_agree": ";".join(agree) if isinstance(agree, list) and agree else "none",
+        "id_flags": ";".join(flags) if isinstance(flags, list) and flags else "none",
+        "mlst_st": (f"{ml.get('scheme')}:ST{ml.get('st')}" if isinstance(ml, dict) and ml.get("scheme") and ml.get("st")
+                    else f"{ml.get('scheme')}:ST-" if isinstance(ml, dict) and ml.get("scheme") else "NA"),
+        "busco_lineage_specific": g(bl, "lineage", default="NA") if g(bl, "busco_complete", default=None) not in (None, "NA") else "NA",
+        "busco_complete_specific": g(bl, "busco_complete", default="NA"),
+        "resistance_read_support": read_support_summary(res),
+        "copy_number_flags": ";".join(g(res, "summary", "copy_number_flags", default=[]) or []) or "none",
+        "n_proteins": g(ann, "n_proteins"), "pct_pfam": g(ann, "pct_pfam"), "pct_go": g(ann, "pct_go"),
+        "pct_eggnog": g(ann, "pct_eggnog"), "pct_interpro": g(ann, "pct_interpro"),
+        "annotation_training": (f"{g(prd, 'augustus_species')}/{g(prd, 'busco_db')}/genemark:{g(prd, 'genemark')}"
+                                if isinstance(prd, dict) and prd else "NA"),
+        "n_secreted": g(ext, "n_secreted"), "n_effectors": g(ext, "n_effectors"),
+        "n_cazymes": g(ext, "n_cazymes"), "n_phibase_hits": g(ext, "n_phibase_hits"),
+        "mito_size_kb": round((org.get("mito_size_estimate") or org["mito_size"]) / 1000, 1) if isinstance(org, dict) and org.get("mito_size") else "NA",
+        "mito_core_genes": f"{org['n_core_genes']}/15" if isinstance(org, dict) and "n_core_genes" in org and org.get("mito_present") else "NA",
+        "mito_circular": g(org, "circular") if g(org, "mito_present", default=False) else "NA",
+        "mito_copy_ratio": g(org, "copy_ratio"),
+        "mito_heteroplasmic_sites": g(org, "heteroplasmy", "n_heteroplasmic_sites"),
+        "te_ltr_pct": g(mob, "te_landscape", "ltr_pct"), "n_genomad_virus": g(mob, "n_genomad_virus"),
+        "n_genomad_plasmid": g(mob, "n_genomad_plasmid"), "n_mito_heg": g(mob, "n_mito_heg"),
+        "mycotoxin_clusters": ";".join(g(bgc, "mycotoxin_compounds", default=[]) or []) or ("none" if g(bgc, "status", default="ok") == "ok" and g(bgc, "knownclusterblast", "ran", default=False) else "NA"),
+        "bioactive_clusters": ";".join(g(bgc, "bioactive_compounds", default=[]) or []) or ("none" if g(bgc, "status", default="ok") == "ok" and g(bgc, "knownclusterblast", "ran", default=False) else "NA"),
+        "n_bgc_mibig_hits": g(bgc, "knownclusterblast", "n_regions_with_mibig_hit"),
     }
     return row
 
 
-def render_html(sample, meta, S, row):
+TEMPLATE_DIRS = [os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fungiforge", "report_templates")]
+
+
+def _pill(value, good):
+    """<span> with a colour class: green when the value equals `good`, grey for NA, amber otherwise."""
+    v = "" if value is None else str(value)
+    cls = "na" if v in ("NA", "", "None") else ("ok" if v == good else "warn")
+    return f'<span class="pill {cls}">{html.escape(v or "NA")}</span>'
+
+
+def render_html(sample, meta, S, row, version="0.2.0"):
+    """Render the isolate report from the Jinja2 template; falls back to a plain table when
+    Jinja2 or the template is unavailable (the report must never be the reason a run fails)."""
+    res = S.get("resistance", {}) or {}
+    ident = S.get("identify", {}) or {}
+    bgc = S.get("bgc", {}) or {}
+    ctx = {"sample": sample, "meta": meta, "row": row, "S": S, "version": version,
+           "generated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+           "calls": [c for c in (res.get("calls") or []) if isinstance(c, dict)],
+           "loci": {k: v for k, v in (ident.get("loci") or {}).items() if isinstance(v, dict)},
+           "bgc_types": sorted((bgc.get("by_type") or {}).items(), key=lambda kv: -kv[1]),
+           "stages": sorted(S.keys()), "pill": _pill}
+    try:
+        import jinja2
+        for d in TEMPLATE_DIRS:
+            if os.path.exists(os.path.join(d, "isolate_report.html.j2")):
+                env = jinja2.Environment(loader=jinja2.FileSystemLoader(d), autoescape=True)
+                from markupsafe import Markup
+                env.globals["pill"] = lambda v, g: Markup(_pill(v, g))
+                return env.get_template("isolate_report.html.j2").render(**ctx)
+    except Exception as e:  # noqa: BLE001
+        sys.stderr.write(f"[make_report] template rendering unavailable ({e}); using the plain layout\n")
+    return render_html_plain(sample, meta, S, row)
+
+
+def render_html_plain(sample, meta, S, row):
     def esc(x): return html.escape(str(x))
     rows = "".join(f"<tr><th>{esc(k)}</th><td>{esc(v)}</td></tr>" for k, v in row.items())
-    # resistance calls table
-    calls = S.get("resistance", {}).get("calls", [])
+    calls = (S.get("resistance", {}) or {}).get("calls", [])
     call_rows = "".join(
         f"<tr><td>{esc(c.get('gene'))}</td><td>{esc(c.get('drug_class'))}</td>"
         f"<td>{esc(c.get('change', c.get('status')))}</td><td>{esc(c.get('known'))}</td>"
         f"<td>{esc(c.get('confidence'))}</td></tr>" for c in calls) or "<tr><td colspan=5>none</td></tr>"
     stages = ", ".join(sorted(S.keys()))
-    try:
-        import jinja2  # noqa: F401 — richer templating available if desired
-    except Exception:
-        pass
     return f"""<!doctype html><meta charset=utf-8><title>FungiForge · {esc(sample)}</title>
 <style>body{{font:14px/1.5 system-ui,sans-serif;max-width:900px;margin:2rem auto;padding:0 1rem;color:#1a2a44}}
 h1{{color:#17233d}}table{{border-collapse:collapse;width:100%;margin:1rem 0}}
-th,td{{border:1px solid #dcdfe6;padding:6px 10px;text-align:left}}th{{background:#f4f6fa;width:34%}}
-.k{{color:#8a6d1f}}caption{{text-align:left;font-weight:bold;margin:.5rem 0}}</style>
+th,td{{border:1px solid #dcdfe6;padding:6px 10px;text-align:left}}th{{background:#f4f6fa;width:34%}}</style>
 <h1>FungiForge — {esc(sample)}</h1>
-<p><b>{esc(row['species'])}</b> · {esc(meta['compartment'])} / {esc(meta['facility'])} / {esc(meta['season'])}
-· stages: {esc(stages)}</p>
+<p><b>{esc(row['species'])}</b> · {esc(meta['compartment'])} / {esc(meta['facility'])} / {esc(meta['season'])} · stages: {esc(stages)}</p>
 <table><caption>Summary (master row)</caption>{rows}</table>
 <table><caption>Antifungal-resistance calls</caption>
 <tr><th>gene</th><th>class</th><th>change/status</th><th>known</th><th>confidence</th></tr>{call_rows}</table>
-<p style="color:#777">Resistance calls on ONT-only assemblies are <b>provisional</b> until hybrid-polished; hybrid and Illumina-only assemblies are high-confidence (no homopolymer-indel risk).</p>
+<p style="color:#777">Resistance calls on ONT-only assemblies are <b>provisional</b> until hybrid-polished.</p>
 """
+
+
+def tsv_value(v):
+    """One TSV field: no tab, CR or LF may survive inside a value.
+
+    Values are assembled from tool output (products, cluster names, notes). One containing a tab
+    would silently add a field to the row, and csv.DictReader files surplus fields away without
+    complaint, so the corruption would reach Layer 2 unnoticed.
+    """
+    s = "NA" if v is None else str(v)
+    return " ".join(s.split()) or "NA"
 
 
 def main():
@@ -121,6 +238,7 @@ def main():
     ap.add_argument("--compartment", default="NA"); ap.add_argument("--facility", default="NA"); ap.add_argument("--season", default="NA")
     ap.add_argument("--jsons", nargs="+", required=True)
     ap.add_argument("--html", required=True); ap.add_argument("--master", required=True)
+    ap.add_argument("--version", default="0.2.0", help="pipeline version, shown in the report footer")
     a = ap.parse_args()
     # expand any globs / dirs
     paths = []
@@ -131,8 +249,8 @@ def main():
     row = build_row(a.sample, a.compartment, a.facility, a.season, S)
     with open(a.master, "w") as fh:
         fh.write("\t".join(MASTER_COLS) + "\n")
-        fh.write("\t".join(str(row.get(c, "NA")) for c in MASTER_COLS) + "\n")
-    open(a.html, "w").write(render_html(a.sample, meta, S, row))
+        fh.write("\t".join(tsv_value(row.get(c, "NA")) for c in MASTER_COLS) + "\n")
+    open(a.html, "w").write(render_html(a.sample, meta, S, row, a.version))
     print(f"[make_report] {a.sample}: {row['species']} · {len(S)} stages · report+master written")
 
 

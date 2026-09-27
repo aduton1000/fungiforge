@@ -13,14 +13,26 @@ params {
   genome_id        = true
 
   // slurm_partition = 'global'   // or leave to FUNGIFORGE_PARTITION / cluster default
+
+  // provenance: where the pre-pulled public images live (same as apptainer.cacheDir below), so
+  // provenance.json can record the sha256 of every image that ran
+  image_cache_dir = '/hpc/opt/fungiforge/images/cache'
 }
 
 // The two fungiforge-built images are NOT on Docker Hub — point their labels at the local
 // .sif files (built by bin/hpc_install.sh from env/Dockerfile + env/antismash-ff.Dockerfile).
 // (Set here as label containers, not params: base.config reads params at parse time.)
 process {
-  withLabel: 'readqc|basecall|decontam|identify|resistance|mge|extras|report' { container = '/hpc/opt/fungiforge/images/fungiforge-0.1.0.sif' }
+  // This selector must list EVERY label whose container is params.fungiforge_image in
+  // conf/base.config; one missing label sends that stage to Docker Hub mid-run. bin/hpc_install.sh
+  // regenerates the list from conf/base.config, here and in an existing site.config.
+  withLabel: 'readqc|basecall|decontam|identify|resistance|mge|extras|cohort|report' { container = '/hpc/opt/fungiforge/images/fungiforge-0.2.0.sif' }
   withLabel: bgc                                                             { container = '/hpc/opt/fungiforge/images/antismash-ff-8.0.0-r3.sif' }
+  // W2.6: when the site built the SignalP 6 image (bin/hpc_install.sh --signalp <tarball>), run the extras stage in it:
+  // The SignalP 6 site image (bin/hpc_install.sh --signalp) must use withName, not withLabel:
+  // the base-image selector above also matches `extras`, and between two matching withLabel
+  // selectors the base image wins, so the stage silently runs without SignalP.
+  // withName: EXTRAS { container = '/hpc/opt/fungiforge/images/fungiforge-signalp6-<version>.sif' }
 }
 
 // heavier slots for the long stages on big nodes

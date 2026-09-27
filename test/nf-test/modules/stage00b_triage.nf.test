@@ -1,0 +1,26 @@
+// Stub test for modules/stage00b_triage.nf — the process must run under -stub-run and emit its stage JSON.
+nextflow_process {
+
+    name "READ_TRIAGE stub"
+    script "modules/stage00b_triage.nf"
+    process "READ_TRIAGE"
+    options "-stub-run"
+
+    test("emits the stage JSON for one isolate") {
+        when {
+            process {
+                """
+                input[0] = [[id:'S1', assembly_mode:'shortread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/assets/NO_ONT"), file("$baseDir/test/reads/TESTFUN03_R1.fastq.gz"), file("$baseDir/test/reads/TESTFUN03_R2.fastq.gz")]
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert process.out.json.size() == 1
+            assert process.out.json[0][1].endsWith('S1.triage.json')
+            def js = path(process.out.json[0][1]).json
+            assert js.sample == 'S1'
+            assert js.verdict == 'likely_fungal'
+        }
+    }
+}

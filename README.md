@@ -24,17 +24,20 @@ The fungal sibling of the *forge* family (captureforge / callforge / methylforge
 flowchart LR
   ONT([ONT reads]) --> ASM
   ILMN([Illumina reads]) --> ASM
-  ASM[assembly + polish<br/>ONT: Flye+Medaka ± hybrid<br/>Illumina-only: SPAdes] --> QC[decontam · QC · BUSCO]
-  QC --> ANN[annotation<br/>Funannotate]
-  ANN --> ID[identify<br/>ITS/LSU · ANI · GCPSR]
-  ANN --> AMR[antifungal resistance<br/>FungAMR · cyp51A TR34/46]
-  ANN --> MGE[mobile / TE / mycovirus]
-  ANN --> BGC[BGCs · fungiSMASH]
-  ID --> REP[per-isolate report<br/>master_fungi.tsv]
+  ASM[assembly + polish<br/>ONT: Flye+purge_dups+Medaka ± hybrid<br/>Illumina-only: SPAdes] --> QC[decontam · organelle · QC · BUSCO]
+  QC --> ID[identify<br/>ITS + CaM/BenA/TEF1/RPB2/LSU · MLST · ANI]
+  ID --> ANN[annotation<br/>Funannotate + eggNOG ± InterProScan]
+  ANN --> AMR[antifungal resistance<br/>FungAMR tiers · read-level genotyping · cyp51A TR]
+  ANN --> MGE[TE landscape · geNomad · mycovirus EVEs]
+  ANN --> BGC[BGCs · fungiSMASH · mycotoxin flags]
+  ANN --> EXT[secretome · CAZymes · MAT · ploidy]
+  ID --> REP[per-isolate report<br/>master row]
   AMR --> REP
   MGE --> REP
   BGC --> REP
-  REP --> OH[One Health<br/>comparative analysis]
+  EXT --> REP
+  REP --> COH[cohort<br/>ANI clusters · tree · clonal groups · GCFs<br/>master_fungi.tsv · cohort report]
+  COH --> OH[One Health<br/>comparative analysis]
 ```
 
 ## Two layers
@@ -141,7 +144,8 @@ CA_SUR_009,,reads/CA_SUR_009_R1.fastq.gz,reads/CA_SUR_009_R2.fastq.gz,SURFACE,Cl
 | `--busco_lineage` | `auto` | `auto` (order-specific after ID) \| e.g. `fungi_odb10` |
 | `--basecall` | `false` | run Dorado on a pod5 dir (`ont_fastq` = pod5 dir); needs `--dorado_model` |
 | `--ont_min_qual` / `--ont_min_len` | `10` / `1000` | chopper Q / length filters (Stage 01) |
-| `--run_interproscan` | `false` | heavy under emulation; on for HPC |
+| `--run_interproscan` | `false` | Stage 07c InterProScan in its own image (needs `--interproscan_data`) |
+| `--genemark_dir` / `--genemark_key` | `null` | licensed GeneMark-ES directory + key for Stage 07a |
 | `--skip_decontam` / `--skip_mge` / `--skip_bgc` / `--skip_novelty` / `--skip_extras` | `false` | skip optional stages |
 | `--max_cpus` / `--max_memory` / `--max_time` | `16` / `120.GB` / `96.h` | resource caps |
 
@@ -163,18 +167,19 @@ results/
 ├── <sample>/
 │   ├── 00_basecall/     # only with --basecall
 │   ├── 01_readqc/       # *.ont.filt.fastq.gz, readqc.json, NanoPlot/fastp reports
-│   ├── 02_assembly/     # <sample>.assembly.fasta
+│   ├── 02_assembly/     # <sample>.assembly.fasta, <sample>.purged.fasta, purge.json
 │   ├── 03_polish/       # <sample>.medaka.fasta, <sample>.polished.fasta, polish.json (mode + confidence)
-│   ├── 04_decontam/     # <sample>.nuclear.fasta, <sample>.mito.fasta, decontam.json
+│   ├── 04_decontam/     # <sample>.nuclear.fasta, <sample>.mito.fasta, decontam.json, organelle.json, <sample>.mito.gff
 │   ├── 05_assembly_qc/  # assemblyqc.json (QUAST contiguity, BUSCO/compleasm, qc_pass)
 │   ├── 06_repeatmask/   # <sample>.masked.fasta, <sample>.telib.fasta, repeat.json
-│   ├── 07_annotate/     # <sample>.proteins.faa, <sample>.gbk, annotate.json
-│   ├── 08_identify/     # <sample>.species.txt, <sample>.markers.fasta, identify.json
+│   ├── 07_annotate/     # <sample>.proteins.faa, <sample>.gbk, annotate.json, predict.json, eggnog.json (+ emapper table, InterProScan XML)
+│   ├── 08_identify/     # <sample>.species.txt, <sample>.markers.fasta, identify.json, busco_lineage.json
 │   ├── 09_resistance/   # resistance.json (calls + confidence + cyp51A TR)
-│   ├── 10_mobile/  11_bgc/  12_novelty/  13_extras/   # *.json
+│   ├── 10_mobile/  11_bgc/  12_novelty/  13_extras/   # *.json (mobile: TE landscape, geNomad, RVDB mycovirus screen, mito HEGs; extras: secretome, effectors, CAZymes, PHI-base, MAT type, nQuire ploidy)
 │   └── 14_report/       # <sample>.report.html  ← self-contained per-isolate report
-├── 04_summary/          # master_fungi.tsv  ← one row per isolate (the Layer-2 handoff)
-└── pipeline_info/       # execution_report.html, timeline.html, trace.txt
+├── 04_summary/          # master_fungi.tsv (schema-validated), cohort_report.html, cohort_summary.json, multiqc/  ← the Layer-2 handoff
+├── cohort/              # ANI matrix, species clusters, BUSCO supermatrix tree, SNP distances, clonal groups
+└── pipeline_info/       # provenance.json, db_manifest.json, execution_report.html, timeline.html, trace.txt
 ```
 
 Every stage emits a small `*.json` with a stable schema; Stage 14 merges them into the HTML report and appends the isolate's row to `04_summary/master_fungi.tsv`, which Layer 2 (`analysis/`) consumes.
@@ -189,8 +194,12 @@ Compose one from each group:
 ## Notes & best practices baked in
 
 - **Input-mode–aware resistance confidence:** ONT homopolymer indels create false frameshifts exactly where antifungal-resistance point-mutations live, so **ONT-only** calls are flagged **provisional until hybrid-polished** (Medaka is applied; Polypolish adds Illumina when present). **Hybrid** and **Illumina-only** assemblies carry **high-confidence** calls — short-read base accuracy has no homopolymer-indel problem.
-- **Antifungal resistance** uses a curated **FungAMR/MARDy** allele+mutation panel plus a dedicated *A. fumigatus* **cyp51A TR34/TR46** promoter-repeat detector (structural, not SNP).
-- **Identification** uses ITS/LSU (UNITE) + genome ANI (sourmash/skani) with multi-locus **GCPSR** concordance — there is no GTDB for fungi.
+- **Antifungal resistance** uses a curated panel merged with every published substitution in **FungAMR** (with its evidence tier), a dedicated *A. fumigatus* **cyp51A TR34/TR46** promoter-repeat detector (structural, not SNP), and **read-level genotyping**: every hotspot is re-read from the reads (allele frequency, zygosity, alleles the assembly missed) and the TR site is checked in the reads, so an assembly cannot silently drop a resistance signal.
+- **Identification** is multi-locus: ITS against UNITE plus CaM, BenA, TEF1, RPB2 and LSU D1/D2 extracted from the assembly and searched against NCBI type-material reference sets; a species call needs ITS and one agreeing secondary locus (ties such as *A. flavus*/*A. oryzae* and discordances are flagged, never hidden); fungal PubMLST schemes give an ST where one exists, and BUSCO is re-scored with the lineage chosen from the call — there is no GTDB for fungi.
+- **Non-fungal isolates are stopped early:** a Kraken2 read triage before assembly, and the contig verdict plus assembly QC after it, stop bacterial/human/failed isolates with the reason on their master row; `--force_all` overrides.
+- **Reads tell you the genome before assembly:** a KMC + GenomeScope2 k-mer profile reports genome size, heterozygosity, a ploidy hint and coverage per isolate.
+- **No silent failure:** every stage JSON carries `status` (`ok | partial | failed | skipped`) and per-tool exit codes and versions; the master table's `stages_failed` column names anything that was not `ok`.
+- **Reproducible by construction:** every container image is a versioned tag or digest (recorded with its manifest digest in `conf/base.config`), the base image is built from an explicit conda lock (`env/base.linux-64.lock`), the databases are verified before any compute (`DB_CHECK`), and every run writes `pipeline_info/provenance.json` — commit, Nextflow version, effective parameters, the sha256/digest of every image that ran, database manifest, and every tool version per sample and stage.
 - **Storage:** databases (~150–250 GB) and Nextflow `work/` live on an external drive via `--data_dir` / `-w`.
 
 ## Documentation
@@ -200,6 +209,31 @@ Compose one from each group:
 - **[Preflight QC](docs/preflight_qc.md)** — fast ONT triage before a long run.
 - **[HPC deployment](docs/hpc_deployment.md)** — running on a Slurm cluster.
 
+## Testing
+
+Every push to `main`/`develop` runs the CI matrix in `.github/workflows/ci.yml`: the unit suite
+(pytest, every `bin/*.py` helper and the CLI, subprocess coverage of `bin/` + `fungiforge/`
+enforced at ≥ 85 %), `nextflow lint` at zero warnings, shellcheck, the 15-stage stub DAG on the
+three-mode fixture, and nf-test (routing functions, one stub test per module, the whole DAG).
+Locally:
+
+```bash
+pip install -e ".[dev]"
+COVERAGE_PROCESS_START=.coveragerc coverage run -m pytest test/unit && coverage combine && coverage report
+nextflow lint . && shellcheck -S warning -x bin/*.sh share/bin/*
+nextflow run main.nf -profile local,test -stub-run
+nf-test test                       # needs nf-test: curl -fsSL https://get.nf-test.com | bash
+bash test/run_docker_fixture.sh    # real containers on the fixture (assemblers are expected to fail on it)
+```
+
+Real-data validation does not fit a hosted runner; it runs on the development deployment and is
+recorded in `docs/validation.md`: `fungiforge validate --results <outdir> --sample <id>` compares a
+run with `test/expected/<id>.json`, `bin/benchmark_assembly.py` scores an assembly against a reference
+genome, and `bin/control_genotype.py` confirms a resistance control's genotype from its own reads
+before it is trusted.
+
 ## Status
 
-Scaffold validated end-to-end (`-profile test -stub-run`, all 15 stages) across all three input modes — ONT-only, Illumina-only, and hybrid. Stage implementations, the comparative analysis layer, HPC packaging, and a real-SRA test are in progress — see `docs/`.
+v0.1.0 (`main`) is deployed and validated on real isolates (hybrid *A. fumigatus* CEA10,
+Illumina-only *A. flavus*); the v0.2 upgrade programme (`develop`, `docs/UPGRADE_PLAN.md`)
+is in progress with a status board per work item.

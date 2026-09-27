@@ -11,9 +11,10 @@
 #   export FUNGIFORGE_DB="/path/to/fungiforge_db"
 #   bin/fetch_references.sh                 # all steps
 #   bin/fetch_references.sh images antismash funannotate   # selected steps
+#   bin/fetch_references.sh --wait interproscan            # queue behind a running fetch
 #
 # Steps: images antismash funannotate eggnog busco unite kraken2 refseq_fungi
-#        fungamr rvdb
+#        fungamr rvdb benchmarks markers mlst dbcan phibase effectorp genomad genomes interproscan
 #
 # NB several DBs are downloaded THROUGH their tool container (funannotate setup,
 # eggnog, antismash) so the relevant image is pulled first. Version/URL-sensitive
@@ -23,12 +24,45 @@
 set -uo pipefail
 
 DB="${FUNGIFORGE_DB:?set FUNGIFORGE_DB to the target data dir, e.g. /data/fungiforge_db}"
-mkdir -p "$DB"/{containers,funannotate,eggnog,antismash,busco,unite,kraken2,refseq_fungi,fungamr,rvdb,logs}
+mkdir -p "$DB"/{containers,funannotate,eggnog,antismash,busco,unite,kraken2,refseq_fungi,fungamr,rvdb,markers,mlst,interproscan,dbcan,phibase,effectorp,logs}
 LOGDIR="$DB/logs"; MANIFEST="$DB/MANIFEST.tsv"
+
+# One fetch at a time per data dir. Two concurrent runs resume the same partial file and
+# truncate each other's work — a download that grows, shrinks and never finishes.
+# --wait queues behind a running fetch instead of refusing, so a second database can be lined up
+# while a multi-hour download finishes.
+FF_LOCK_WAIT=0; _args=()
+for _a in "$@"; do
+  case "$_a" in --wait) FF_LOCK_WAIT=1 ;; *) _args+=("$_a") ;; esac
+done
+set -- ${_args[@]+"${_args[@]}"}
+unset _a _args
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$DB/.fetch.lock"
+  if [ "$FF_LOCK_WAIT" = 1 ]; then
+    flock -n 9 || { echo "another fetch_references run is using $DB — waiting for it (--wait)" >&2; flock 9; }
+  elif ! flock -n 9; then
+    echo "another fetch_references run is using $DB (lock: $DB/.fetch.lock)." >&2
+    # Name the holder. Killing the script alone can leave a download running that still holds the
+    # lock, and "pkill -f fetch_references" then looks like it did nothing.
+    holder="$( { fuser "$DB/.fetch.lock" 2>/dev/null || lsof -t "$DB/.fetch.lock" 2>/dev/null; } | tr -s ' ' '\n' | grep -E '^[0-9]+$' | sort -u | tr '\n' ' ')"
+    if [ -n "${holder// /}" ]; then
+      echo "held by:" >&2; ps -o pid=,etime=,args= -p ${holder} 2>/dev/null | sed 's/^/  /' >&2
+      echo "wait for it, or stop it:  kill ${holder}" >&2
+    else
+      echo "wait for it, or stop it first:  pkill -f fetch_references" >&2
+    fi
+    echo "or queue behind it:  $0 --wait $*" >&2
+    exit 1
+  fi
+fi
 [ -f "$MANIFEST" ] || echo -e "database\tdetail\tstatus\ttimestamp" > "$MANIFEST"
 
 log(){ echo "[$(date '+%F %T')] $*" | tee -a "$LOGDIR/fetch.log" ; }
 
+# The downloader must not inherit the lock file descriptor (9<&- below): a download that outlives a
+# killed parent would otherwise keep the data dir locked, and the next run reports a fetch in
+# progress that no longer exists.
 # Robust, resumable, multi-connection download. aria2c preferred (16 parallel
 # connections, --continue resumes a broken transfer from where it stopped, infinite
 # retries); curl -C - is the fallback. Never restarts a partial file from scratch.
@@ -37,9 +71,78 @@ dl(){  # dl <url> <output-filename>   (run inside the target dir)
   if command -v aria2c >/dev/null 2>&1; then
     aria2c --continue=true -x16 -s16 -k1M --max-tries=0 --retry-wait=10 \
            --file-allocation=none --auto-file-renaming=false --console-log-level=warn \
-           -o "$out" "$url"
+           -o "$out" "$url" 9<&-
+  elif command -v wget >/dev/null 2>&1; then
+    # Preferred over curl for the multi-GB databases. curl's --retry rewinds to byte 0 when the
+    # server drops a transfer that -C - had positioned, so a flaky link makes the file grow and
+    # shrink forever; wget -c re-issues a Range request from the bytes already on disk on every
+    # retry. -nv keeps one line per event in the log instead of a rewriting progress bar.
+    wget -c -nv --tries=0 --timeout=60 --read-timeout=300 --waitretry=30 -O "$out" "$url" 9<&-
   else
-    curl -fL -C - --retry 999 --retry-delay 10 --retry-all-errors -o "$out" "$url"
+    # -sS: no progress meter. Everything here is appended to a log file, where curl's meter
+    # rewrites one line thousands of times and buries the real messages; errors still print.
+    # Watch progress by file size instead:  watch -n 20 'ls -lh <db>/<dir>'
+    curl -fL -C - --retry 999 --retry-delay 10 --retry-all-errors -sS -o "$out" "$url" 9<&-
+  fi
+}
+
+# A resumed multi-GB download that picked up from a corrupt offset still decompresses to a short,
+# useless database. Check the archive before trusting it; a failure here deletes the file so the
+# next run starts clean rather than resuming onto the same damage.
+verify_archive(){  # verify_archive <file>   (run inside the target dir)
+  local f="$1"
+  case "$f" in
+    *.tar.gz|*.tgz) tar tzf "$f" >/dev/null 2>&1 ;;
+    *.gz)     gzip -t "$f" 2>/dev/null ;;
+    *)        return 0 ;;
+  esac || { echo "[fetch] $f is corrupt (failed its integrity check) — removing it" >&2; rm -f "$f"; return 1; }
+}
+
+
+# Print the growing file's size every 60 s while a download runs in the background, so a long
+# fetch shows progress in the log without a progress meter. Usage: watch_size <file> & ; WPID=$!
+watch_size(){
+  local f="$1" last=0 now
+  while sleep 60; do
+    [ -e "$f" ] || continue
+    now=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null || echo 0)
+    [ "$now" = "$last" ] && continue
+    log "  $(basename "$f"): $(numfmt --to=iec "$now" 2>/dev/null || echo "$now")"
+    last=$now
+  done
+}
+
+# ---- run a command inside a container image, whatever runtime the host has (L24) -------------
+# crun <image> <host_dir>:<container_dir> [<host_dir>:<container_dir> ...] -- <command...>
+# Apptainer/Singularity first (the cluster path: no daemon, no root), then Docker. Apptainer
+# ignores an image ENTRYPOINT with `exec`, which is what both callers below need; under Docker the
+# entrypoint is cleared explicitly. Images are cached under $DB/containers for the apptainer path.
+crun(){
+  local img="$1"; shift
+  local binds=() mounts=()
+  while [ "${1:-}" != "--" ] && [ $# -gt 0 ]; do binds+=("$1"); shift; done
+  [ "${1:-}" = "--" ] && shift
+  local rt=""
+  command -v apptainer >/dev/null 2>&1 && rt=apptainer
+  [ -z "$rt" ] && command -v singularity >/dev/null 2>&1 && rt=singularity
+  if [ -n "$rt" ]; then
+    local cache="${NXF_APPTAINER_CACHEDIR:-${NXF_SINGULARITY_CACHEDIR:-$DB/containers}}"
+    mkdir -p "$cache"
+    local sif
+    sif="$cache/$(echo "$img" | sed -E 's#[/:]#-#g').img"
+    if [ ! -s "$sif" ]; then
+      log "  $rt pull $img"
+      rm -f "$sif.part"
+      $rt pull --name "$sif.part" "docker://$img" >>"$LOGDIR/containers.log" 2>&1 || return 1
+      mv "$sif.part" "$sif"
+    fi
+    for b in "${binds[@]}"; do mounts+=(-B "$b"); done
+    $rt exec "${mounts[@]}" "$sif" "$@"
+  elif command -v docker >/dev/null 2>&1; then
+    for b in "${binds[@]}"; do mounts+=(-v "$b"); done
+    docker run --rm --platform linux/amd64 --entrypoint "" "${mounts[@]}" "$img" "$@"
+  else
+    echo "no apptainer/singularity/docker on PATH" >&2; return 127
   fi
 }
 
@@ -92,46 +195,102 @@ step_images(){
 step_antismash(){
   is_done antismash && { log "antismash db present — skip"; return; }
   log "downloading antiSMASH databases -> $DB/antismash"
-  # The image entrypoint is `antismash`; the DB downloader is a separate console
-  # script, so override the entrypoint. `download-antismash-databases` takes --database-dir.
-  docker run --rm --platform linux/amd64 --entrypoint download-antismash-databases \
-      -v "$DB/antismash":/db antismash/standalone:8.0.0 --database-dir /db >>"$LOGDIR/antismash.log" 2>&1 \
+  # The image entrypoint is `antismash`; the DB downloader is a separate console script, so the
+  # entrypoint is bypassed (crun does that for both runtimes). It takes --database-dir.
+  crun antismash/standalone:8.0.0 "$DB/antismash:/db" -- download-antismash-databases --database-dir /db >>"$LOGDIR/antismash.log" 2>&1 \
     && mark antismash "antismash8 db" || fail antismash "download-antismash-databases"
 }
 
 # ---- Funannotate database (~30-50 GB): Pfam, dbCAN, MEROPS, InterPro, BUSCO --
 step_funannotate(){
   is_done funannotate && { log "funannotate db present — skip"; return; }
-  log "funannotate setup -i all -> $DB/funannotate (large, hours)"
-  docker run --rm --platform linux/amd64 -e FUNANNOTATE_DB=/data -v "$DB/funannotate":/data \
-      nextgenusfs/funannotate:latest funannotate setup -i all -d /data >>"$LOGDIR/funannotate.log" 2>&1 \
-    && mark funannotate "funannotate setup all" || fail funannotate "funannotate setup"
+  # `-b all` matters: setup installs only the dikarya BUSCO set by default, and stage 07a's
+  # species-aware training picks a clade set (eurotiomycetes, sordariomycetes, saccharomycetes,
+  # basidiomycota, ascomycota) only when it is actually staged — otherwise it silently falls back
+  # to dikarya and records the reason.
+  log "funannotate setup -i all -b all -> $DB/funannotate (large, hours)"
+  FUNANNOTATE_DB=/data crun nextgenusfs/funannotate:latest "$DB/funannotate:/data" -- funannotate setup -i all -b all -d /data >>"$LOGDIR/funannotate.log" 2>&1 \
+    && mark funannotate "funannotate setup all + all BUSCO sets" || fail funannotate "funannotate setup"
 }
 
 # ---- eggNOG database (~50 GB) -----------------------------------------------
 # eggnog-mapper ships download_eggnog_data.py; run it from the funannotate image
 # (bundles eggnog-mapper) or the eggnog-mapper image. -y = accept all downloads.
 step_eggnog(){
+  # eggNOG 5 data for eggNOG-mapper 2.1 (stage 07b): direct download, no container needed
+  # (the funannotate image ships no emapper; stage 07b runs the eggnog-mapper image).
+  # A file is only accepted when it reaches its expected size: a truncated leftover from an
+  # interrupted or failed earlier attempt is non-empty, and treating that as done shipped a
+  # 1.5 GB eggnog directory that emapper cannot use.
   is_done eggnog && { log "eggnog db present — skip"; return; }
-  log "downloading eggNOG data -> $DB/eggnog (large)"
-  docker run --rm --platform linux/amd64 -v "$DB/eggnog":/eggnog \
-      nextgenusfs/funannotate:latest download_eggnog_data.py -y --data_dir /eggnog >>"$LOGDIR/eggnog.log" 2>&1 \
-    && mark eggnog "eggnog data" || fail eggnog "download_eggnog_data.py"
+  local base="${EGGNOG_URL:-http://eggnog5.embl.de/download/emapperdb-5.0.2}"
+  local ok=1 f name min have
+  log "downloading eggNOG 5.0.2 data (eggnog.db ~12 GB and eggnog_proteins.dmnd ~9 GB once decompressed) -> $DB/eggnog"
+  for f in eggnog.db.gz:eggnog.db:8000000000 eggnog_proteins.dmnd.gz:eggnog_proteins.dmnd:4000000000 eggnog.taxa.tar.gz:eggnog.taxa.db:1000000; do
+    name="${f#*:}"; min="${name#*:}"; name="${name%%:*}"; f="${f%%:*}"
+    have=$(stat -c%s "$DB/eggnog/$name" 2>/dev/null || stat -f%z "$DB/eggnog/$name" 2>/dev/null || echo 0)
+    if [ "$have" -ge "$min" ]; then log "have $name ($(numfmt --to=iec "$have" 2>/dev/null || echo "$have")) — skip"; continue; fi
+    [ "$have" -gt 0 ] && log "  $name is $(numfmt --to=iec "$have" 2>/dev/null || echo "$have"), expected >= $(numfmt --to=iec "$min" 2>/dev/null || echo "$min") — re-downloading"
+    ( cd "$DB/eggnog" && rm -f "$name" && dl "$base/$f" "$f" && verify_archive "$f" \
+      && { case "$f" in *.tar.gz) tar xzf "$f" && rm -f "$f";; *.gz) gunzip -f "$f";; esac; } ) >>"$LOGDIR/eggnog.log" 2>&1 \
+      || { fail eggnog "$f"; ok=0; }
+  done
+  local db_size dmnd_size
+  db_size=$(stat -c%s "$DB/eggnog/eggnog.db" 2>/dev/null || stat -f%z "$DB/eggnog/eggnog.db" 2>/dev/null || echo 0)
+  dmnd_size=$(stat -c%s "$DB/eggnog/eggnog_proteins.dmnd" 2>/dev/null || stat -f%z "$DB/eggnog/eggnog_proteins.dmnd" 2>/dev/null || echo 0)
+  if [ "$ok" = 1 ] && [ "$db_size" -ge 8000000000 ] && [ "$dmnd_size" -ge 4000000000 ]; then
+    mark eggnog "emapperdb-5.0.2 (eggnog.db $(numfmt --to=iec "$db_size" 2>/dev/null || echo "$db_size"), eggnog_proteins.dmnd $(numfmt --to=iec "$dmnd_size" 2>/dev/null || echo "$dmnd_size"), taxa)"
+  else
+    fail eggnog "incomplete after download (eggnog.db=$db_size dmnd=$dmnd_size); see logs/eggnog.log"
+  fi
+}
+
+# ---- InterProScan data release (W2.5, stage 07c) ------------------------------
+# The image (interpro/interproscan:<ver>, conf/base.config) carries the software only; the member
+# databases come from the matching data tarball (~6.9 GB), extracted to
+# $DB/interproscan/interproscan-<ver>/data and bound at /opt/interproscan/data by the profile
+# (--interproscan_data). IPS_VERSION must match the image tag.
+step_interproscan(){
+  is_done interproscan && { log "interproscan data present — skip"; return; }
+  local ver="${IPS_VERSION:-5.78-109.0}"
+  local url="${IPS_DATA_URL:-https://ftp.ebi.ac.uk/pub/software/unix/iprscan/5/$ver/alt/interproscan-data-$ver.tar.gz}"
+  mkdir -p "$DB/interproscan"
+  log "downloading InterProScan data $ver -> $DB/interproscan"
+  # The release unpacks into a versioned directory. Leave a stable `data` symlink beside it so the
+  # pipeline can derive the bind path from --data_dir alone, without being told the version.
+  ( cd "$DB/interproscan" && dl "$url" "interproscan-data-$ver.tar.gz" && dl "$url.md5" "interproscan-data-$ver.tar.gz.md5" \
+    && md5sum -c "interproscan-data-$ver.tar.gz.md5" && verify_archive "interproscan-data-$ver.tar.gz" \
+    && tar xzf "interproscan-data-$ver.tar.gz" && rm -f "interproscan-data-$ver.tar.gz" \
+    && ln -sfn "interproscan-$ver/data" data ) >>"$LOGDIR/interproscan.log" 2>&1 \
+    && [ -d "$DB/interproscan/data" ] && mark interproscan "$ver -> data -> interproscan-$ver/data" || fail interproscan "$url"
 }
 
 # ---- BUSCO / compleasm fungal lineages --------------------------------------
 # compleasm is fastest; if not installed, fall back to BUSCO container download.
 step_busco(){
+  # fungi_odb10 is the lineage of the early QC gate (stage 05); the others are the species-aware
+  # lineages stage 08b re-runs BUSCO with (fungiforge/resources/busco_lineages.tsv). Override the
+  # set with BUSCO_LINEAGES="fungi_odb10 eurotiales_odb10 ..." (space-separated). Lineages are
+  # downloaded straight from the BUSCO data server (no container needed) into
+  # $DB/busco/lineages/<lineage>, the layout `busco --download_path $DB/busco --offline` and
+  # compleasm `-L $DB/busco/lineages` read; file_versions.tsv is refreshed alongside.
   is_done busco && { log "busco lineages present — skip"; return; }
-  log "fetching fungal BUSCO/compleasm lineages -> $DB/busco"
-  if command -v compleasm >/dev/null 2>&1; then
-    compleasm download fungi_odb10 -L "$DB/busco" >>"$LOGDIR/busco.log" 2>&1 \
-      && mark busco "compleasm fungi_odb10" || fail busco "compleasm download"
-  else
-    docker run --rm --platform linux/amd64 -v "$DB/busco":/busco -w /busco \
-        ezlabgva/busco:v5.7.1_cv1 busco --download fungi_odb10 >>"$LOGDIR/busco.log" 2>&1 \
-      && mark busco "busco fungi_odb10" || fail busco "busco --download"
-  fi
+  local lineages="${BUSCO_LINEAGES:-fungi_odb10 eurotiales_odb10 saccharomycetes_odb10 hypocreales_odb10 tremellomycetes_odb10 mucorales_odb10 onygenales_odb10 sordariomycetes_odb10}"
+  local base="${BUSCO_DATA_URL:-https://busco-data.ezlab.org/v5/data}"
+  local ok=1 l ver
+  mkdir -p "$DB/busco/lineages"
+  log "fetching BUSCO lineages ($lineages) -> $DB/busco/lineages"
+  ( cd "$DB/busco" && dl "$base/file_versions.tsv" file_versions.tsv ) >>"$LOGDIR/busco.log" 2>&1 \
+    || { fail busco "file_versions.tsv from $base"; return; }
+  for l in $lineages; do
+    if [ -d "$DB/busco/lineages/$l" ] || [ -d "$DB/busco/$l" ] || [ -d "$DB/busco/busco_downloads/lineages/$l" ]; then log "have $l — skip"; continue; fi
+    ver=$(awk -v L="$l" -F'\t' '$1==L {print $2; exit}' "$DB/busco/file_versions.tsv")
+    if [ -z "$ver" ]; then fail busco "$l not in file_versions.tsv"; ok=0; continue; fi
+    log "downloading $l ($ver)"
+    ( cd "$DB/busco/lineages" && dl "$base/lineages/$l.$ver.tar.gz" "$l.tar.gz" && verify_archive "$l.tar.gz" && tar xzf "$l.tar.gz" && rm -f "$l.tar.gz" ) >>"$LOGDIR/busco.log" 2>&1 \
+      && [ -d "$DB/busco/lineages/$l" ] || { fail busco "download/extract $l"; ok=0; }
+  done
+  [ "$ok" = 1 ] && mark busco "$lineages"
 }
 
 # ---- UNITE fungal ITS reference (version-sensitive URL) ----------------------
@@ -146,7 +305,7 @@ step_unite(){
   local UNITE_URL="${UNITE_URL:-https://s3.hpc.ut.ee/plutof-public/original/9489f7bc-7cc1-4e0a-84dc-c732476b9acd.tgz}"
   if [ -z "$UNITE_URL" ]; then fail unite "UNITE_URL not set — resolve current release"; return; fi
   log "downloading UNITE -> $DB/unite"
-  ( cd "$DB/unite" && dl "$UNITE_URL" unite.tgz && tar xzf unite.tgz ) >>"$LOGDIR/unite.log" 2>&1 \
+  ( cd "$DB/unite" && dl "$UNITE_URL" unite.tgz && verify_archive unite.tgz && tar xzf unite.tgz ) >>"$LOGDIR/unite.log" 2>&1 \
     && mark unite "$UNITE_URL" || fail unite "$UNITE_URL"
 }
 
@@ -158,7 +317,7 @@ step_kraken2(){
   local K2_URL="${K2_URL:-https://genome-idx.s3.amazonaws.com/kraken/k2_pluspf_08gb_20250402.tar.gz}"
   if [ -z "$K2_URL" ]; then fail kraken2 "K2_URL not set — resolve current index at genome-idx.s3"; return; fi
   log "downloading Kraken2 DB -> $DB/kraken2"
-  ( cd "$DB/kraken2" && dl "$K2_URL" k2.tgz && tar xzf k2.tgz ) >>"$LOGDIR/kraken2.log" 2>&1 \
+  ( cd "$DB/kraken2" && dl "$K2_URL" k2.tgz && verify_archive k2.tgz && tar xzf k2.tgz ) >>"$LOGDIR/kraken2.log" 2>&1 \
     && mark kraken2 "$K2_URL" || fail kraken2 "$K2_URL"
 }
 
@@ -216,13 +375,137 @@ step_rvdb(){
   # https://rvdb-prot.pasteur.fr/ for newer versions.
   local RVDB_URL="${RVDB_URL:-https://rvdb-prot.pasteur.fr/files/U-RVDBv31.0-prot_unique.fasta.xz}"
   if [ -z "$RVDB_URL" ]; then fail rvdb "RVDB_URL not set — resolve current RVDB-prot release"; return; fi
-  ( cd "$DB/rvdb" && dl "$RVDB_URL" rvdb.fasta.xz ) >>"$LOGDIR/rvdb.log" 2>&1 \
-    && mark rvdb "$RVDB_URL" || fail rvdb "$RVDB_URL"
+  # Keep the release's own compression in the name: stage 10 accepts .xz, .gz or plain, and
+  # renaming a gzip stream to .xz would make it undecompressable.
+  local out="rvdb.fasta.xz"
+  case "$RVDB_URL" in *.gz) out="rvdb.fasta.gz";; *.fasta) out="rvdb.fasta";; esac
+  if [ -s "$DB/rvdb/rvdb.fasta.xz" ] || [ -s "$DB/rvdb/rvdb.fasta.gz" ] || [ -s "$DB/rvdb/rvdb.fasta" ]; then
+    log "have an RVDB-prot FASTA already — skip"; mark rvdb "$RVDB_URL"; return
+  fi
+  ( cd "$DB/rvdb" && dl "$RVDB_URL" "$out" ) >>"$LOGDIR/rvdb.log" 2>&1 \
+    && mark rvdb "$RVDB_URL -> $out" || fail rvdb "$RVDB_URL"
+}
+
+# ---- reference genomes for the assembly benchmarks (W1.1; small) -------------
+# A. fumigatus A1163 (CEA10 lineage) for the CEA10 hybrid benchmark and A. flavus NRRL 3357
+# for the Illumina-only benchmark. NCBI Datasets zip -> <acc>.fna; bin/benchmark_assembly.py.
+step_benchmarks(){
+  is_done benchmarks && { log "benchmark references present — skip"; return; }
+  local ok=1 acc
+  mkdir -p "$DB/benchmarks"
+  for acc in GCA_000150145.1 GCA_009017415.1; do
+    [ -s "$DB/benchmarks/$acc.fna" ] && { log "have $acc — skip"; continue; }
+    log "downloading $acc -> $DB/benchmarks/$acc.fna"
+    ( cd "$DB/benchmarks" \
+      && dl "https://api.ncbi.nlm.nih.gov/datasets/v2/genome/accession/$acc/download?include_annotation_type=GENOME_FASTA&filename=$acc.zip" "$acc.zip" \
+      && unzip -o -q "$acc.zip" -d "$acc.tmp" \
+      && cat "$acc.tmp"/ncbi_dataset/data/$acc/*.fna > "$acc.fna" && rm -rf "$acc.tmp" "$acc.zip" ) >>"$LOGDIR/benchmarks.log" 2>&1 \
+      || { fail benchmarks "$acc"; ok=0; }
+  done
+  [ "$ok" = 1 ] && mark benchmarks "A1163 GCA_000150145.1 + NRRL3357 GCA_009017415.1"
+}
+
+# ---- type-material reference sets for the secondary ID loci (W2.3) ------------
+# NCBI records flagged "sequence from type" for CaM, BenA, TEF1, RPB2 and LSU (D1/D2); the
+# per-locus BLAST databases are built inside the identification task, so no BLAST is needed here.
+step_markers(){
+  is_done markers && { log "marker reference sets present — skip"; return; }
+  log "fetching type-material marker sets -> $DB/markers"
+  python3 "$REPO_DIR/bin/fetch_marker_refs.py" --out-dir "$DB/markers" >>"$LOGDIR/markers.log" 2>&1 \
+    && mark markers "NCBI type-material CaM/BenA/TEF1/RPB2/LSU $(date +%F)" || fail markers "fetch_marker_refs.py (see logs/markers.log)"
+}
+
+# ---- fungal PubMLST schemes for mlst (W2.3) ------------------------------------
+step_mlst(){
+  is_done mlst && { log "mlst schemes present — skip"; return; }
+  log "fetching PubMLST fungal schemes -> $DB/mlst/pubmlst"
+  python3 "$REPO_DIR/bin/fetch_mlst_schemes.py" --out-dir "$DB/mlst" >>"$LOGDIR/mlst.log" 2>&1 \
+    && mark mlst "PubMLST afumigatus calbicans cglabrata ctropicalis ckrusei $(date +%F)" || fail mlst "fetch_mlst_schemes.py (see logs/mlst.log)"
+}
+
+# ---- W2.6 extras: dbCAN HMMs, PHI-base, EffectorP 3 --------------------------------
+# dbCAN CAZyme family HMMs (the HMMER module of run_dbcan; searched with hmmsearch in the base image).
+step_dbcan(){
+  is_done dbcan && { log "dbcan HMMs present — skip"; return; }
+  # the dbCAN site serves its files through a download script (plain paths return an HTML page)
+  local ver="${DBCAN_VERSION:-V14}"
+  local url="${DBCAN_URL:-https://pro.unl.edu/dbCAN2/download_file.php?file=dbCAN-HMMdb-$ver.txt}"
+  log "downloading dbCAN HMM database $ver -> $DB/dbcan"
+  ( cd "$DB/dbcan" && dl "$url" "dbCAN-HMMdb.txt" && grep -q '^HMMER3' dbCAN-HMMdb.txt && hmmpress -f dbCAN-HMMdb.txt >/dev/null 2>&1 || true ) >>"$LOGDIR/dbcan.log" 2>&1 \
+    && [ -s "$DB/dbcan/dbCAN-HMMdb.txt" ] && grep -q '^HMMER3' "$DB/dbcan/dbCAN-HMMdb.txt" && mark dbcan "dbCAN-HMMdb-$ver ($url)" || fail dbcan "$url"
+}
+
+# PHI-base pathogen–host interaction proteins (CC BY; FASTA with phenotype in the header).
+step_phibase(){
+  is_done phibase && { log "phibase present — skip"; return; }
+  local url="${PHIBASE_URL:-https://raw.githubusercontent.com/PHI-base/data/master/releases/phi-base_current.fas}"
+  log "downloading PHI-base -> $DB/phibase"
+  ( cd "$DB/phibase" && dl "$url" "phi-base_current.fas" ) >>"$LOGDIR/phibase.log" 2>&1 \
+    && [ -s "$DB/phibase/phi-base_current.fas" ] && mark phibase "$url" || fail phibase "$url"
+}
+
+# EffectorP 3.0 (GPL; Python + bundled WEKA, run with the Java of the base image).
+step_effectorp(){
+  is_done effectorp && { log "effectorp present — skip"; return; }
+  local repo="${EFFECTORP_REPO:-https://github.com/JanaSperschneider/EffectorP-3.0}"
+  log "cloning EffectorP 3.0 -> $DB/effectorp"
+  ( rm -rf "$DB/effectorp/EffectorP-3.0" && git clone -q --depth 1 "$repo" "$DB/effectorp/EffectorP-3.0" \
+    && cd "$DB/effectorp/EffectorP-3.0" && unzip -o -q weka-3-8-4.zip ) >>"$LOGDIR/effectorp.log" 2>&1 \
+    && [ -f "$DB/effectorp/EffectorP-3.0/EffectorP.py" ] && [ -d "$DB/effectorp/EffectorP-3.0/weka-3-8-4" ] \
+    && mark effectorp "$repo ($(git -C "$DB/effectorp/EffectorP-3.0" rev-parse --short HEAD))" || fail effectorp "$repo"
+}
+
+# ---- geNomad database (W2.8, stage 10) ---------------------------------------
+# Zenodo release matching the pinned genomad (1.12 uses database v1.9); extracted to $DB/genomad_db.
+step_genomad(){
+  is_done genomad_db && { log "genomad_db present — skip"; return; }
+  local url="${GENOMAD_DB_URL:-https://zenodo.org/api/records/14886553/files/genomad_db_v1.9.tar.gz/content}"
+  mkdir -p "$DB/genomad_db"
+  log "downloading geNomad database v1.9 (~0.8 GB) -> $DB/genomad_db"
+  ( cd "$DB" && dl "$url" genomad_db.tar.gz && verify_archive genomad_db.tar.gz && tar xzf genomad_db.tar.gz && rm -f genomad_db.tar.gz ) >>"$LOGDIR/genomad.log" 2>&1 \
+    && [ -s "$DB/genomad_db/genomad_db" ] || [ -s "$DB/genomad_db/version.txt" ] && mark genomad_db "$url" || fail genomad_db "$url"
+}
+
+# ---- reference genome set for genome-ANI novelty (W2.9, stage 12) -----------------
+# The reference genome of every species in the genera of fungiforge/resources/novelty_genera.txt
+# (NCBI Datasets; override with GENOMES_GENERA="Aspergillus,Candida" or add GENOMES_ACCESSIONS).
+# Tens of GB for the default list; resumable (present files are kept).
+step_genomes(){
+  is_done refseq_fungi_genomes && { log "reference genome set present — skip"; return; }
+  mkdir -p "$DB/refseq_fungi_genomes"
+  log "fetching the reference genome set -> $DB/refseq_fungi_genomes"
+  python3 "$REPO_DIR/bin/fetch_reference_genomes.py" --out-dir "$DB/refseq_fungi_genomes" \
+      ${GENOMES_GENERA:+--genera "$GENOMES_GENERA"} --genera-file "$REPO_DIR/fungiforge/resources/novelty_genera.txt" \
+      ${GENOMES_ACCESSIONS:+--accessions "$GENOMES_ACCESSIONS"} >>"$LOGDIR/genomes.log" 2>&1 \
+    && mark refseq_fungi_genomes "$(ls "$DB/refseq_fungi_genomes"/*.fna 2>/dev/null | wc -l | tr -d ' ') genomes (fetch_reference_genomes.py)" \
+    || fail refseq_fungi_genomes "fetch_reference_genomes.py (see logs/genomes.log)"
 }
 
 # ---- driver -----------------------------------------------------------------
-STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggnog busco unite kraken2 refseq_fungi fungamr rvdb)
+STEPS=("$@"); [ ${#STEPS[@]} -eq 0 ] && STEPS=(images antismash funannotate eggnog busco unite kraken2 refseq_fungi fungamr rvdb benchmarks markers mlst dbcan phibase effectorp genomad)   # genomes (tens of GB) and interproscan: on request (6.9 GB + hours per genome)
 log "==== fungiforge fetch_references start · DB=$DB · steps: ${STEPS[*]} ===="
 for s in "${STEPS[@]}"; do "step_$s"; done
 log "==== fetch_references finished ===="
-log "manifest: $MANIFEST"; column -t -s $'\t' "$MANIFEST" 2>/dev/null || cat "$MANIFEST"
+# CURRENT state, one row per database: $MANIFEST is an append-only log, so a database that failed
+# in July and succeeded in September has both rows in it and the raw log reads as broken. The
+# `.done` marker on disk is the authority; the log stays for the audit trail.
+log "current state (latest entry per database; full log: $MANIFEST)"
+{
+  echo -e "database\tstate\tsize\tdetail\twhen"
+  for d in "$DB"/*/; do
+    name="$(basename "$d")"
+    [ "$name" = "logs" ] && continue
+    last="$(awk -F'\t' -v n="$name" '$1==n {row=$0} END{print row}' "$MANIFEST")"
+    state="missing"; [ -f "$d/.done" ] && state="present"
+    [ -z "$(ls -A "$d" 2>/dev/null)" ] && state="empty"
+    # these are staged only when asked for (large, and nothing needs them by default)
+    case "$name" in
+      interproscan|refseq_fungi_genomes)
+        [ "$state" = "present" ] || state="on request" ;;
+    esac
+    size="$(du -sh "$d" 2>/dev/null | cut -f1)"
+    echo -e "$name\t$state\t${size:--}\t$(echo "$last" | cut -f2 | cut -c1-60)\t$(echo "$last" | cut -f4)"
+  done
+} | column -t -s $'\t' 2>/dev/null || cat "$MANIFEST"
+log "'missing'/'empty' -> re-fetch by naming the step: bin/fetch_references.sh <step>"
+log "'on request' -> optional, nothing needs it by default: interproscan (6.9 GB, stage 07c), genomes (tens of GB, stage 12 ANI novelty)"

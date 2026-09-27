@@ -675,7 +675,8 @@ for i in "${!R_SAMPLE[@]}"; do
     RESEQ_L+=("$s")
   fi
 done
-# comma-join, tolerant of empty arrays under `set -u` (macOS bash 3.2 safe)
+# comma-join, tolerant of empty arrays under `set -u` (macOS bash 3.2 safe: no namerefs)
+# shellcheck disable=SC2154  # c and arr are assigned by the evals
 listjoin(){ eval "local c=\${#$1[@]}"; if [ "$c" -eq 0 ]; then printf '(none)'; return; fi
   eval "local arr=(\"\${$1[@]}\")"; local out="" e
   for e in "${arr[@]}"; do [ -n "$out" ] && out="$out, $e" || out="$e"; done; printf '%s' "$out"; }

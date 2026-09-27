@@ -1,0 +1,11 @@
+# Coverage for the fungiforge helpers. Most tests drive the scripts as subprocesses (the way the
+# pipeline does), so subprocess measurement is on: run with
+#   COVERAGE_PROCESS_START=.coveragerc pytest --cov=bin --cov=fungiforge   (pytest-cov), or
+#   COVERAGE_PROCESS_START=.coveragerc coverage run -m pytest && coverage combine && coverage report
+[run]
+parallel = true
+source = bin, fungiforge
+omit = bin/hpc_*.sh, test/*
+[report]
+skip_covered = false
+show_missing = true
