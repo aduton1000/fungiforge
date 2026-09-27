@@ -11,11 +11,14 @@ process REPORT {
           path("${meta.id}.master.tsv"),                   emit: master
   script:
   """
-  python3 ${projectDir}/bin/make_report.py --sample "${meta.id}" \\
+  source ff_status.sh; ff_init report "${meta.id}" ${meta.id}.report_status.json
+  ff_version python -- python3 --version
+  ff_version pandas -- python3 -c "import pandas; print(pandas.__version__)"
+  ff_run make_report -- make_report.py --sample "${meta.id}" \\
       --compartment "${meta.compartment}" --facility "${meta.facility}" --season "${meta.season}" \\
       --jsons ${jsons} \\
-      --html ${meta.id}.report.html --master ${meta.id}.master.tsv \\
-      || { echo -e "sample\\tcompartment\\tspecies" > ${meta.id}.master.tsv; echo -e "${meta.id}\\t${meta.compartment}\\tNA" >> ${meta.id}.master.tsv; echo "<html><body>${meta.id}</body></html>" > ${meta.id}.report.html; }
+      --html ${meta.id}.report.html --master ${meta.id}.master.tsv
+  ff_finalize
   """
   stub:
   "echo '<html>${meta.id}</html>' > ${meta.id}.report.html; printf 'sample\\n${meta.id}\\n' > ${meta.id}.master.tsv"

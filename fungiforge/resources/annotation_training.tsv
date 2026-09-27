@@ -1,0 +1,89 @@
+# Species-aware annotation training (W2.5, stage 07a). The species call of stage 08 picks the
+# Augustus pre-trained species funannotate starts its BUSCO-guided training from
+# (--busco_seed_species; names as listed by `funannotate species`) and the funannotate BUSCO set
+# (--busco_db; a directory under $FUNANNOTATE_DB, dikarya when the set is not staged).
+# Lookup: exact species, then genus, else the defaults (anidulans, dikarya). Columns: taxon, augustus_species, busco_db.
+taxon	augustus_species	busco_db
+Aspergillus fumigatus	aspergillus_fumigatus	eurotiomycetes
+Aspergillus flavus	aspergillus_oryzae	eurotiomycetes
+Aspergillus oryzae	aspergillus_oryzae	eurotiomycetes
+Aspergillus terreus	aspergillus_terreus	eurotiomycetes
+Aspergillus nidulans	aspergillus_nidulans	eurotiomycetes
+Aspergillus	aspergillus_fumigatus	eurotiomycetes
+Penicillium	aspergillus_nidulans	eurotiomycetes
+Talaromyces	aspergillus_nidulans	eurotiomycetes
+Paecilomyces	aspergillus_nidulans	eurotiomycetes
+Exophiala	anidulans	eurotiomycetes
+Cladophialophora	anidulans	eurotiomycetes
+Fonsecaea	anidulans	eurotiomycetes
+Histoplasma	histoplasma_capsulatum	eurotiomycetes
+Blastomyces	histoplasma_capsulatum	eurotiomycetes
+Emergomyces	histoplasma_capsulatum	eurotiomycetes
+Coccidioides	coccidioides_immitis	eurotiomycetes
+Paracoccidioides	histoplasma_capsulatum	eurotiomycetes
+Trichophyton	coccidioides_immitis	eurotiomycetes
+Microsporum	coccidioides_immitis	eurotiomycetes
+Nannizzia	coccidioides_immitis	eurotiomycetes
+Candida albicans	candida_albicans	saccharomycetes
+Candida tropicalis	candida_tropicalis	saccharomycetes
+Candida guilliermondii	candida_guilliermondii	saccharomycetes
+Meyerozyma	candida_guilliermondii	saccharomycetes
+Candida	candida_albicans	saccharomycetes
+Candidozyma	candida_albicans	saccharomycetes
+Nakaseomyces	saccharomyces_cerevisiae_S288C	saccharomycetes
+Saccharomyces	saccharomyces_cerevisiae_S288C	saccharomycetes
+Kluyveromyces	kluyveromyces_lactis	saccharomycetes
+Pichia	pichia_stipitis	saccharomycetes
+Debaryomyces	debaryomyces_hansenii	saccharomycetes
+Lodderomyces	lodderomyces_elongisporus	saccharomycetes
+Clavispora	candida_albicans	saccharomycetes
+Yarrowia	yarrowia_lipolytica	saccharomycetes
+Wickerhamomyces	pichia_stipitis	saccharomycetes
+Cryptococcus neoformans	cryptococcus_neoformans_neoformans_JEC21	basidiomycota
+Cryptococcus gattii	cryptococcus_neoformans_gattii	basidiomycota
+Cryptococcus	cryptococcus	basidiomycota
+Naganishia	cryptococcus	basidiomycota
+Papiliotrema	cryptococcus	basidiomycota
+Trichosporon	cryptococcus	basidiomycota
+Cutaneotrichosporon	cryptococcus	basidiomycota
+Rhodotorula	ustilago_maydis	basidiomycota
+Malassezia	ustilago_maydis	basidiomycota
+Ustilago	ustilago_maydis	basidiomycota
+Coprinus	coprinus_cinereus	basidiomycota
+Coprinopsis	coprinus_cinereus	basidiomycota
+Agaricus	coprinus_cinereus	basidiomycota
+Pleurotus	coprinus_cinereus	basidiomycota
+Schizophyllum	coprinus_cinereus	basidiomycota
+Laccaria	laccaria_bicolor	basidiomycota
+Phanerochaete	phanerochaete_chrysosporium	basidiomycota
+Ganoderma	phanerochaete_chrysosporium	basidiomycota
+Fusarium graminearum	fusarium_graminearum	sordariomycetes
+Fusarium	fusarium	sordariomycetes
+Trichoderma	fusarium	sordariomycetes
+Purpureocillium	fusarium	sordariomycetes
+Beauveria	fusarium	sordariomycetes
+Metarhizium	fusarium	sordariomycetes
+Neurospora	neurospora_crassa	sordariomycetes
+Chaetomium	chaetomium_globosum	sordariomycetes
+Magnaporthe	magnaporthe_grisea	sordariomycetes
+Pyricularia	magnaporthe_grisea	sordariomycetes
+Verticillium	verticillium_longisporum1	sordariomycetes
+Colletotrichum	magnaporthe_grisea	sordariomycetes
+Scedosporium	chaetomium_globosum	sordariomycetes
+Lomentospora	chaetomium_globosum	sordariomycetes
+Sporothrix	neurospora_crassa	sordariomycetes
+Botrytis	botrytis_cinerea	ascomycota
+Sclerotinia	botrytis_cinerea	ascomycota
+Alternaria	botrytis_cinerea	ascomycota
+Curvularia	botrytis_cinerea	ascomycota
+Bipolaris	botrytis_cinerea	ascomycota
+Cladosporium	botrytis_cinerea	ascomycota
+Aureobasidium	botrytis_cinerea	ascomycota
+Schizosaccharomyces	schizosaccharomyces_pombe	ascomycota
+Pneumocystis	pneumocystis	ascomycota
+Rhizopus	rhizopus_oryzae	fungi
+Mucor	rhizopus_oryzae	fungi
+Lichtheimia	rhizopus_oryzae	fungi
+Rhizomucor	rhizopus_oryzae	fungi
+Cunninghamella	rhizopus_oryzae	fungi
+Apophysomyces	rhizopus_oryzae	fungi

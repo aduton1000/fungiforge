@@ -1,0 +1,12 @@
+ 50.00	500	500	U	0	unclassified
+ 50.00	500	0	R	1	root
+ 50.00	500	0	R1	131567	  cellular organisms
+ 40.00	400	0	D	2759	    Eukaryota
+  4.00	40	0	K	33208	      Metazoa
+  4.00	40	40	S	9606	        Homo sapiens
+ 36.00	360	0	K	4751	      Fungi
+ 36.00	360	0	G	5052	        Aspergillus
+ 30.00	300	300	S	746128	          Aspergillus fumigatus
+  6.00	60	60	S	5059	          Aspergillus flavus
+ 10.00	100	0	D	2	    Bacteria
+ 10.00	100	100	S	562	      Escherichia coli

@@ -7,21 +7,37 @@ process ASSEMBLY_QC {
   publishDir { "${params.outdir}/${meta.id}/05_assembly_qc" }, mode: 'copy'
   input:  tuple val(meta), path(nuclear)
   output: tuple val(meta), path("${meta.id}.assemblyqc.json"), emit: json
+          tuple val(meta), path("${meta.id}.busco_sc.faa"),    emit: busco_sc   // W3.1: single-copy BUSCO proteins for the cohort tree
   script:
   def lineage = params.busco_lineage == 'auto' ? 'fungi_odb10' : params.busco_lineage
   """
   export TMPDIR="\$PWD/tmp"; mkdir -p "\$TMPDIR"   # node /tmp is a shared tmpfs; keep scratch on disk
-  quast.py ${nuclear} -o quast --threads ${task.cpus} --silent || true
+  source ff_status.sh; ff_init assembly_qc "${meta.id}" ${meta.id}.assemblyqc.json
+  ff_version busco -- busco --version
+    ff_version compleasm -- compleasm --version
+  # Contiguity statistics come from assembly_qc.py (no QUAST in the images; the reference
+  # benchmark lives in bin/benchmark_assembly.py, run by the validation suite, not per isolate).
+  COMPLEASM_OK=0
   if command -v compleasm >/dev/null 2>&1 && [ -n "${params.data_dir ?: ''}" ]; then
-    compleasm run -a ${nuclear} -o compleasm -l ${lineage} -L "${params.data_dir}/busco" -t ${task.cpus} || true
+    ff_run compleasm --optional -- compleasm run -a ${nuclear} -o compleasm -l ${lineage} -L "${params.data_dir}/busco" -t ${task.cpus}
+    if [ "\$FF_RC" -eq 0 ]; then COMPLEASM_OK=1; fi
   else
-    busco -i ${nuclear} -o busco -l ${lineage} -m genome -c ${task.cpus} \\
-        ${ params.data_dir ? "--download_path ${params.data_dir}/busco --offline" : "" } || true
+    ff_skip compleasm "compleasm not available in this image; using BUSCO"
   fi
-  python3 ${projectDir}/bin/assembly_qc.py --sample "${meta.id}" --nuclear ${nuclear} \\
+  if [ "\$COMPLEASM_OK" -eq 0 ]; then
+    ff_run busco -- busco -i ${nuclear} -o busco -l ${lineage} -m genome -c ${task.cpus} \\
+        ${ params.data_dir ? "--download_path ${params.data_dir}/busco --offline" : "" }
+  fi
+  ff_run assembly_qc -- assembly_qc.py --sample "${meta.id}" --nuclear ${nuclear} \\
       --lineage ${lineage} --compleasm-dir compleasm --busco-dir busco \\
       --out ${meta.id}.assemblyqc.json
+  ff_run busco_singlecopy --optional -- busco_singlecopy.py --sample "${meta.id}" --busco-dir busco --compleasm-dir compleasm --out ${meta.id}.busco_sc.faa
+  [ -f ${meta.id}.busco_sc.faa ] || : > ${meta.id}.busco_sc.faa
+  ff_finalize
   """
   stub:
-  "touch ${meta.id}.assemblyqc.json"
+  // --stub_qc_fail 'ID,ID2' lets the DAG tests exercise the gate
+  def failing = (params.stub_qc_fail ?: '').toString().split(',').collect { id -> id.trim() }
+  def qc = failing.contains(meta.id) ? 'false' : 'true'
+  ": > ${meta.id}.busco_sc.faa; echo '{\"sample\":\"${meta.id}\",\"stage\":\"assembly_qc\",\"qc_pass\":${qc}}' > ${meta.id}.assemblyqc.json"
 }

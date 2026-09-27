@@ -28,6 +28,7 @@ TMO=""; command -v timeout >/dev/null 2>&1 && TMO="timeout -k 5"
 # MISSING. Load the site hooks ourselves (they are silent, export-only snippets).
 SOURCED_HOOKS=""
 for f in /etc/profile.d/*.sh; do
+  # shellcheck disable=SC1090  # profile.d hooks are discovered at run time
   [ -r "$f" ] && grep -qs 'hpc/opt\|forge' "$f" && { . "$f" >/dev/null 2>&1 || true; SOURCED_HOOKS="$SOURCED_HOOKS $f"; }
 done
 
@@ -110,7 +111,7 @@ audit_forge(){
   if [ -n "$envf" ]; then run 10 "site env $envf" "grep -vE '^\s*#|^\s*$' '$envf'"; ok "site env" "$envf"; check_paths "$envf" "site env"
     grep -q '\[EDIT' "$envf" && part "site env edited" "still contains [EDIT] markers"
   else echo "  no $name-env.sh found (root, repo/share, ~)"; miss "site env" "$name-env.sh not created from share/$name-env.sh.example"; fi
-  local params; params="$(find "$root" "$HOME" /hpc/prj /hpc/data 2>/dev/null -maxdepth 3 -name '*.params.yaml' -o -maxdepth 3 -name '*params*.yml' 2>/dev/null | grep -i "$name\|site" | head -5)"
+  local params; params="$(find "$root" "$HOME" /hpc/prj /hpc/data -maxdepth 3 \( -name '*.params.yaml' -o -name '*params*.yml' \) 2>/dev/null | grep -i "$name\|site" | head -5)"
   if [ -n "$params" ]; then for f in $params; do run 10 "params file $f" "grep -vE '^\s*#|^\s*$' '$f' | head -60"; check_paths "$f" "params file"; grep -q '\[EDIT' "$f" && part "params edited" "$f still contains [EDIT] markers"; done; ok "params file" "$params"
   else echo "  no site params yaml found"; [ "$name" != fungiforge ] && miss "params file" "conf/cluster.params.example.yaml not copied/edited"; fi
   for f in "$root/site.config" "$repo/site.config"; do [ -f "$f" ] && { run 10 "site.config" "cat '$f'"; check_paths "$f" "site.config"; ok "site.config" "$f"; }; done

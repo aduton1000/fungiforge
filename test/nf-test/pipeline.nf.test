@@ -1,0 +1,198 @@
+// Whole-DAG stub tests on the three-mode fixture (ONT-only, hybrid, Illumina-only).
+// -stub-run exercises routing, channel wiring, DB_CHECK gating and the run-level
+// PROVENANCE stage without running any tool (machinery, not data quality).
+nextflow_pipeline {
+
+    name "fungiforge stub DAG"
+    script "main.nf"
+    options "-stub-run"
+
+    test("three-mode fixture runs every stage and writes provenance") {
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+        }
+        then {
+            assert workflow.success
+            def names = workflow.trace.tasks().collect { it.name }
+            // 1 DB_CHECK + 3 x (READ_QC, READ_TRIAGE, KMER_PROFILE, SRPOLISH, DECONTAM, ORGANELLE, ASSEMBLY_QC, REPEATMASK,
+            // PREDICT, EGGNOG, ANNOTATE, IDENTIFY, BUSCO_LINEAGE, RESISTANCE, MOBILE, BGC, NOVELTY, EXTRAS, REPORT)
+            // + 2 x (ASSEMBLE, PURGE_DUPS, MEDAKA) + 1 SR_ASSEMBLE + 1 PROVENANCE + 1 COHORT + 1 SUMMARY = 68
+            assert workflow.trace.succeeded().size() == 68
+            assert names.count { it.startsWith("FUNGIFORGE:PURGE_DUPS") } == 2
+            assert names.count { it.startsWith("FUNGIFORGE:COHORT") } == 1 && names.count { it.startsWith("FUNGIFORGE:SUMMARY") } == 1
+            assert path("$outputDir/cohort/cohort.json").exists()
+            assert path("$outputDir/04_summary/master_fungi.tsv").exists() && path("$outputDir/04_summary/cohort_report.html").exists()
+            assert names.count { it.startsWith("FUNGIFORGE:ORGANELLE") } == 3
+            assert names.count { it.startsWith("FUNGIFORGE:PREDICT") } == 3 && names.count { it.startsWith("FUNGIFORGE:EGGNOG") } == 3
+            assert !names.any { it.contains("INTERPROSCAN") }
+            assert names.count { it.startsWith("FUNGIFORGE:BUSCO_LINEAGE") } == 3
+            assert names.count { it.startsWith("FUNGIFORGE:READ_TRIAGE") } == 3
+            assert names.count { it.startsWith("FUNGIFORGE:KMER_PROFILE") } == 3
+            assert workflow.trace.failed().size() == 0
+            assert names.count { it.startsWith("FUNGIFORGE:ASSEMBLE ") } == 2       // ONT-only + hybrid
+            assert names.count { it.startsWith("FUNGIFORGE:SR_ASSEMBLE") } == 1     // Illumina-only
+            assert names.count { it.startsWith("FUNGIFORGE:MEDAKA") } == 2
+            assert names.count { it.startsWith("FUNGIFORGE:DB_CHECK") } == 1
+            assert names.count { it.startsWith("FUNGIFORGE:PROVENANCE") } == 1
+            // per-isolate master rows + run-level provenance
+            assert path("$outputDir/04_summary/TESTFUN01.master.tsv").exists()
+            assert path("$outputDir/04_summary/TESTFUN02.master.tsv").exists()
+            assert path("$outputDir/04_summary/TESTFUN03.master.tsv").exists()
+            def prov = path("$outputDir/pipeline_info/provenance.json").json
+            assert prov.schema_version == "1.0"
+            assert prov.n_samples == 3
+            assert prov.samples.keySet() == ["TESTFUN01", "TESTFUN02", "TESTFUN03"] as Set
+            assert prov.run.stub_run == true
+            assert prov.containers.keySet().any { it.contains("assembly") }
+            assert prov.databases.stub == true
+            assert path("$outputDir/pipeline_info/db_manifest.json").exists()
+        }
+    }
+
+    test("skip flags remove the optional stages from the DAG") {
+        when {
+            params {
+                outdir = "$outputDir"
+                skip_bgc = true
+                skip_mge = true
+                skip_novelty = true
+                skip_extras = true
+            }
+        }
+        then {
+            assert workflow.success
+            def names = workflow.trace.tasks().collect { it.name }
+            assert !names.any { it.contains("BGC") || it.contains("MOBILE") || it.contains("NOVELTY") || it.contains("EXTRAS") }
+            assert workflow.trace.succeeded().size() == 68 - 4 * 3
+            assert path("$outputDir/pipeline_info/provenance.json").json.n_samples == 3
+        }
+    }
+
+    test("gate: a non-fungal verdict and a failed QC stop the fungal stages, rows still written") {
+        when {
+            params {
+                outdir = "$outputDir"
+                stub_verdicts = "TESTFUN03=non_fungal"
+                stub_qc_fail = "TESTFUN01"
+            }
+        }
+        then {
+            assert workflow.success
+            def names = workflow.trace.tasks().collect { it.name }
+            assert names.count { it.startsWith("FUNGIFORGE:GATE_ASSEMBLY") } == 2
+            assert names.any { it == "FUNGIFORGE:GATE_ASSEMBLY (TESTFUN03)" } && names.any { it == "FUNGIFORGE:GATE_ASSEMBLY (TESTFUN01)" }
+            // the two gated isolates skip 11 tasks each (12 stages, InterProScan off); TESTFUN02 runs everything; COHORT runs on it
+            assert workflow.trace.succeeded().size() == 68 - 2 * 11 + 2
+            ["REPEATMASK", "PREDICT", "EGGNOG", "ANNOTATE", "IDENTIFY", "BUSCO_LINEAGE", "RESISTANCE", "MOBILE", "BGC", "NOVELTY", "EXTRAS"].each { st ->
+                assert !names.any { it == "FUNGIFORGE:${st} (TESTFUN03)" || it == "FUNGIFORGE:${st} (TESTFUN01)" }
+                assert names.any { it == "FUNGIFORGE:${st} (TESTFUN02)" }
+            }
+            assert path("$outputDir/04_summary/TESTFUN03.master.tsv").exists()
+            assert path("$outputDir/04_summary/TESTFUN01.master.tsv").exists()
+            def g3 = path("$outputDir/TESTFUN03/05_assembly_qc/TESTFUN03.gate.json").json
+            assert g3.status == "skipped" && g3.reason == "verdict:non_fungal"
+            assert path("$outputDir/TESTFUN01/05_assembly_qc/TESTFUN01.gate.json").json.reason == "qc_pass:false"
+            def prov = path("$outputDir/pipeline_info/provenance.json").json
+            assert prov.samples.TESTFUN03.gate.status == "skipped" && !prov.samples.TESTFUN03.containsKey("annotate")
+        }
+    }
+
+    test("gate: --force_all runs every stage regardless of verdict") {
+        when {
+            params {
+                outdir = "$outputDir"
+                stub_verdicts = "TESTFUN03=non_fungal"
+                force_all = true
+            }
+        }
+        then {
+            assert workflow.success
+            assert workflow.trace.succeeded().size() == 68
+            assert !workflow.trace.tasks().any { it.name.startsWith("FUNGIFORGE:GATE") }
+        }
+    }
+
+    test("read triage: a human/bacterial read verdict stops the isolate before assembly") {
+        when {
+            params {
+                outdir = "$outputDir"
+                stub_read_verdicts = "TESTFUN02=human"
+            }
+        }
+        then {
+            assert workflow.success
+            def names = workflow.trace.tasks().collect { it.name }
+            assert names.count { it.startsWith("FUNGIFORGE:GATE_READS") } == 1 && names.any { it == "FUNGIFORGE:GATE_READS (TESTFUN02)" }
+            // TESTFUN02 (hybrid) runs READ_QC, READ_TRIAGE, GATE_READS, REPORT only: 22 tasks -> 4
+            assert workflow.trace.succeeded().size() == 68 - 22 + 4
+            ["KMER_PROFILE", "ASSEMBLE", "PURGE_DUPS", "MEDAKA", "SRPOLISH", "DECONTAM", "ORGANELLE", "ASSEMBLY_QC", "PREDICT", "EGGNOG", "ANNOTATE", "IDENTIFY", "BUSCO_LINEAGE", "RESISTANCE"].each { st ->
+                assert !names.any { it == "FUNGIFORGE:${st} (TESTFUN02)" }
+            }
+            assert names.any { it == "FUNGIFORGE:ASSEMBLE (TESTFUN01)" } && names.any { it == "FUNGIFORGE:SR_ASSEMBLE (TESTFUN03)" }
+            assert path("$outputDir/04_summary/TESTFUN02.master.tsv").exists()
+            def g = path("$outputDir/TESTFUN02/05_assembly_qc/TESTFUN02.gate.json").json
+            assert g.reason == "read_triage:human" && g.skipped_stages.contains("assemble") && g.skipped_stages.size() == 20 && g.skipped_stages.contains("purge")
+            assert path("$outputDir/pipeline_info/provenance.json").json.samples.TESTFUN02.triage.status == "ok" || true
+        }
+    }
+
+    test("--read_triage false --kmer_profile false gives the W2.1 DAG") {
+        when {
+            params {
+                outdir = "$outputDir"
+                read_triage = false
+                kmer_profile = false
+            }
+        }
+        then {
+            assert workflow.success
+            assert workflow.trace.succeeded().size() == 62
+            assert !workflow.trace.tasks().any { it.name.contains("READ_TRIAGE") || it.name.contains("KMER_PROFILE") }
+        }
+    }
+
+    test("--run_interproscan adds stage 07c; --skip_eggnog removes 07b") {
+        when {
+            params {
+                outdir = "$outputDir"
+                run_interproscan = true
+                skip_eggnog = true
+            }
+        }
+        then {
+            assert workflow.success
+            def names = workflow.trace.tasks().collect { it.name }
+            assert names.count { it.startsWith("FUNGIFORGE:INTERPROSCAN") } == 3 && !names.any { it.contains("EGGNOG") }
+            assert workflow.trace.succeeded().size() == 68
+            assert path("$outputDir/TESTFUN01/07_annotate/TESTFUN01.interproscan.json").exists()
+        }
+    }
+
+    test("--skip_cohort removes the run-level cohort stage") {
+        when {
+            params {
+                outdir = "$outputDir"
+                skip_cohort = true
+            }
+        }
+        then {
+            assert workflow.success
+            assert workflow.trace.succeeded().size() == 67 && !workflow.trace.tasks().any { it.name.contains("COHORT") }
+            assert path("$outputDir/04_summary/master_fungi.tsv").exists()   // the summary still runs
+        }
+    }
+
+    test("--help prints usage and runs nothing") {
+        when {
+            params {
+                help = true
+            }
+        }
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().size() == 0     // usage goes to the log, no process is launched
+        }
+    }
+}

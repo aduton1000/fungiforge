@@ -55,6 +55,13 @@ in `share/`; sets group read/exec; writes `/etc/profile.d/fungiforge.sh` (with
 `--profile-d`, via sudo) so every login gets the launchers on PATH; and with
 `--smoke` runs the 15-stage DAG as `-stub-run` through SLURM.
 
+The public images are pinned to versioned tags/digests in `conf/base.config`; the cache file
+names follow Nextflow's convention (`staphb-flye-2.9.6.img`, `nextgenusfs-funannotate@sha256-….img`),
+so a checkout that changes a pin needs the new file pulled (`fungiforge-fetch-refs images`, or
+rerun the installer) — an older `…-latest.img` in the cache is simply not used. Set
+`params.image_cache_dir` in `site.config` to the same directory as `apptainer.cacheDir` so
+`provenance.json` can record the sha256 of every image a run used.
+
 No Docker on the cluster? Build the two images on any Linux box with Docker
 (`docker build --platform linux/amd64 …`, then `apptainer build x.sif docker-daemon://tag`),
 copy the `.sif` files into `<prefix>/images/`, and rerun the installer with `--skip-images`.
@@ -62,16 +69,92 @@ copy the `.sif` files into `<prefix>/images/`, and rerun the installer with `--s
 ## 2. Reference databases (one-time, hours, resumable)
 
 ```bash
-fungiforge-fetch-refs                       # all steps into $FUNGIFORGE_DB
-fungiforge-fetch-refs unite fungamr busco   # or selected steps
+/hpc/opt/fungiforge/bin/fungiforge-fetch-refs                 # every default step
+/hpc/opt/fungiforge/bin/fungiforge-fetch-refs eggnog genomad  # selected steps
 ```
 
-Some steps run downloader tools inside containers via `docker run` (antiSMASH,
-funannotate, eggNOG) — on a cluster where Docker is available to the installer this
-works as-is; files land root-owned but world-readable. Optional: a free academic
-GeneMark key in `~/.gm_key` (funannotate uses it if present).
+Each database is guarded by a `.done` marker, one failing step never aborts the others, and the
+manifest (`$FUNGIFORGE_DB/MANIFEST.tsv`) records what succeeded. The two databases that are built
+*through* their tool container (funannotate, antiSMASH) run under **Apptainer/Singularity** when
+present and Docker otherwise, so no Docker daemon is needed on a cluster.
+
+| Step | What it stages | Size |
+|:--|:--|:--|
+| `images` | every public image into the shared Apptainer cache | ~40 GB |
+| `funannotate`, `antismash` | annotation and BGC databases (through their containers) | ~40 GB, ~9 GB |
+| `eggnog` | eggNOG 5.0.2 (`eggnog.db`, `eggnog_proteins.dmnd`, taxa) — direct download | ~12 GB |
+| `busco` | `fungi_odb10` plus the order/class lineages of `busco_lineages.tsv`, direct from the BUSCO data server | ~1 GB |
+| `unite`, `kraken2`, `refseq_fungi` | ITS reference, contamination DB, sourmash signatures | ~15 GB |
+| `fungamr` | resistance catalogue + reference proteins + derived panel | small |
+| `markers`, `mlst` | type-material sets for CaM/BenA/TEF1/RPB2/LSU; PubMLST fungal schemes | ~100 MB |
+| `dbcan`, `phibase`, `effectorp` | CAZyme HMMs, virulence proteins, EffectorP 3 | ~300 MB |
+| `genomad` | geNomad database v1.9 | 0.8 GB |
+| `benchmarks` | A1163 and NRRL 3357 reference genomes | ~80 MB |
+| `genomes` *(on request)* | one reference genome per species of `novelty_genera.txt`, for genome-ANI novelty | tens of GB |
+| `interproscan` *(on request)* | InterProScan data release matching the image tag (`--run_interproscan true` to use it) | 6.9 GB |
+
+`site.config` repoints every process label that uses the base image at the locally built `.sif`.
+The installer derives that label list from `conf/base.config` and refreshes it in an existing
+`site.config`, because a label added to the pipeline but missing from the list keeps its Docker Hub
+reference and is pulled mid-run, which fails outright against a private repository.
+
+The multi-GB databases (eggNOG, Kraken 2, geNomad, UNITE) are fetched with `aria2c` when it is
+installed, otherwise `wget -c`, otherwise `curl`. Install `aria2c` if you can: it is the only one of
+the three that downloads in parallel chunks, and on a link that drops connections `curl` restarts a
+transfer from byte 0 each retry, so the file grows and shrinks without ever finishing. Every archive
+is integrity-checked before decompression and deleted if it fails, so a rerun starts clean. The step
+only marks itself done when the decompressed files meet their expected sizes, and one fetch per data
+directory runs at a time: a second one refuses to start rather than writing over the first, and
+names the process holding the lock so you can stop it. Pass `--wait` to queue behind a running
+fetch instead, which is how you line up a second database while a multi-hour download finishes.
+
+Two resources are **licensed** and staged by hand (Appendix A of the upgrade plan):
+
+- **GeneMark-ES** — unpack the academic tarball and pass `--genemark_dir <dir> --genemark_key <key>`
+  (both the directory and the key's directory are bound into the container; the stage copies the
+  key to a per-task `$HOME/.gm_key`, and prediction falls back to Augustus alone, recording why, if
+  the key is unusable)
+  to the run; the profiles bind the directory into the annotation container.
+- **SignalP 6** — `bash bin/hpc_install.sh … --signalp <signalp-6.0*.fast.tar.gz>` builds a
+  site-only image from it and points the extras stage at it in `site.config`.
+
+The `fungiforge` CLI finds the pipeline through `FUNGIFORGE_HOME` (set by `fungiforge-env.sh`),
+falling back to `$FUNGIFORGE_ROOT/repo`, then to its own source tree. It is pip-installed editable
+from `repo/`, so `git -C <install_root>/repo pull` updates the CLI along with the pipeline; an
+installation made before this was the case needs one `pip install -e` to catch up:
+
+```bash
+<install_root>/cli-env/bin/pip install -q --no-cache-dir -e <install_root>/repo
+```
+ Outside a login that sources
+the site environment, set `FUNGIFORGE_HOME` to the checkout or the helper subcommands (`check`,
+`validate`, `check-master`) cannot find `bin/`.
 
 ## 3. Run (any user)
+
+Source the site environment once and the launchers are on `PATH`, so runs are typed without paths:
+
+```bash
+echo '[ -r <install_root>/fungiforge-env.sh ] && source <install_root>/fungiforge-env.sh' >> ~/.bashrc
+# then, from any writable directory:
+fungiforge-run --samplesheet samples.csv --outdir results -resume
+```
+
+If a site runs two installs (a production one hooked in through `/etc/profile.d` and a development
+one sourced from `~/.bashrc`), sourcing order decides which launchers are on `PATH`, and that order
+differs between login and interactive shells. The env file therefore removes any other fungiforge
+install's launchers before prepending its own, and clears `FUNGIFORGE_WORK` so a global scratch
+path cannot leak across: whichever env file is sourced last wins outright. Check with
+`which -a fungiforge-run`, and note that `fungiforge-run` always echoes the pipeline, config and
+work directory it resolved before doing any work.
+
+`fungiforge-env.sh` also carries the site facts that would otherwise be retyped every run:
+`FUNGIFORGE_DB`, the SLURM partition and account, and `FUNGIFORGE_GENEMARK_DIR` /
+`FUNGIFORGE_GENEMARK_KEY`, which `fungiforge-run` passes as `--genemark_dir` / `--genemark_key`
+unless the command line gives its own. GeneMark has to travel as CLI parameters rather than
+`site.config` values, because the engine profiles read them at config-parse time to build the
+container binds, before a `-c` file is merged.
+
 
 ```bash
 mkdir -p ~/runs/batch1 && cd ~/runs/batch1               # run state lives in CWD
@@ -105,7 +188,7 @@ job: `sbatch --wrap 'fungiforge-run --samplesheet samples.csv' --time=7-0 --cpus
 bash /hpc/opt/fungiforge/repo/bin/hpc_install.sh --prefix /hpc/opt/fungiforge --db /hpc/data/fungiforge --group <group> --ref v0.1.1
 ```
 Existing `site.config` / `fungiforge-env.sh` are kept; images are rebuilt only with
-`--rebuild-images` (or when the version in `nextflow.config` changes).
+`--rebuild-images` (or when the version in `nextflow.config` changes). Add `--signalp /path/to/signalp-6.0i.fast.tar.gz` to build the site-only SignalP 6 image for the extras stage (W2.6); it is written next to the other `.sif` files and wired into `site.config`.
 
 ## Notes
 - Launch from a **writable** dir (Nextflow writes `.nextflow/`, `work/`, the log to CWD).
@@ -113,3 +196,26 @@ Existing `site.config` / `fungiforge-env.sh` are kept; images are rebuilt only w
 - `--run_interproscan true` and `--genome_id true` are on in the site config (native speed).
 - Apptainer auto-mounts `$HOME`, `/tmp`, CWD only — anything else referenced in place
   must be in `FUNGIFORGE_BIND` (default `/hpc`).
+
+## Automatic reboots
+
+A run's head process (the `nextflow` started by `fungiforge-run`) lives on the node you launch
+from, and every SLURM task lives on a node. Ubuntu's `unattended-upgrades` with
+`Unattended-Upgrade::Automatic-Reboot "true"` reboots a node at `Automatic-Reboot-Time` whenever a
+kernel update has been installed; with the HWE kernel that is roughly weekly, and on a cluster
+where every node has the same setting all of them reboot the same morning. A run in flight is
+killed (`Session aborted -- Cause: SIGTERM` in `.nextflow.log`; `last -x reboot shutdown` shows
+the reboot) and must be resumed by hand with the same command plus `-resume`; completed stages are
+kept. Check the policy with:
+
+```
+grep -Rh "Automatic-Reboot" /etc/apt/apt.conf.d/ ; ls /var/run/reboot-required 2>/dev/null
+```
+
+Recommendation for a shared cluster: set `Automatic-Reboot "false"` on every node and reboot in a
+maintenance window when `/var/run/reboot-required` appears. Where the policy stays, start long
+runs with `fungiforge-run --submit ...`: the head process then runs as a requeueable SLURM job
+whose command carries `-resume`, so after a reboot SLURM requeues the job and the run continues
+from its cache by itself (state in `.fungiforge-head.{sbatch,log,jobid}` in the run directory;
+`squeue -u $USER` shows the head job as `ff-head-<rundir>`; `scancel <jobid>` stops it).
+Tasks that were running at the reboot are repeated; everything finished is kept.

@@ -1,0 +1,26 @@
+// Stub test for modules/stage01b_kmer.nf — the process must run under -stub-run and emit its stage JSON.
+nextflow_process {
+
+    name "KMER_PROFILE stub"
+    script "modules/stage01b_kmer.nf"
+    process "KMER_PROFILE"
+    options "-stub-run"
+
+    test("emits the stage JSON for one isolate") {
+        when {
+            process {
+                """
+                input[0] = [[id:'S1', assembly_mode:'longread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/test/reads/TESTFUN01.ont.fastq.gz"), file("$baseDir/assets/NO_R1"), file("$baseDir/assets/NO_R2")]
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert process.out.json.size() == 1
+            assert process.out.json[0][1].endsWith('S1.kmer.json')
+            def js = path(process.out.json[0][1]).json
+            assert js.sample == 'S1'
+            assert js.ploidy_hint == 'haploid'
+        }
+    }
+}

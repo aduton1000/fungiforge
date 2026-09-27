@@ -1,0 +1,30 @@
+// Stub test for modules/stage02b_srassemble.nf — the process must run under -stub-run and emit every
+// declared output once, named after the sample (the contract the subworkflow joins on).
+nextflow_process {
+
+    name "SR_ASSEMBLE stub"
+    script "modules/stage02b_srassemble.nf"
+    process "SR_ASSEMBLE"
+    options "-stub-run"
+
+    test("emits every declared output for one isolate") {
+        when {
+            process {
+                """
+                input[0] = [[id:'S1', assembly_mode:'shortread', compartment:'AIR', facility:'F1', season:'Dry'], file("$baseDir/assets/NO_ONT"), file("$baseDir/test/reads/TESTFUN02_R1.fastq.gz"), file("$baseDir/test/reads/TESTFUN02_R2.fastq.gz")]
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert process.out.assembly.size() == 1
+            assert process.out.assembly[0][1].endsWith('S1.assembly.fasta')
+            assert path(process.out.assembly[0][1]).exists()
+            assert process.out.json.size() == 1
+            assert process.out.json[0][1].endsWith('S1.assemble.json')
+            assert path(process.out.json[0][1]).exists()
+            def js = path(process.out.json[0][1]).json
+            assert js.sample == 'S1'
+        }
+    }
+}

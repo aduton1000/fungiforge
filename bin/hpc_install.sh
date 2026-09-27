@@ -27,6 +27,8 @@
 #   --bind PATHS      extra container bind roots           (default /hpc)
 #   --skip-images     don't build the two .sif images / pre-pull public images
 #   --rebuild-images  rebuild the .sif files even if present
+#   --signalp <tgz>   build the site-only SignalP 6 image from the licensed package (env/signalp6.Dockerfile)
+#                     and write the `extras` label override into site.config (W2.6)
 #   --skip-cli        don't create the conda cli-env
 #   --profile-d       write /etc/profile.d/fungiforge.sh via sudo (else prints the snippet)
 #   --smoke           after install, run the stub-run DAG test through SLURM (~2-5 min)
@@ -35,11 +37,12 @@
 set -euo pipefail
 
 PREFIX=/hpc/opt/fungiforge; DB=/hpc/data/fungiforge; GROUP=""; REPO=https://github.com/aduton1000/fungiforge.git
-REF=main; PARTITION=""; BIND=/hpc; SKIP_IMAGES=0; REBUILD_IMAGES=0; SKIP_CLI=0; PROFILE_D=0; SMOKE=0; DRY=0
+REF=main; PARTITION=""; BIND=/hpc; SKIP_IMAGES=0; REBUILD_IMAGES=0; SKIP_CLI=0; PROFILE_D=0; SMOKE=0; DRY=0; SIGNALP_TGZ=""
 while [ $# -gt 0 ]; do case "$1" in
   --prefix) PREFIX="$2"; shift;;   --db) DB="$2"; shift;;   --group) GROUP="$2"; shift;;
   --repo) REPO="$2"; shift;;       --ref) REF="$2"; shift;; --partition) PARTITION="$2"; shift;;
   --bind) BIND="$2"; shift;;       --skip-images) SKIP_IMAGES=1;; --rebuild-images) REBUILD_IMAGES=1;;
+  --signalp) SIGNALP_TGZ="$2"; shift;;
   --skip-cli) SKIP_CLI=1;;         --profile-d) PROFILE_D=1;; --smoke) SMOKE=1;; --dry-run) DRY=1;;
   -h|--help) sed -n '2,36p' "$0"; exit 0;;
   *) echo "unknown option $1" >&2; exit 2;;
@@ -81,14 +84,30 @@ log "layout under $PREFIX (group $GROUP)"
 run mkdir -p "$PREFIX/images/cache" "$PREFIX/bin" "$DB"
 if [ -d "$PREFIX/repo/.git" ]; then
   log "updating repo -> $REF"
-  run git -C "$PREFIX/repo" fetch --tags origin
-  run git -C "$PREFIX/repo" checkout -q "$REF"
-  git -C "$PREFIX/repo" symbolic-ref -q HEAD >/dev/null 2>&1 && run git -C "$PREFIX/repo" pull -q --ff-only || true
+  # Two silent failures lived here: a checkout edited by hand (a regenerated lock) was overwritten
+  # or left half-updated without a word, and `pull --ff-only || true` left a rewritten branch at
+  # its OLD commit while the install carried on and deployed stale code. Refuse the first, and
+  # make a branch ref mean "exactly what origin has now".
+  dirty="$(git -C "$PREFIX/repo" status --porcelain --untracked-files=no)"
+  [ -z "$dirty" ] || die "$PREFIX/repo has local modifications — commit them upstream or discard them (git -C $PREFIX/repo checkout -- .) and rerun:
+$dirty"
+  run git -C "$PREFIX/repo" fetch -q --tags --force origin
+  if git -C "$PREFIX/repo" show-ref -q --verify "refs/remotes/origin/$REF"; then
+    run git -C "$PREFIX/repo" checkout -q -B "$REF" "origin/$REF"
+  else
+    run git -C "$PREFIX/repo" checkout -q "$REF"
+  fi
 else
   log "cloning $REPO -> $PREFIX/repo"
   run git clone -q "$REPO" "$PREFIX/repo"
   run git -C "$PREFIX/repo" checkout -q "$REF"
 fi
+# Fail on bad arguments before anything expensive: an unreadable SignalP package used to surface
+# only after ~35 minutes of image building.
+[ -z "$SIGNALP_TGZ" ] || [ -s "$SIGNALP_TGZ" ] || die "--signalp: '$SIGNALP_TGZ' not found or empty.
+  Stage the licensed package first, e.g.
+    sudo mkdir -p /hpc/opt/licensed/signalp6 && sudo cp ~/signalp-6.0i.fast.tar.gz /hpc/opt/licensed/signalp6/"
+
 REPO_DIR="$PREFIX/repo"
 VERSION="$(grep -oE "version *= *'[^']+'" "$REPO_DIR/nextflow.config" 2>/dev/null | head -1 | sed -E "s/.*'([^']+)'/\1/" || true)"
 [ -n "$VERSION" ] || { [ "$DRY" = 1 ] && VERSION=0.1.0 || die "cannot read manifest.version from $REPO_DIR/nextflow.config"; }
@@ -100,11 +119,41 @@ FF_TAG="aduton1000/fungiforge:$VERSION";      FF_SIF="$PREFIX/images/fungiforge-
 AS_TAG="aduton1000/antismash-ff:8.0.0-r3";    AS_SIF="$PREFIX/images/antismash-ff-8.0.0-r3.sif"
 if [ "$SKIP_IMAGES" = 0 ]; then
   export APPTAINER_TMPDIR="${APPTAINER_TMPDIR:-$PREFIX/images/.tmp}"; mkdir -p "$APPTAINER_TMPDIR"
+  # Guard (W4.1): the base image is normally built from the explicit lock (env/base.linux-64.lock)
+  # so rebuilds reproduce the validated environment byte for byte. The lock is stale when a `==`
+  # pin in env/base.yml is absent from it — checked by CONTENT, not modification time, because a
+  # git checkout stamps every file with the same time. A stale lock would silently ship an image
+  # without the newer tools, so build from base.yml instead and ask for the lock to be refreshed.
+  ENV_SPEC="env/base.linux-64.lock"
+  MISSING_PINS="$(python3 - "$REPO_DIR/env/base.yml" "$REPO_DIR/env/base.linux-64.lock" <<'PY' || true
+import re, sys
+pins = dict(re.findall(r'^\s*- ([A-Za-z0-9_.-]+)==([^\s#]+)', open(sys.argv[1]).read(), re.M))
+have = {}
+for line in open(sys.argv[2]):
+    if line.startswith("https"):
+        fn = line.rsplit("/", 1)[1].split("#")[0]
+        m = re.match(r'(.+?)-(\d[^-]*)-[^-]+\.(conda|tar\.bz2)$', fn)
+        if m:
+            have[m.group(1).lower()] = m.group(2)
+print(" ".join(f"{k}=={v}" for k, v in pins.items() if have.get(k.lower()) != v))
+PY
+)"
+  if [ -n "$MISSING_PINS" ]; then
+    ENV_SPEC="env/base.yml"
+    log "NOTE the lock does not carry these env/base.yml pins: $MISSING_PINS"
+    log "     building the base image from env/base.yml; afterwards regenerate and commit the lock:"
+    log "       bash $REPO_DIR/bin/lock_env.sh $FF_TAG"
+  fi
+
   build_sif(){ # build_sif <tag> <dockerfile> <context> <sif>
     local tag="$1" df="$2" ctx="$3" sif="$4"
     if [ -s "$sif" ] && [ "$REBUILD_IMAGES" = 0 ]; then echo "  have $sif — skip (use --rebuild-images)"; return; fi
     log "docker build $tag  (native linux/amd64)"
-    run docker build --platform linux/amd64 -t "$tag" -f "$df" "$ctx"
+    if [ "$df" = "$REPO_DIR/env/Dockerfile" ]; then
+      run docker build --platform linux/amd64 --build-arg "ENV_SPEC=$ENV_SPEC" -t "$tag" -f "$df" "$ctx"
+    else
+      run docker build --platform linux/amd64 -t "$tag" -f "$df" "$ctx"
+    fi
     log "convert -> $sif"
     # build to a temp name and rename only on success: an interrupted build (ssh drop,
     # Ctrl-C) must never leave a truncated .sif that a rerun would treat as finished.
@@ -114,9 +163,32 @@ if [ "$SKIP_IMAGES" = 0 ]; then
   }
   build_sif "$FF_TAG" "$REPO_DIR/env/Dockerfile"              "$REPO_DIR"     "$FF_SIF"
   build_sif "$AS_TAG" "$REPO_DIR/env/antismash-ff.Dockerfile" "$REPO_DIR/env" "$AS_SIF"
+  # W2.6: site-only SignalP 6 image from the licensed package (never pushed); the `extras` label is
+  # pointed at it in site.config below. Rebuilt whenever the base image is rebuilt (--rebuild-images).
+  if [ -n "$SIGNALP_TGZ" ]; then
+    SP_SIF="$PREFIX/images/fungiforge-signalp6-$VERSION.sif"; SP_TAG="aduton1000/fungiforge-signalp6:$VERSION"
+    if [ -s "$SP_SIF" ] && [ "$REBUILD_IMAGES" = 0 ]; then echo "  have $SP_SIF — skip (use --rebuild-images)"; else
+      SP_CTX="$(mktemp -d)"; run cp "$SIGNALP_TGZ" "$SP_CTX/signalp6.tar.gz"
+      log "docker build $SP_TAG from $(basename "$SIGNALP_TGZ")"
+      run docker build --platform linux/amd64 --build-arg "BASE=$FF_TAG" --build-arg SIGNALP_TGZ=signalp6.tar.gz \
+          -t "$SP_TAG" -f "$REPO_DIR/env/signalp6.Dockerfile" "$SP_CTX"
+      run rm -f "$SP_SIF" "$SP_SIF.part"; run "$RT" build "$SP_SIF.part" "docker-daemon://$SP_TAG"; run mv "$SP_SIF.part" "$SP_SIF"; rm -rf "$SP_CTX"
+      run "$RT" exec "$SP_SIF" bash -c 'signalp6 --help >/dev/null && echo "  signalp6 OK"'
+    fi
+  fi
   log "sanity: tools inside the images"
-  run "$RT" exec "$FF_SIF" bash -c 'ps --version | head -1; fungiforge version; ITSx -h 2>&1 | head -1; sourmash --version'
+  run "$RT" exec "$FF_SIF" bash -c 'ps --version | head -1; fungiforge version; ITSx -h 2>&1 | head -1; sourmash --version; nQuire 2>&1 | head -1; bigscape --version; multiqc --version; purge_dups 2>&1 | head -1'
   run "$RT" exec "$AS_SIF" bash -c 'ps --version | head -1; antismash --version'
+  # Verify the SignalP image even when the build was skipped: an image that exists is not an image
+  # that works, and a broken one shows up only as "signalp6: command not found" in a stage JSON
+  # after the extras stage has already run.
+  if [ -n "${SP_SIF:-}" ] && [ -s "${SP_SIF:-}" ]; then
+    if "$RT" exec "$SP_SIF" bash -c 'command -v signalp6 >/dev/null' 2>/dev/null; then
+      run "$RT" exec "$SP_SIF" bash -c 'signalp6 --version 2>&1 | head -1 || echo "signalp6 present"'
+    else
+      warn "$SP_SIF has no signalp6 on PATH — rebuild it with --signalp <tgz> --rebuild-images"
+    fi
+  fi
   log "pre-pull public images into the shared cache (funannotate ≈15 GB — be patient)"
   export FUNGIFORGE_DB="$DB" NXF_APPTAINER_CACHEDIR="$PREFIX/images/cache" NXF_SINGULARITY_CACHEDIR="$PREFIX/images/cache"
   if [ "$DRY" = 0 ]; then
@@ -134,7 +206,15 @@ if [ "$SKIP_CLI" = 0 ]; then
     export CONDA_PKGS_DIRS="${CONDA_PKGS_DIRS:-$HOME/.conda/pkgs}"
     run "$CONDA" create -y -q -p "$PREFIX/cli-env" -c conda-forge python=3.11 pip
   fi
-  run "$PREFIX/cli-env/bin/pip" install -q --no-cache-dir "$REPO_DIR"
+  # Editable: the pipeline (main.nf, bin/, conf/) is already read live from $REPO_DIR, so a
+  # copied package only adds a second version of the CLI that a `git pull` silently leaves stale.
+  # Uninstall first: a real `fungiforge/` directory left in site-packages by an earlier
+  # non-editable install SHADOWS the editable finder, so the CLI silently keeps serving the old
+  # subcommands (a cluster install went on offering only run/samplesheet/fetch-refs/version long
+  # after check, validate and check-master existed in the checkout).
+  run "$PREFIX/cli-env/bin/pip" uninstall -y -q fungiforge >/dev/null 2>&1 || true
+  run "$PREFIX/cli-env/bin/pip" install -q --no-cache-dir -e "$REPO_DIR"
+  run "$PREFIX/cli-env/bin/fungiforge" --help >/dev/null
   run "$PREFIX/cli-env/bin/fungiforge" version
 fi
 
@@ -144,14 +224,56 @@ if [ "$DRY" = 0 ]; then
   for need in share/site.config.example share/fungiforge-env.sh.example share/bin/fungiforge-run bin/fetch_references.sh bin/preflight_qc.sh; do
     [ -f "$REPO_DIR/$need" ] || die "$REPO_DIR/$need missing — the deployed ref '$REF' predates the HPC kit; push the latest main (or pass --ref) and rerun"
   done
+  # Every label whose container is params.fungiforge_image must be repointed at the .sif this
+  # install built. Derive the list from conf/base.config instead of trusting the template: a label
+  # added to the pipeline but missing from the selector sends that one stage to Docker Hub, which
+  # fails mid-run on a private image (stage 16 COHORT did exactly that).
+  BASE_LABELS="$(sed -n 's/^[[:space:]]*withLabel:[[:space:]]*\([a-z_]*\).*params\.fungiforge_image.*/\1/p' \
+                   "$REPO_DIR/conf/base.config" | paste -sd'|' -)"
+  [ -n "$BASE_LABELS" ] || die "could not read the base-image labels from $REPO_DIR/conf/base.config"
+  log "base-image labels: $BASE_LABELS"
   if [ ! -f "$PREFIX/site.config" ]; then
     sed -e "s#/hpc/opt/fungiforge#$PREFIX#g" \
-        -e "s#fungiforge-0.1.0.sif#$(basename "$FF_SIF")#" \
+        -e "s#fungiforge-[0-9][0-9.a-z-]*\.sif#$(basename "$FF_SIF")#" \
+        -e "s#^\([[:space:]]*withLabel:[[:space:]]*\)'[a-z_|]*'\([[:space:]]*{[[:space:]]*container[^}]*fungiforge-\)#\1'$BASE_LABELS'\2#" \
         "$REPO_DIR/share/site.config.example" > "$PREFIX/site.config"
     if [ -n "$PARTITION" ]; then   # (no sed -i: differs between GNU and BSD)
       sed "s#// slurm_partition = 'global'.*#slurm_partition = '$PARTITION'#" "$PREFIX/site.config" > "$PREFIX/site.config.tmp" && mv "$PREFIX/site.config.tmp" "$PREFIX/site.config"
     fi
-  else echo "  keeping existing $PREFIX/site.config"; fi
+  else
+    echo "  keeping existing $PREFIX/site.config"
+    # the .sif paths are derived, not user tuning: repoint them at what this install built,
+    # otherwise a version bump leaves the config on a file that no longer exists.
+    # Same reasoning as above: an existing site.config predates any label added since it was
+    # written, so refresh the selector before touching the image paths.
+    CUR_LABELS="$(sed -n "s#^[[:space:]]*withLabel:[[:space:]]*'\([a-z_|]*\)'.*fungiforge-[0-9].*#\1#p" "$PREFIX/site.config" | head -1)"
+    if [ -n "$CUR_LABELS" ] && [ "$CUR_LABELS" != "$BASE_LABELS" ]; then
+      sed "s#'$CUR_LABELS'#'$BASE_LABELS'#" "$PREFIX/site.config" > "$PREFIX/site.config.tmp" && mv "$PREFIX/site.config.tmp" "$PREFIX/site.config"
+      echo "  site.config: base-image labels -> $BASE_LABELS (was $CUR_LABELS)"
+    fi
+    for pair in "fungiforge-[0-9][0-9.a-z-]*\.sif:$(basename "$FF_SIF")" "antismash-ff-[0-9][0-9.a-z-]*\.sif:$(basename "$AS_SIF")"; do
+      pat="${pair%%:*}"; new="${pair##*:}"
+      if grep -qE "$pat" "$PREFIX/site.config" && ! grep -q "$new" "$PREFIX/site.config"; then
+        sed -E "s#$pat#$new#g" "$PREFIX/site.config" > "$PREFIX/site.config.tmp" && mv "$PREFIX/site.config.tmp" "$PREFIX/site.config"
+        echo "  site.config: image path -> $new"
+      fi
+    done
+  fi
+  # withName, not withLabel. The base-image override is a withLabel selector that also matches
+  # `extras`, and two label selectors on one process are ambiguous: the base image won, so the
+  # extras stage ran without SignalP and reported "signalp6: command not found" while a perfectly
+  # good SignalP image sat unused. withName takes documented priority over withLabel whatever the
+  # order, and leaving `extras` in the base list keeps it working when no SignalP image exists.
+  if [ -n "${SP_SIF:-}" ] && [ -s "${SP_SIF:-}" ]; then
+    if grep -q "withLabel: *extras *{ *container.*fungiforge-signalp6" "$PREFIX/site.config"; then
+      sed -E "s#withLabel: *extras *\{ *container#withName: EXTRAS { container#" \
+          "$PREFIX/site.config" > "$PREFIX/site.config.tmp" && mv "$PREFIX/site.config.tmp" "$PREFIX/site.config"
+      echo "  site.config: SignalP override migrated from withLabel:extras to withName:EXTRAS"
+    elif ! grep -q "fungiforge-signalp6" "$PREFIX/site.config"; then
+      printf '\n// W2.6: the site-built SignalP 6 image (licensed package) runs the extras stage.\n// withName beats the withLabel base-image override, which also matches this process.\nprocess { withName: EXTRAS { container = %s } }\n' "'$SP_SIF'" >> "$PREFIX/site.config"
+      echo "  site.config: EXTRAS -> $SP_SIF"
+    fi
+  fi
   if [ ! -f "$PREFIX/fungiforge-env.sh" ]; then
     sed -e "s#^export FUNGIFORGE_ROOT=.*#export FUNGIFORGE_ROOT=\"$PREFIX\"#" \
         -e "s#^export FUNGIFORGE_DB=.*#export FUNGIFORGE_DB=\"$DB\"#" \
@@ -159,6 +281,47 @@ if [ "$DRY" = 0 ]; then
         -e "s#^export FUNGIFORGE_BIND=.*#export FUNGIFORGE_BIND=\"$BIND\"#" \
         "$REPO_DIR/share/fungiforge-env.sh.example" > "$PREFIX/fungiforge-env.sh"
   else echo "  keeping existing $PREFIX/fungiforge-env.sh"; fi
+  # An env file written before the PATH fix lets another install's launchers win by accident of
+  # sourcing order. Inject the prune block rather than overwriting the user's edits.
+  if ! grep -q "_ff_prune_path" "$PREFIX/fungiforge-env.sh"; then
+    python3 - "$PREFIX/fungiforge-env.sh" <<'PY'
+import sys
+p = sys.argv[1]; s = open(p).read()
+needle = 'export PATH="$FUNGIFORGE_ROOT/bin:'
+i = s.find(needle)
+if i < 0:
+    print("  NOTE could not find the PATH line in the env file; left untouched"); raise SystemExit(0)
+block = (
+ '# Drop any OTHER fungiforge install\'s launchers first: with two on PATH, `fungiforge-run`\n'
+ '# resolves by accident of sourcing order, which differs between login and interactive shells.\n'
+ '_ff_prune_path() {\n'
+ '  local _out="" _p _old_ifs="$IFS"\n'
+ '  IFS=:; set -- $PATH; IFS="$_old_ifs"\n'
+ '  for _p in "$@"; do\n'
+ '    case "$_p" in\n'
+ '      */fungiforge*/bin) continue ;;\n'
+ '    esac\n'
+ '    _out="${_out:+$_out:}$_p"\n'
+ '  done\n'
+ '  PATH="$_out"\n'
+ '}\n'
+ '_ff_prune_path; unset -f _ff_prune_path\n'
+ '# Another install may have exported a global scratch path; clear it so the launcher uses\n'
+ '# work/ inside the directory the run is started from.\n'
+ 'unset FUNGIFORGE_WORK\n')
+open(p, "w").write(s[:i] + block + s[i:])
+print("  fungiforge-env.sh: PATH prune + FUNGIFORGE_WORK reset injected")
+PY
+  fi
+  # An env file written before 2026-09-25 does not mark itself loaded, so fungiforge-run sourced it
+  # again and its FUNGIFORGE_WORK reset discarded a work dir set on the command line.
+  if ! grep -q "FUNGIFORGE_ENV_LOADED" "$PREFIX/fungiforge-env.sh"; then
+    printf '%s\n' '# Record that this file is loaded, so fungiforge-run does not source it a second time and undo a' \
+      '# FUNGIFORGE_WORK (or any other variable) set on the command line for one run.' \
+      'FUNGIFORGE_ENV_LOADED="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"; export FUNGIFORGE_ENV_LOADED' \
+      >> "$PREFIX/fungiforge-env.sh"
+    echo "  fungiforge-env.sh: FUNGIFORGE_ENV_LOADED marker appended"
+  fi
 
   cat > "$PREFIX/bin/fungiforge-run" <<EOF
 #!/usr/bin/env bash
