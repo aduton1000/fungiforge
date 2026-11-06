@@ -1,14 +1,28 @@
 cff-version: 1.2.0
-message: "If you use FungiForge, please cite it."
-title: "FungiForge: reproducible fungal genomics from ONT, Illumina, or hybrid"
+message: "If you use FungiForge, please cite it as below."
+title: "FungiForge: reproducible fungal genomics from Oxford Nanopore, Illumina, or hybrid reads (assembly -> annotation -> antifungal resistance -> biosynthetic gene clusters -> comparative analysis)"
+abstract: >-
+  FungiForge is an organism-agnostic Nextflow DSL2 + Python pipeline for fungal
+  genomics from Oxford Nanopore, Illumina, or a hybrid of both. Each isolate is routed
+  automatically by its reads: long-read assembly (Flye + Medaka, optionally Illumina-polished)
+  when ONT data are present, or short-read assembly (SPAdes) from Illumina alone. It then
+  performs eukaryotic genome annotation, ITS and whole-genome identification, antifungal-
+  resistance calling, mobile-element/transposon/mycovirus detection, biosynthetic gene
+  cluster discovery, novelty assessment and One Health comparative analysis. It is the
+  fungal sibling of the forge family (CaptureForge, CallForge, MethylForge).
 authors:
-  - family-names: Adu
-    given-names: Bright
-    alias: aduton1000
+  - family-names: "Adu"
+    given-names: "Bright"
+    alias: "aduton1000"
+    orcid: "https://orcid.org/0000-0002-3622-2137"
+    affiliation: "Genomics & Bioinformatics Core, Noguchi Memorial Institute for Medical Research, University of Ghana, Legon, Ghana"
 version: 0.2.0
+date-released: "2026-09-27"
 license: MIT
+type: software
 repository-code: "https://github.com/aduton1000/fungiforge"
 keywords:
+  - bioinformatics
   - fungal genomics
   - nanopore
   - illumina
@@ -17,3 +31,8 @@ keywords:
   - biosynthetic gene clusters
   - Funannotate
   - nextflow
+references:
+  - type: software
+    title: "CallForge: a targeted-capture germline analysis pipeline"
+    repository-code: "https://github.com/aduton1000/callforge"
+    notes: "Sibling pipeline in the forge family; shares the configuration-over-code design pattern."
